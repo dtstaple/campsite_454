@@ -1,0 +1,24 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+addopts = "-v --strict-markers --cov --cov-report=term-missing --cov-report=xml"
+markers = [
+    "unit: fast isolated tests",
+    "integration: tests requiring the database or external services",
+]
+
+[tool.coverage.run]
+branch = true
+omit = ["*/tests/*", "*/.venv/*", "*/migrations/*"]
+
+[tool.coverage.report]
+fail_under = 70
+show_missing = true
+skip_empty = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
