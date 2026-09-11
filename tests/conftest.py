@@ -22,9 +22,11 @@ def env(monkeypatch):
         def test_something(env):
             env({"DATABASE_URL": "postgres://localhost/test"})
     """
+
     def _set(values: dict):
         for key, value in values.items():
             monkeypatch.setenv(key, value)
+
     return _set
 
 
