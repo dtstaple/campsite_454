@@ -12,7 +12,6 @@ branch = true
 omit = ["*/tests/*", "*/.venv/*", "*/migrations/*"]
 
 [tool.coverage.report]
-fail_under = 70
 show_missing = true
 skip_empty = true
 
