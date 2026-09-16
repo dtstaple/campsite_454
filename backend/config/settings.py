@@ -5,10 +5,15 @@ Django settings for config project.
 import os
 from pathlib import Path
 
+import dj_database_url
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
+# BASE_DIR is /backend (this file is /backend/config/settings.py). The .env lives at the
+# repo root so Docker Compose and Django read the same file — see docs/setup.md.
 BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(BASE_DIR / ".env")
+REPO_ROOT = BASE_DIR.parent
+load_dotenv(REPO_ROOT / ".env")
 
 SECRET_KEY = os.environ.get("SECRET_KEY", "django-insecure-dev-only-change-me")
 DEBUG = os.environ.get("DEBUG", "True") == "True"
@@ -21,6 +26,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.gis",
     "rest_framework",
     "corsheaders",
     "health",
@@ -57,16 +63,26 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 
+DATABASE_URL = os.environ.get("DATABASE_URL")
+if not DATABASE_URL:
+    raise ImproperlyConfigured(
+        "DATABASE_URL is not set. Copy .env.example to .env at the repo root and fill it "
+        "in, then start the database with `docker compose up -d` (see docs/setup.md)."
+    )
+
 DATABASES = {
-    "default": {
-        "ENGINE": os.environ.get("DB_ENGINE", "django.db.backends.sqlite3"),
-        "NAME": os.environ.get("DB_NAME", BASE_DIR / "db.sqlite3"),
-        "USER": os.environ.get("DB_USER", ""),
-        "PASSWORD": os.environ.get("DB_PASSWORD", ""),
-        "HOST": os.environ.get("DB_HOST", ""),
-        "PORT": os.environ.get("DB_PORT", ""),
-    }
+    "default": dj_database_url.parse(
+        DATABASE_URL,
+        conn_max_age=600,
+        engine="django.contrib.gis.db.backends.postgis",
+    )
 }
+
+# Django 5.1 locates GDAL by probing names for versions 3.0-3.8 only, so a newer Homebrew
+# GDAL is never found and django.contrib.gis fails to import. Both are set in .env.example;
+# when unset these stay None, which Django treats as "search the default paths" (Linux).
+GDAL_LIBRARY_PATH = os.environ.get("GDAL_LIBRARY_PATH")
+GEOS_LIBRARY_PATH = os.environ.get("GEOS_LIBRARY_PATH")
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
