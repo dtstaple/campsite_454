@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "health",
     "geodata",
+    "pipeline",
 ]
 
 MIDDLEWARE = [
