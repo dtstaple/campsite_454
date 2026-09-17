@@ -1,6 +1,8 @@
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = "test_*.py"
+DJANGO_SETTINGS_MODULE = "config.settings"
+pythonpath = ["backend"]
 addopts = "-v --strict-markers --cov --cov-report=term-missing --cov-report=xml"
 markers = [
     "unit: fast isolated tests",
@@ -21,3 +23,12 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+# Django generates migrations and re-generates them on schema changes, so they are
+# not hand-maintained. Long lines there are copied help_text at deep indentation.
+"*/migrations/*" = ["E501"]
+
+[tool.ruff.lint.isort]
+# Our own Django apps, so they sort as first-party rather than third-party.
+known-first-party = ["config", "geodata", "health", "pipeline"]

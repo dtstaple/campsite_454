@@ -1,4 +1,4 @@
-cat > .gitignore << 'EOF'
+
 # ---------- Secrets and environment ----------
 .env
 .env.*
