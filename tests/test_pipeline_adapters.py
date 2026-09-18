@@ -17,7 +17,7 @@ from django.contrib.gis.geos import LineString, Point, Polygon
 from django.core.management import call_command
 from django.core.management.base import CommandError
 
-from geodata.models import Campsite, IngestRun, PublicLand, Trail
+from geodata.models import Campsite, IngestRun, PublicLand, Trail, WaterFeature
 from pipeline.adapters import (
     GeometryTypeMismatch,
     SourceAdapter,
@@ -395,3 +395,58 @@ def test_command_fails_usefully_on_unknown_names(clean_registry):
 
     with pytest.raises(CommandError, match="Both <source> and <region> are required"):
         call_command("ingest")
+
+
+def test_a_generic_geometry_column_accepts_mixed_types_without_promotion(clean_registry):
+    """WaterFeature.geom is a bare GeometryField, which is the case NHD needs.
+
+    NHD delivers streams as lines and lakes as polygons in the same dataset, in NAD83.
+    Both must land in one column, reprojected, with their own geometry type intact --
+    not coerced into a Multi container the way a typed column would coerce them.
+    """
+    flowline = LineString((-74.05, 44.11), (-74.04, 44.12), srid=4326)
+    waterbody = VALID_RING.clone()
+
+    class MixedWaterAdapter(SourceAdapter):
+        name = "mixed-water"
+        source = WaterFeature.Source.NHD
+        model = WaterFeature
+        source_srid = 4269  # NHD's native projection, as the real adapter will declare
+
+        def fetch(self, aoi):
+            return [None]
+
+        def normalize(self, raw):
+            return [
+                {
+                    "source_id": "nhd-flowline-1",
+                    "geom": flowline.transform(4269, clone=True),
+                    "feature_type": WaterFeature.FeatureType.STREAM,
+                    "perennial": True,
+                },
+                {
+                    "source_id": "nhd-waterbody-1",
+                    "geom": waterbody.transform(4269, clone=True),
+                    "feature_type": WaterFeature.FeatureType.LAKE,
+                    "perennial": None,
+                },
+            ]
+
+    clean_registry.register(MixedWaterAdapter)
+    run = MixedWaterAdapter().run(ADK)
+
+    assert run.status == IngestRun.Status.SUCCESS
+    assert run.record_count == 2
+
+    stream = WaterFeature.objects.get(source_id="nhd-flowline-1")
+    lake = WaterFeature.objects.get(source_id="nhd-waterbody-1")
+
+    # Each keeps its own shape -- a generic column does not force a Multi container.
+    assert stream.geom.geom_type == "LineString"
+    assert lake.geom.geom_type == "Polygon"
+
+    # Both reprojected out of NAD83 into the storage CRS.
+    assert stream.geom.srid == 4326
+    assert lake.geom.srid == 4326
+    assert stream.geom.coords[0][0] == pytest.approx(-74.05, abs=1e-6)
+    assert lake.geom.extent == pytest.approx(waterbody.extent, abs=1e-6)
