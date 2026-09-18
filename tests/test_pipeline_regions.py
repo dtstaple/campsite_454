@@ -129,3 +129,70 @@ def test_a_custom_config_can_add_a_region_without_touching_code(tmp_path):
     assert list(areas) == ["north-cascades"]
     assert areas["north-cascades"].states == ("WA",)
     assert get_region("north-cascades", path).label == "North Cascades"
+
+
+# --- tiling: pure geometry, no database -----------------------------------------------
+
+
+def test_an_area_that_already_fits_yields_itself_unchanged():
+    aoi = get_region("adirondacks")
+
+    tiles = list(aoi.tile(50.0))
+
+    assert tiles == [aoi]
+    assert tiles[0] is aoi
+
+
+def test_tiling_divides_into_the_expected_grid():
+    aoi = AreaOfInterest(name="box", label="Box", bbox=(-75.0, 43.0, -73.0, 44.0))
+
+    tiles = list(aoi.tile(1.0))  # 2 wide x 1 tall
+
+    assert len(tiles) == 2
+    assert [t.bbox for t in tiles] == [
+        (-75.0, 43.0, -74.0, 44.0),
+        (-74.0, 43.0, -73.0, 44.0),
+    ]
+
+
+def test_tiles_cover_the_original_area_exactly_with_no_gaps():
+    aoi = get_region("maine")
+
+    tiles = list(aoi.tile(0.7))
+
+    union = tiles[0].as_polygon()
+    for tile in tiles[1:]:
+        union = union.union(tile.as_polygon())
+
+    assert union.equals(aoi.as_polygon())
+    # Outer edges snap back to the original bounds rather than drifting.
+    assert min(t.min_lon for t in tiles) == aoi.min_lon
+    assert max(t.max_lon for t in tiles) == aoi.max_lon
+    assert min(t.min_lat for t in tiles) == aoi.min_lat
+    assert max(t.max_lat for t in tiles) == aoi.max_lat
+
+
+def test_a_ragged_division_still_tiles_correctly():
+    """2.1 degrees at 0.7 each is exactly 3, not 4 -- float division must not round up."""
+    aoi = AreaOfInterest(name="ragged", label="Ragged", bbox=(-75.4, 43.0, -73.3, 43.7))
+
+    tiles = list(aoi.tile(0.7))
+
+    assert len(tiles) == 3
+
+
+def test_tiles_keep_the_parent_metadata_and_get_traceable_names():
+    aoi = get_region("adirondacks")
+
+    tiles = list(aoi.tile(1.0))
+
+    assert all(t.states == ("NY",) for t in tiles)
+    assert all(t.label == aoi.label for t in tiles)
+    assert all(t.name.startswith("adirondacks/tile-") for t in tiles)
+
+
+def test_a_non_positive_tile_size_is_rejected():
+    aoi = get_region("adirondacks")
+
+    with pytest.raises(InvalidAreaOfInterest, match="must be positive"):
+        list(aoi.tile(0))
