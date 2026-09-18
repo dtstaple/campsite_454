@@ -5,3 +5,40 @@ Install Docker Desktop and make sure it's running. From the repo root, copy
 to start PostgreSQL 16 with PostGIS 3.4. Verify it's working with
 `docker compose exec db psql -U campsite -d campsite -c "SELECT postgis_version();"`.
 Stop it with `docker compose down`; data persists in a named volume between restarts.
+
+## Django to the database
+
+Django reads the same repo-root `.env`, so there is only one file to maintain. Set a real
+local password in **both** `POSTGRES_PASSWORD` and the password inside `DATABASE_URL` — they
+have to match or the connection is refused. `DATABASE_URL` uses the `postgis://` scheme and
+`localhost` as the host, because `manage.py` runs on your machine while Compose publishes
+port 5432.
+
+```
+source .venv/bin/activate
+pip install -r requirements.txt
+cd backend
+python manage.py migrate
+```
+
+Confirm the tables really landed in PostGIS rather than a stray SQLite file:
+
+```
+docker compose exec db psql -U campsite -d campsite -c "\dt"
+```
+
+GeoDjango needs GDAL and GEOS on the host: `brew install gdal geos` on macOS.
+
+One gotcha worth knowing about. Django 5.1 searches for the GDAL library by name and only
+knows about versions 3.0 through 3.8, so a current Homebrew GDAL (3.9+) is never found and
+you get `Could not find the GDAL library`. The fix is already in `.env.example` — keep
+`GDAL_LIBRARY_PATH` and `GEOS_LIBRARY_PATH` set:
+
+```
+GDAL_LIBRARY_PATH=/opt/homebrew/opt/gdal/lib/libgdal.dylib
+GEOS_LIBRARY_PATH=/opt/homebrew/opt/geos/lib/libgeos_c.dylib
+```
+
+Those `/opt/homebrew/opt/...` paths are stable symlinks that follow Homebrew upgrades, so
+they do not need updating when GDAL bumps. On Intel Macs substitute `/usr/local`. On Linux
+the libraries are normally on the default search path and both variables can be omitted.

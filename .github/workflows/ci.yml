@@ -5,6 +5,30 @@ on: [push, pull_request]
 jobs:
   quality:
     runs-on: ubuntu-latest
+
+    # The test suite talks to a real PostGIS database rather than mocking it, so the
+    # spatial columns, GiST indexes, and unique constraints are verified for real.
+    services:
+      postgis:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_DB: campsite
+          POSTGRES_USER: campsite
+          # Throwaway password for an ephemeral service container that only exists
+          # for the duration of this job. Not a real credential.
+          POSTGRES_PASSWORD: ci-postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgis://campsite:ci-postgres@localhost:5432/campsite
+      SECRET_KEY: ci-only-not-a-real-secret
+
     steps:
       - uses: actions/checkout@v4
 
@@ -12,6 +36,16 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
+
+      # GeoDjango loads these at import time. Ubuntu's GDAL is within the version
+      # range Django probes for by name, so no GDAL_LIBRARY_PATH is needed here.
+      - name: Install GDAL and GEOS
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            binutils libproj-dev gdal-bin libgdal-dev libgeos-dev
+          gdal-config --version
+          ldconfig -p | grep -E 'libgdal|libgeos_c' || true
 
       - name: Install dependencies
         run: pip install -r requirements.txt

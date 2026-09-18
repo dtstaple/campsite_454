@@ -1,0 +1,48 @@
+# Areas of interest for the ingestion pipeline.
+#
+# Bounding boxes are [min_lon, min_lat, max_lon, max_lat] in EPSG:4326 (WGS84 decimal
+# degrees). That CRS is a contract, not a setting -- see AreaOfInterest.SRID. Adapters
+# declare their own source projection and the framework reprojects; nothing here does.
+#
+# Boxes are deliberately approximate. They are ingestion extents, not legal boundaries:
+# generous enough not to clip features at the edges, tight enough to keep Overpass and
+# NHD requests reasonable. Legal camping status comes from PAD-US, never from these.
+#
+# Northeast US is the current sprint. West Coast (CO, OR, WA, CA) and Alaska arrive in
+# later sprints as additional entries in this file -- adding a region is a config change,
+# never a code change. Alaska will need much larger extents and has far sparser OSM trail
+# coverage, so expect its trail ingest to return comparatively little.
+
+regions:
+  adirondacks:
+    label: Adirondack Park
+    bbox: [-75.40, 43.00, -73.30, 44.90]
+    states: [NY]
+    notes: >
+      Roughly the Blue Line. Large amounts of Forest Preserve where dispersed camping is
+      legal, which makes it the best region to validate the scoring model against.
+
+  white-mountains-nh:
+    label: White Mountains
+    bbox: [-72.00, 43.85, -70.95, 44.55]
+    states: [NH]
+    notes: >
+      White Mountain National Forest and the Presidential Range. Dense trail network and
+      heavy AMC hut infrastructure, so expect many closely spaced candidate sites.
+
+  green-mountains-vt:
+    label: Green Mountains
+    bbox: [-73.30, 42.73, -72.40, 44.55]
+    states: [VT]
+    notes: >
+      Green Mountain National Forest plus the Long Trail corridor. Long and narrow, so the
+      bbox covers a fair amount of private land that PAD-US will need to exclude.
+
+  maine:
+    label: Maine
+    bbox: [-71.10, 42.97, -66.85, 47.46]
+    states: [ME]
+    notes: >
+      Whole-state extent covering Baxter, the Hundred Mile Wilderness, and the North Maine
+      Woods. Much larger than the other three; consider splitting it into sub-regions if
+      ingest runs get slow.
