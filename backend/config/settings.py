@@ -102,3 +102,22 @@ STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 CORS_ALLOWED_ORIGINS = os.environ.get("CORS_ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+
+# GEOS logs a warning for every ring it finds invalid while reading source geometry.
+# Real data produces these in bulk -- one small PAD-US bounding box emitted 149 lines,
+# and NHD will emit thousands -- which buries anything worth reading. Raising this logger
+# to ERROR keeps genuine failures visible while dropping the per-ring notices. The
+# framework still records every skipped record in IngestRun.notes, so nothing is lost.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "root": {"handlers": ["console"], "level": "INFO"},
+    "loggers": {
+        "django.contrib.gis": {
+            "handlers": ["console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+    },
+}
