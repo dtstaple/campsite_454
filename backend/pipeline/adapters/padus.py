@@ -48,24 +48,21 @@ import json
 from collections.abc import Iterable, Iterator
 from typing import Any
 
-import requests
 from django.contrib.gis.geos import GEOSGeometry
 
 from geodata.models import PublicLand
 from pipeline.adapters.base import SourceAdapter
 from pipeline.adapters.registry import register
 from pipeline.aoi import AreaOfInterest
+from pipeline.arcgis import ArcGisError, ArcGisFeatureClient, ArcGisResponseError
+
+# The transport-level failures are the shared ArcGIS ones; aliased so callers of this
+# module keep a PAD-US-flavoured name.
+PadusError = ArcGisError
+PadusResponseError = ArcGisResponseError
 
 
-class PadusError(Exception):
-    """Base for every failure this adapter raises."""
-
-
-class PadusResponseError(PadusError):
-    """The service was unreachable, errored, or returned something unusable."""
-
-
-class UnknownPublicAccessCode(PadusError):
+class UnknownPublicAccessCode(ArcGisError):
     """PAD-US returned a Pub_Access code we have no mapping for."""
 
 
@@ -118,90 +115,18 @@ class PadusAdapter(SourceAdapter):
 
     # --- fetch ------------------------------------------------------------------------
 
-    def fetch(self, aoi: AreaOfInterest) -> Iterator[list[dict]]:
-        """Yield pages of GeoJSON features for `aoi`, newest request last.
-
-        A generator rather than one accumulated list, so the framework can batch rows
-        into the database while later pages are still being fetched.
-        """
-        session = requests.Session()
-        session.headers["User-Agent"] = self.USER_AGENT
-
-        offset = 0
-        for _ in range(self.max_pages):
-            payload = self._request_page(session, aoi, offset)
-
-            features = payload.get("features")
-            if features is None:
-                raise PadusResponseError(
-                    f"PAD-US response at offset {offset} has no 'features' key; "
-                    f"got keys {sorted(payload)}"
-                )
-
-            # An empty page means we have run off the end, whatever the flag says.
-            if not features:
-                return
-
-            yield features
-
-            # Advance by what arrived, not by page_size: if the server capped the page
-            # below what we asked for, assuming page_size would skip records.
-            offset += len(features)
-
-            # On the last page ArcGIS omits the properties block entirely rather than
-            # sending exceededTransferLimit=false, so treat missing as "done".
-            properties = payload.get("properties") or {}
-            if not properties.get("exceededTransferLimit"):
-                return
-
-        raise PadusResponseError(
-            f"PAD-US still reported more data after {self.max_pages} pages "
-            f"({self.max_pages * self.page_size} records). Refusing to loop further."
+    def __init__(self, client: ArcGisFeatureClient | None = None):
+        super().__init__()
+        self.client = client or ArcGisFeatureClient(
+            self.SERVICE_URL,
+            page_size=self.page_size,
+            max_pages=self.max_pages,
+            timeout_seconds=self.timeout_seconds,
         )
 
-    def _request_page(self, session: requests.Session, aoi: AreaOfInterest, offset: int) -> dict:
-        params = {
-            "geometry": ",".join(str(coordinate) for coordinate in aoi.bbox),
-            "geometryType": "esriGeometryEnvelope",
-            "inSR": AreaOfInterest.SRID,
-            "outSR": AreaOfInterest.SRID,
-            "spatialRel": "esriSpatialRelIntersects",
-            "where": "1=1",
-            "outFields": "*",
-            "returnGeometry": "true",
-            "resultOffset": offset,
-            "resultRecordCount": self.page_size,
-            "f": "geojson",
-        }
-
-        try:
-            response = session.get(self.SERVICE_URL, params=params, timeout=self.timeout_seconds)
-        except requests.RequestException as exc:
-            raise PadusResponseError(
-                f"PAD-US request failed at offset {offset} for {aoi.name}: {exc}"
-            ) from exc
-
-        if response.status_code != 200:
-            raise PadusResponseError(
-                f"PAD-US returned HTTP {response.status_code} at offset {offset} "
-                f"for {aoi.name}: {response.text[:200]}"
-            )
-
-        try:
-            payload = response.json()
-        except ValueError as exc:
-            raise PadusResponseError(
-                f"PAD-US returned non-JSON at offset {offset} for {aoi.name}: "
-                f"{response.text[:200]}"
-            ) from exc
-
-        # ArcGIS reports query errors in a 200 body rather than an HTTP status.
-        if isinstance(payload, dict) and "error" in payload:
-            raise PadusResponseError(
-                f"PAD-US error at offset {offset} for {aoi.name}: {payload['error']}"
-            )
-
-        return payload
+    def fetch(self, aoi: AreaOfInterest):
+        """Yield pages of GeoJSON features for `aoi`, paging via the shared client."""
+        yield from self.client.iter_pages(aoi)
 
     # --- normalize --------------------------------------------------------------------
 
