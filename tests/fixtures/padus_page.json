@@ -1,0 +1,502 @@
+{
+ "type": "FeatureCollection",
+ "crs": {
+  "type": "name",
+  "properties": {
+   "name": "EPSG:4326"
+  }
+ },
+ "features": [
+  {
+   "type": "Feature",
+   "id": 237201,
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -74.0419693196983,
+       44.0787933500509
+      ],
+      [
+       -74.0420234800251,
+       44.0787721901523
+      ],
+      [
+       -74.0421707022221,
+       44.0788690039351
+      ],
+      [
+       -74.0417846305675,
+       44.0791533904809
+      ],
+      [
+       -74.0415248638384,
+       44.078962788365
+      ],
+      [
+       -74.0417823021343,
+       44.0787730013389
+      ],
+      [
+       -74.0419693196983,
+       44.0787933500509
+      ]
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 237201,
+    "Category": "Easement",
+    "FeatClass": "Easement",
+    "Unit_Nm": "Tahawus Easement, Mt. Adam Observers Cabin Parcel",
+    "Pub_Access": "UK",
+    "GAP_Sts": "4",
+    "IUCN_Cat": "Unassigned",
+    "IUCN_Cat_Reclass": "Unknown",
+    "MngTp_Desc": "State",
+    "MngTp_Reclass": "State/Territory",
+    "MngNm_Desc": "State Department of Conservation",
+    "DesTp_Desc": "Unknown Easement",
+    "BndryName": "Conterminous U.S. (CONUS)",
+    "BndryExten": "National",
+    "BndryID": "Not Applicable",
+    "GIS_AcrsDb": 0.2906327803594476,
+    "GIS_Acres": 0,
+    "ST_Name": "Not Applicable",
+    "Shape__Area": 2279.5546875,
+    "Shape__Length": 194.0903082483742
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 247727,
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -73.9562830438087,
+       44.1910246766266
+      ],
+      [
+       -73.9562110222791,
+       44.1908619439798
+      ],
+      [
+       -73.9533533762575,
+       44.1785695399789
+      ],
+      [
+       -73.9545062821779,
+       44.1784771589017
+      ],
+      [
+       -73.9567599593931,
+       44.1940657087348
+      ],
+      [
+       -73.9567097552468,
+       44.1940697915364
+      ],
+      [
+       -73.9562830438087,
+       44.1910246766266
+      ]
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 247727,
+    "Category": "Fee",
+    "FeatClass": "Fee",
+    "Unit_Nm": "Adirondak Loj",
+    "Pub_Access": "XA",
+    "GAP_Sts": "3",
+    "IUCN_Cat": "Other Conservation Area",
+    "IUCN_Cat_Reclass": "Unknown",
+    "MngTp_Desc": "Non-Governmental Organization",
+    "MngTp_Reclass": "Non-Governmental Organization",
+    "MngNm_Desc": "Non-Governmental Organization",
+    "DesTp_Desc": "Private Conservation",
+    "BndryName": "Conterminous U.S. (CONUS)",
+    "BndryExten": "National",
+    "BndryID": "Not Applicable",
+    "GIS_AcrsDb": 17.32831817758844,
+    "GIS_Acres": 17,
+    "ST_Name": "Not Applicable",
+    "Shape__Area": 136391.75,
+    "Shape__Length": 5003.9322529427
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 281071,
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -74.0245968597075,
+       44.0556490576459
+      ],
+      [
+       -74.0247576123293,
+       44.0555478255588
+      ],
+      [
+       -74.0250768340554,
+       44.0556405029647
+      ],
+      [
+       -74.0259772289394,
+       44.0558051133808
+      ],
+      [
+       -74.0258087157719,
+       44.0559160397733
+      ],
+      [
+       -74.0250238307587,
+       44.0557723537637
+      ],
+      [
+       -74.0245968597075,
+       44.0556490576459
+      ]
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 281071,
+    "Category": "Fee",
+    "FeatClass": "Fee",
+    "Unit_Nm": "Macintyre Primitive Area",
+    "Pub_Access": "OA",
+    "GAP_Sts": "2",
+    "IUCN_Cat": "V",
+    "IUCN_Cat_Reclass": "V: Protected landscape / seascape",
+    "MngTp_Desc": "State",
+    "MngTp_Reclass": "State/Territory",
+    "MngNm_Desc": "State Department of Conservation",
+    "DesTp_Desc": "State Conservation Area",
+    "BndryName": "Conterminous U.S. (CONUS)",
+    "BndryExten": "National",
+    "BndryID": "Not Applicable",
+    "GIS_AcrsDb": 0.38366518542375133,
+    "GIS_Acres": 0,
+    "ST_Name": "Not Applicable",
+    "Shape__Area": 3006.8984375,
+    "Shape__Length": 332.3680848276839
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 110480,
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -73.7725733595992,
+       44.143300093755
+      ],
+      [
+       -73.8245114142812,
+       44.1078945870543
+      ],
+      [
+       -73.8496487292299,
+       44.0893912132766
+      ],
+      [
+       -73.868797741544,
+       44.0668706414544
+      ],
+      [
+       -73.8738444067416,
+       44.0643754134234
+      ],
+      [
+       -73.8874851617359,
+       44.0579230276778
+      ],
+      [
+       -73.8852900780335,
+       44.0553521408602
+      ],
+      [
+       -73.9025193986703,
+       44.0460301673974
+      ],
+      [
+       -73.9060128048764,
+       44.0495477693323
+      ],
+      [
+       -73.9019779220648,
+       44.0608424093214
+      ],
+      [
+       -73.8967819784266,
+       44.075519590337
+      ],
+      [
+       -73.894392414855,
+       44.0937407442859
+      ],
+      [
+       -73.8992817374357,
+       44.0924033073593
+      ],
+      [
+       -73.9001919050917,
+       44.0906665005256
+      ],
+      [
+       -73.8992821147281,
+       44.0924587830673
+      ],
+      [
+       -73.8448993201531,
+       44.1073084694775
+      ],
+      [
+       -73.8273720211501,
+       44.1282290465774
+      ],
+      [
+       -73.7871566117182,
+       44.157586497951
+      ],
+      [
+       -73.7778113246298,
+       44.1484862984803
+      ],
+      [
+       -73.7725733595992,
+       44.143300093755
+      ]
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 110480,
+    "Category": "Easement",
+    "FeatClass": "Easement",
+    "Unit_Nm": "Adirondack Mountain Reserve Easement",
+    "Pub_Access": "RA",
+    "GAP_Sts": "3",
+    "IUCN_Cat": "Other Conservation Area",
+    "IUCN_Cat_Reclass": "Unknown",
+    "MngTp_Desc": "State",
+    "MngTp_Reclass": "State/Territory",
+    "MngNm_Desc": "State Department of Conservation",
+    "DesTp_Desc": "Forest Stewardship Easement",
+    "BndryName": "Conterminous U.S. (CONUS)",
+    "BndryExten": "National",
+    "BndryID": "Not Applicable",
+    "GIS_AcrsDb": 6994.023785291229,
+    "GIS_Acres": 6994,
+    "ST_Name": "Not Applicable",
+    "Shape__Area": 54898924.16796875,
+    "Shape__Length": 49657.27767899091
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 126319,
+   "geometry": {
+    "type": "MultiPolygon",
+    "coordinates": [
+     [
+      [
+       [
+        -74.1646848406071,
+        43.9945944731744
+       ],
+       [
+        -74.1646702402888,
+        43.9944245704831
+       ],
+       [
+        -74.1647429346565,
+        43.9945985594307
+       ],
+       [
+        -74.1646852178995,
+        43.9946911053392
+       ],
+       [
+        -74.1646848406071,
+        43.9945944731744
+       ]
+      ]
+     ],
+     [
+      [
+       [
+        -74.1520493183821,
+        44.0036924025326
+       ],
+       [
+        -74.1520752743039,
+        44.0038699187864
+       ],
+       [
+        -74.1520485530174,
+        44.0040764324152
+       ],
+       [
+        -74.1520493183821,
+        44.0036924025326
+       ]
+      ]
+     ],
+     [
+      [
+       [
+        -74.1490557527663,
+        44.0061933123457
+       ],
+       [
+        -74.1498525503385,
+        44.0059416132412
+       ],
+       [
+        -74.1492156492936,
+        44.0061684300097
+       ],
+       [
+        -74.1486925459307,
+        44.0063675756321
+       ],
+       [
+        -74.1490557527663,
+        44.0061933123457
+       ]
+      ]
+     ],
+     [
+      [
+       [
+        -74.1466353302682,
+        44.0071837332676
+       ],
+       [
+        -74.1471206729482,
+        44.0072523759129
+       ],
+       [
+        -74.1467242814476,
+        44.0072260893667
+       ],
+       [
+        -74.1463770969633,
+        44.0071877198013
+       ],
+       [
+        -74.1466353302682,
+        44.0071837332676
+       ]
+      ]
+     ],
+     [
+      [
+       [
+        -74.1405956080667,
+        44.0074193356563
+       ],
+       [
+        -74.1407426883298,
+        44.0074332781298
+       ],
+       [
+        -74.1405415438596,
+        44.0074584610237
+       ],
+       [
+        -74.1402486292966,
+        44.007469102499
+       ],
+       [
+        -74.1405956080667,
+        44.0074193356563
+       ]
+      ]
+     ],
+     [
+      [
+       [
+        -74.1345781506096,
+        44.0088959345231
+       ],
+       [
+        -74.1346338129195,
+        44.0088909964033
+       ],
+       [
+        -74.1346026961764,
+        44.0089234078552
+       ],
+       [
+        -74.1345562487846,
+        44.0089192192098
+       ],
+       [
+        -74.1345781506096,
+        44.0088959345231
+       ]
+      ]
+     ],
+     [
+      [
+       [
+        -74.1329651105326,
+        44.0086729201419
+       ],
+       [
+        -74.1332030401153,
+        44.0087170177066
+       ],
+       [
+        -74.1330816130418,
+        44.0087174861284
+       ],
+       [
+        -74.1326348359352,
+        44.0086741722827
+       ],
+       [
+        -74.1329651105326,
+        44.0086729201419
+       ]
+      ]
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 126319,
+    "Category": "Fee",
+    "FeatClass": "Fee",
+    "Unit_Nm": "High Peaks",
+    "Pub_Access": "OA",
+    "GAP_Sts": "3",
+    "IUCN_Cat": "Other Conservation Area",
+    "IUCN_Cat_Reclass": "Unknown",
+    "MngTp_Desc": "State",
+    "MngTp_Reclass": "State/Territory",
+    "MngNm_Desc": "State Department of Conservation",
+    "DesTp_Desc": "State Resource Management Area",
+    "BndryName": "Conterminous U.S. (CONUS)",
+    "BndryExten": "National",
+    "BndryID": "Not Applicable",
+    "GIS_AcrsDb": 0.14430033763113667,
+    "GIS_Acres": 0,
+    "ST_Name": "Not Applicable",
+    "Shape__Area": 1129.0234375,
+    "Shape__Length": 922.965746759774
+   }
+  }
+ ]
+}
