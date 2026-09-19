@@ -1,0 +1,78 @@
+{
+ "METADATA": {
+  "RESULTS": {
+   "CURRENT_COUNT": 3,
+   "TOTAL_COUNT": 3
+  },
+  "SEARCH_PARAMETERS": {
+   "LIMIT": 100,
+   "OFFSET": 0,
+   "QUERY": ""
+  }
+ },
+ "RECDATA": [
+  {
+   "Enabled": true,
+   "FACILITYADDRESS": [],
+   "FacilityAdaAccess": "N",
+   "FacilityEmail": "whitemountaincampgrounds@goexplorus.com",
+   "FacilityID": "232172",
+   "FacilityLatitude": 43.9544444,
+   "FacilityLongitude": -71.2138889,
+   "FacilityMapURL": "",
+   "FacilityName": "WHITE LEDGE CAMPGROUND",
+   "FacilityPhone": "603-447-5448",
+   "FacilityReservationURL": "",
+   "FacilityTypeDescription": "Campground",
+   "LastUpdatedDate": "2026-09-03",
+   "LegacyFacilityID": "70440",
+   "OrgFacilityID": "AN370440",
+   "ParentOrgID": "131",
+   "ParentRecAreaID": "1087",
+   "Reservable": true,
+   "StayLimit": ""
+  },
+  {
+   "Enabled": true,
+   "FACILITYADDRESS": [],
+   "FacilityAdaAccess": "N",
+   "FacilityEmail": "",
+   "FacilityID": "234237",
+   "FacilityLatitude": 44.1975,
+   "FacilityLongitude": -71.1722222,
+   "FacilityMapURL": "",
+   "FacilityName": "BLACK MOUNTAIN CABIN",
+   "FacilityPhone": "603-447-5448",
+   "FacilityReservationURL": "",
+   "FacilityTypeDescription": "Campground",
+   "LastUpdatedDate": "2026-06-06",
+   "LegacyFacilityID": "75087",
+   "OrgFacilityID": "AN375087",
+   "ParentOrgID": "131",
+   "ParentRecAreaID": "1087",
+   "Reservable": true,
+   "StayLimit": ""
+  },
+  {
+   "Enabled": true,
+   "FACILITYADDRESS": [],
+   "FacilityAdaAccess": "",
+   "FacilityEmail": "",
+   "FacilityID": "10077833",
+   "FacilityLatitude": 44.40419444,
+   "FacilityLongitude": -71.11952778,
+   "FacilityMapURL": "",
+   "FacilityName": "Centennial Trailhead",
+   "FacilityPhone": "",
+   "FacilityReservationURL": "",
+   "FacilityTypeDescription": "Facility",
+   "LastUpdatedDate": "2026-02-25",
+   "LegacyFacilityID": "",
+   "OrgFacilityID": "74433",
+   "ParentOrgID": "131",
+   "ParentRecAreaID": "",
+   "Reservable": false,
+   "StayLimit": ""
+  }
+ ]
+}

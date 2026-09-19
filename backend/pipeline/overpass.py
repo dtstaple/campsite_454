@@ -29,6 +29,8 @@ from collections.abc import Callable
 
 import requests
 
+from pipeline.retry import call_with_backoff
+
 logger = logging.getLogger(__name__)
 
 OVERPASS_ENDPOINT = "https://overpass-api.de/api/interpreter"
@@ -77,28 +79,18 @@ class OverpassClient:
 
     def query(self, overpass_ql: str) -> dict:
         """Run a query, retrying transient failures with exponential backoff."""
-        last_failure: Exception | None = None
-
-        for attempt in range(self.max_attempts):
-            if attempt:
-                delay = self.backoff_seconds * (2 ** (attempt - 1))
-                logger.warning(
-                    "Overpass unavailable (%s); retry %d of %d in %.0fs",
-                    last_failure,
-                    attempt + 1,
-                    self.max_attempts,
-                    delay,
-                )
-                self._sleep(delay)
-            try:
-                return self._attempt(overpass_ql)
-            except OverpassUnavailable as exc:
-                last_failure = exc
-
-        raise OverpassUnavailable(
-            f"Overpass still unavailable after {self.max_attempts} attempts. "
-            f"The public instance allows 2 concurrent slots, so this usually means it is "
-            f"busy rather than broken. Last failure: {last_failure}"
+        return call_with_backoff(
+            lambda: self._attempt(overpass_ql),
+            retry_on=OverpassUnavailable,
+            on_exhausted=lambda last: OverpassUnavailable(
+                f"Overpass still unavailable after {self.max_attempts} attempts. "
+                f"The public instance allows 2 concurrent slots, so this usually means "
+                f"it is busy rather than broken. Last failure: {last}"
+            ),
+            max_attempts=self.max_attempts,
+            backoff_seconds=self.backoff_seconds,
+            sleep=self._sleep,
+            describe="Overpass query",
         )
 
     def _attempt(self, overpass_ql: str) -> dict:
