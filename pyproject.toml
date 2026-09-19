@@ -32,4 +32,4 @@ select = ["E", "F", "I", "UP", "B"]
 
 [tool.ruff.lint.isort]
 # Our own Django apps, so they sort as first-party rather than third-party.
-known-first-party = ["config", "geodata", "health", "pipeline"]
+known-first-party = ["api", "config", "geodata", "health", "pipeline"]
