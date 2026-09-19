@@ -1,0 +1,162 @@
+{
+ "type": "FeatureCollection",
+ "crs": null,
+ "features": [
+  {
+   "type": "Feature",
+   "id": 26315814,
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -74.06854842466954,
+      44.112441889094555
+     ],
+     [
+      -74.06888949085507,
+      44.112318689169285
+     ],
+     [
+      -74.06891889113902,
+      44.11216362300379
+     ],
+     [
+      -74.0688016240146,
+      44.11203622314737
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 26315814,
+    "permanent_identifier": "167103094",
+    "fdate": 1331183694000,
+    "resolution": 2,
+    "gnis_id": null,
+    "gnis_name": null,
+    "lengthkm": 0.065,
+    "reachcode": "02020001002038",
+    "flowdir": 1,
+    "wbarea_permanent_identifier": null,
+    "ftype": 460,
+    "fcode": 46006,
+    "innetwork": 1,
+    "mainpath": 0,
+    "visibilityfilter": 24000,
+    "Shape_Length": 90.44239563296844,
+    "globalid": "{158BA08F-4C9A-11E1-BCF4-0021280458E6}"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 305383,
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -74.12995084017237,
+      44.055569877296655
+     ],
+     [
+      -74.13003630754179,
+      44.055486343187965
+     ],
+     [
+      -74.13014510784227,
+      44.055438010052235
+     ],
+     [
+      -74.1301961075279,
+      44.05541534355233
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 305383,
+    "permanent_identifier": "89344803",
+    "fdate": 1331183503000,
+    "resolution": 2,
+    "gnis_id": null,
+    "gnis_name": null,
+    "lengthkm": 0.027,
+    "reachcode": "02020001002164",
+    "flowdir": 1,
+    "wbarea_permanent_identifier": null,
+    "ftype": 460,
+    "fcode": 46000,
+    "innetwork": 1,
+    "mainpath": 0,
+    "visibilityfilter": 100000,
+    "Shape_Length": 36.9745050357426,
+    "globalid": "{95A2E2E5-4C93-11E1-BCF4-0021280458E6}"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": 16883203,
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -74.06565135679597,
+      44.11158648967158
+     ],
+     [
+      -74.06561935725847,
+      44.11156928945574
+     ],
+     [
+      -74.06559289023944,
+      44.11155508954309
+     ],
+     [
+      -74.06548722402692,
+      44.11152542264456
+     ],
+     [
+      -74.06548828953359,
+      44.111414423038376
+     ],
+     [
+      -74.065495157057,
+      44.111277156215515
+     ],
+     [
+      -74.06553388988905,
+      44.11115108950478
+     ],
+     [
+      -74.06570529078705,
+      44.11100242288584
+     ],
+     [
+      -74.06582815702411,
+      44.11091568949909
+     ],
+     [
+      -74.06589429127459,
+      44.11090122271581
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 16883203,
+    "permanent_identifier": "89344017",
+    "fdate": 1331183586000,
+    "resolution": 2,
+    "gnis_id": null,
+    "gnis_name": null,
+    "lengthkm": 0.098,
+    "reachcode": "02020001002041",
+    "flowdir": 1,
+    "wbarea_permanent_identifier": null,
+    "ftype": 460,
+    "fcode": 46003,
+    "innetwork": 1,
+    "mainpath": 0,
+    "visibilityfilter": 24000,
+    "Shape_Length": 136.07912053993797,
+    "globalid": "{2097EDFF-4C7A-11E1-BCF4-0021280458E6}"
+   }
+  }
+ ]
+}

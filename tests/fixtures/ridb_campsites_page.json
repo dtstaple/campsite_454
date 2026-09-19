@@ -1,0 +1,347 @@
+{
+ "METADATA": {
+  "RESULTS": {
+   "CURRENT_COUNT": 6,
+   "TOTAL_COUNT": 6
+  },
+  "SEARCH_PARAMETERS": {
+   "LIMIT": 50,
+   "OFFSET": 0,
+   "QUERY": ""
+  }
+ },
+ "RECDATA": [
+  {
+   "ATTRIBUTES": [
+    {
+     "AttributeName": "Accessibility",
+     "AttributeValue": "Y"
+    },
+    {
+     "AttributeName": "Accessible Occupant Message",
+     "AttributeValue": "Y"
+    },
+    {
+     "AttributeName": "Max Num of People",
+     "AttributeValue": "8"
+    },
+    {
+     "AttributeName": "Checkout Time",
+     "AttributeValue": "12:00 PM"
+    },
+    {
+     "AttributeName": "Shade",
+     "AttributeValue": "Full"
+    },
+    {
+     "AttributeName": "Checkin Time",
+     "AttributeValue": "2:00 PM"
+    },
+    {
+     "AttributeName": "Min Num of People",
+     "AttributeValue": "1"
+    },
+    {
+     "AttributeName": "Driveway Surface",
+     "AttributeValue": "Gravel"
+    },
+    {
+     "AttributeName": "Driveway Entry",
+     "AttributeValue": "Back-In"
+    },
+    {
+     "AttributeName": "Max Vehicle Length",
+     "AttributeValue": "35"
+    },
+    {
+     "AttributeName": "Max Num of Vehicles",
+     "AttributeValue": "2"
+    }
+   ],
+   "CampsiteAccessible": true,
+   "CampsiteID": "219540",
+   "CampsiteLatitude": 0,
+   "CampsiteLongitude": 0,
+   "CampsiteName": "XXX",
+   "CampsiteReservable": false,
+   "CampsiteType": "MANAGEMENT",
+   "CreatedDate": "2018-06-26",
+   "FacilityID": "232172",
+   "LastUpdatedDate": "2026-09-03",
+   "Loop": "MANAGEMENT SITES",
+   "TypeOfUse": "Overnight"
+  },
+  {
+   "ATTRIBUTES": [
+    {
+     "AttributeName": "Capacity/Size Rating",
+     "AttributeValue": "Single"
+    },
+    {
+     "AttributeName": "Accessible Occupant Message",
+     "AttributeValue": "Y"
+    },
+    {
+     "AttributeName": "Placed on Map",
+     "AttributeValue": "1"
+    },
+    {
+     "AttributeName": "Accessibility",
+     "AttributeValue": "Y"
+    },
+    {
+     "AttributeName": "Shade",
+     "AttributeValue": "Full"
+    },
+    {
+     "AttributeName": "Max Num of People",
+     "AttributeValue": "8"
+    },
+    {
+     "AttributeName": "Checkout Time",
+     "AttributeValue": "12:00 PM"
+    },
+    {
+     "AttributeName": "Pets Allowed",
+     "AttributeValue": "Yes"
+    },
+    {
+     "AttributeName": "IS EQUIPMENT MANDATORY",
+     "AttributeValue": "true"
+    },
+    {
+     "AttributeName": "Max Num of Vehicles",
+     "AttributeValue": "2"
+    },
+    {
+     "AttributeName": "Driveway Surface",
+     "AttributeValue": "Gravel"
+    },
+    {
+     "AttributeName": "Driveway Entry",
+     "AttributeValue": "Back-In"
+    },
+    {
+     "AttributeName": "Max Vehicle Length",
+     "AttributeValue": "25"
+    },
+    {
+     "AttributeName": "Checkin Time",
+     "AttributeValue": "2:00 PM"
+    },
+    {
+     "AttributeName": "Min Num of People",
+     "AttributeValue": "1"
+    }
+   ],
+   "CampsiteAccessible": true,
+   "CampsiteID": "73842",
+   "CampsiteLatitude": 0,
+   "CampsiteLongitude": 0,
+   "CampsiteName": "028",
+   "CampsiteReservable": false,
+   "CampsiteType": "STANDARD NONELECTRIC",
+   "CreatedDate": "2014-05-02",
+   "FacilityID": "232172",
+   "LastUpdatedDate": "2026-09-03",
+   "Loop": "WHIT",
+   "TypeOfUse": "Overnight"
+  },
+  {
+   "ATTRIBUTES": [
+    {
+     "AttributeName": "Placed on Map",
+     "AttributeValue": "1"
+    },
+    {
+     "AttributeName": "Checkin Time",
+     "AttributeValue": "0:00 AM"
+    },
+    {
+     "AttributeName": "Checkout Time",
+     "AttributeValue": "0:00 AM"
+    }
+   ],
+   "CampsiteAccessible": false,
+   "CampsiteID": "73909",
+   "CampsiteLatitude": 43.938838,
+   "CampsiteLongitude": -71.226512,
+   "CampsiteName": "018",
+   "CampsiteReservable": false,
+   "CampsiteType": "MANAGEMENT",
+   "CreatedDate": "2014-05-02",
+   "FacilityID": "232172",
+   "LastUpdatedDate": "2025-12-02",
+   "Loop": "MANAGEMENT SITES",
+   "TypeOfUse": "Overnight"
+  },
+  {
+   "ATTRIBUTES": [
+    {
+     "AttributeName": "Checkin Time",
+     "AttributeValue": "0:00 AM"
+    },
+    {
+     "AttributeName": "Placed on Map",
+     "AttributeValue": "1"
+    },
+    {
+     "AttributeName": "Checkout Time",
+     "AttributeValue": "0:00 AM"
+    }
+   ],
+   "CampsiteAccessible": false,
+   "CampsiteID": "73996",
+   "CampsiteLatitude": 43.938946,
+   "CampsiteLongitude": -71.226756,
+   "CampsiteName": "016",
+   "CampsiteReservable": false,
+   "CampsiteType": "MANAGEMENT",
+   "CreatedDate": "2014-05-02",
+   "FacilityID": "232172",
+   "LastUpdatedDate": "2025-12-02",
+   "Loop": "MANAGEMENT SITES",
+   "TypeOfUse": "Overnight"
+  },
+  {
+   "ATTRIBUTES": [
+    {
+     "AttributeName": "Checkout Time",
+     "AttributeValue": "12:00 PM"
+    },
+    {
+     "AttributeName": "Max Num of People",
+     "AttributeValue": "8"
+    },
+    {
+     "AttributeName": "Capacity/Size Rating",
+     "AttributeValue": "Single"
+    },
+    {
+     "AttributeName": "Checkin Time",
+     "AttributeValue": "2:00 PM"
+    },
+    {
+     "AttributeName": "Max Vehicle Length",
+     "AttributeValue": "20"
+    },
+    {
+     "AttributeName": "Placed on Map",
+     "AttributeValue": "1"
+    },
+    {
+     "AttributeName": "Driveway Entry",
+     "AttributeValue": "Back-In"
+    },
+    {
+     "AttributeName": "Accessible Occupant Message",
+     "AttributeValue": "Y"
+    },
+    {
+     "AttributeName": "Accessibility",
+     "AttributeValue": "Y"
+    },
+    {
+     "AttributeName": "Min Num of People",
+     "AttributeValue": "1"
+    },
+    {
+     "AttributeName": "Shade",
+     "AttributeValue": "Full"
+    },
+    {
+     "AttributeName": "Pets Allowed",
+     "AttributeValue": "Yes"
+    },
+    {
+     "AttributeName": "IS EQUIPMENT MANDATORY",
+     "AttributeValue": "true"
+    },
+    {
+     "AttributeName": "Max Num of Vehicles",
+     "AttributeValue": "2"
+    },
+    {
+     "AttributeName": "Driveway Surface",
+     "AttributeValue": "Gravel"
+    }
+   ],
+   "CampsiteAccessible": true,
+   "CampsiteID": "72867",
+   "CampsiteLatitude": 43.939254,
+   "CampsiteLongitude": -71.225717,
+   "CampsiteName": "024",
+   "CampsiteReservable": false,
+   "CampsiteType": "STANDARD NONELECTRIC",
+   "CreatedDate": "2014-05-02",
+   "FacilityID": "232172",
+   "LastUpdatedDate": "2026-09-03",
+   "Loop": "WHIT",
+   "TypeOfUse": "Overnight"
+  },
+  {
+   "ATTRIBUTES": [
+    {
+     "AttributeName": "Max Num of People",
+     "AttributeValue": "8"
+    },
+    {
+     "AttributeName": "Placed on Map",
+     "AttributeValue": "1"
+    },
+    {
+     "AttributeName": "Pets Allowed",
+     "AttributeValue": "Yes"
+    },
+    {
+     "AttributeName": "Capacity/Size Rating",
+     "AttributeValue": "Single"
+    },
+    {
+     "AttributeName": "Checkin Time",
+     "AttributeValue": "2:00 PM"
+    },
+    {
+     "AttributeName": "IS EQUIPMENT MANDATORY",
+     "AttributeValue": "true"
+    },
+    {
+     "AttributeName": "Max Vehicle Length",
+     "AttributeValue": "0"
+    },
+    {
+     "AttributeName": "Max Num of Vehicles",
+     "AttributeValue": "2"
+    },
+    {
+     "AttributeName": "Min Num of People",
+     "AttributeValue": "1"
+    },
+    {
+     "AttributeName": "Checkout Time",
+     "AttributeValue": "12:00 PM"
+    },
+    {
+     "AttributeName": "Shade",
+     "AttributeValue": "Full"
+    },
+    {
+     "AttributeName": "Driveway Surface",
+     "AttributeValue": "Gravel"
+    }
+   ],
+   "CampsiteAccessible": false,
+   "CampsiteID": "73436",
+   "CampsiteLatitude": 43.939073,
+   "CampsiteLongitude": -71.227148,
+   "CampsiteName": "008",
+   "CampsiteReservable": true,
+   "CampsiteType": "TENT ONLY NONELECTRIC",
+   "CreatedDate": "2014-05-02",
+   "FacilityID": "232172",
+   "LastUpdatedDate": "2026-09-03",
+   "Loop": "WHIT",
+   "TypeOfUse": "Overnight"
+  }
+ ]
+}

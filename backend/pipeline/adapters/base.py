@@ -26,6 +26,7 @@ never requires editing this file or the registry.
 """
 
 from abc import ABC, abstractmethod
+from collections.abc import Iterable, Iterator
 from typing import Any
 
 from django.contrib.gis.geos import GEOSGeometry, MultiLineString, MultiPoint, MultiPolygon
@@ -37,6 +38,9 @@ from pipeline.aoi import AreaOfInterest
 
 # How many skip reasons to keep in IngestRun.notes before truncating.
 MAX_LOGGED_SKIPS = 20
+
+# Rows per bulk_create. Keeps peak memory flat regardless of how much a source returns.
+DEFAULT_BATCH_SIZE = 1000
 
 # Sources are inconsistent about single vs multi geometry. A single geometry fits inside
 # a Multi container, so promote rather than reject; the reverse is a genuine error.
@@ -75,6 +79,8 @@ class SourceAdapter(ABC):
     source: str = ""
     model: Any = None
     source_srid: int = AreaOfInterest.SRID
+    max_tile_degrees: float | None = None
+    batch_size: int = DEFAULT_BATCH_SIZE
 
     def __init__(self):
         missing = [attr for attr in ("name", "source", "model") if not getattr(self, attr, None)]
@@ -85,11 +91,19 @@ class SourceAdapter(ABC):
 
     @abstractmethod
     def fetch(self, aoi: AreaOfInterest) -> Any:
-        """Pull raw data for `aoi`. Return whatever shape the source gives back."""
+        """Pull raw data for `aoi`. Return whatever shape the source gives back.
+
+        May return a single blob, or be a generator yielding chunks as they arrive --
+        the framework never calls len() on this. Yielding is what keeps memory flat on
+        a source like NHD that returns 200k features for one region.
+        """
 
     @abstractmethod
-    def normalize(self, raw: Any) -> list[dict]:
+    def normalize(self, raw: Any) -> Iterable[dict]:
         """Convert raw source data into dicts of model field names.
+
+        Receives exactly what fetch() returned, so a generator-based fetch hands you a
+        generator to consume lazily. Return a list or yield records -- both work.
 
         Each dict needs `source_id` and `geom`; `geom` may be in the adapter's
         source_srid and may be a single geometry where the column expects a Multi.
@@ -154,11 +168,74 @@ class SourceAdapter(ABC):
             "whose geometry column matches."
         )
 
+    def iter_areas(self, aoi: AreaOfInterest) -> Iterator[AreaOfInterest]:
+        """The areas fetch() will be called with: just `aoi`, or its tiles.
+
+        Tiling is a framework concern because subdividing an AreaOfInterest is pure
+        geometry over a framework type. Pagination is not -- asking a server for the
+        next page is protocol-specific (ArcGIS has resultOffset, Overpass has nothing),
+        so that stays inside the adapter's fetch().
+        """
+        if self.max_tile_degrees is None:
+            return iter((aoi,))
+        return aoi.tile(self.max_tile_degrees)
+
+    def iter_records(self, aoi: AreaOfInterest) -> Iterator[dict]:
+        """fetch -> normalize across every tile, lazily, with cross-tile dedup."""
+        records = self._chain_areas(aoi)
+        if self.max_tile_degrees is not None:
+            records = self._drop_repeat_source_ids(records)
+        return records
+
+    def _chain_areas(self, aoi: AreaOfInterest) -> Iterator[dict]:
+        for area in self.iter_areas(aoi):
+            yield from self.normalize(self.fetch(area))
+
+    @staticmethod
+    def _drop_repeat_source_ids(records: Iterable[dict]) -> Iterator[dict]:
+        """Drop records already seen, so a feature on a tile boundary is written once.
+
+        Only applied when tiling. The cost is a set of source_ids held for the whole
+        run -- roughly 25 MB for 200k features, against the ~1 GB of model instances
+        streaming saves. Untiled sources skip this entirely and stay genuinely flat.
+        """
+        seen: set = set()
+        for record in records:
+            source_id = record.get("source_id")
+            if not source_id:
+                # Let load() report it, so the reason lands in IngestRun.notes.
+                yield record
+                continue
+            if source_id in seen:
+                continue
+            seen.add(source_id)
+            yield record
+
+    def _flush(self, batch: list) -> int:
+        """Upsert one batch. Returns how many rows it accounted for."""
+        if not batch:
+            return 0
+        self.model.objects.bulk_create(
+            batch,
+            update_conflicts=True,
+            unique_fields=["source", "source_id"],
+            update_fields=self.upsert_update_fields(),
+        )
+        return len(batch)
+
     @transaction.atomic
-    def load(self, records: list[dict], run: IngestRun) -> tuple[int, list[str]]:
-        """Upsert `records`, stamping each with this run. Returns (written, skipped)."""
-        objs = []
+    def load(self, records: Iterable[dict], run: IngestRun) -> tuple[int, list[str]]:
+        """Upsert `records`, stamping each with this run. Returns (written, skipped).
+
+        Consumes `records` one at a time and writes every batch_size rows, so a
+        generator source never has more than one batch resident. `written` is
+        accumulated as batches flush -- never len() of the input, which may be a
+        generator with no length at all.
+        """
+        written = 0
         skipped: list[str] = []
+        batch: list = []
+        batch_ids: set = set()
 
         for index, record in enumerate(records):
             fields = dict(record)
@@ -177,11 +254,19 @@ class SourceAdapter(ABC):
                 skipped.append(f"{source_id}: invalid geometry ({prepared.valid_reason})")
                 continue
 
+            # Postgres refuses two rows with the same conflict target inside one
+            # INSERT ... ON CONFLICT ("cannot affect row a second time"), so a repeat
+            # within the pending batch has to go. Across batches it is harmless --
+            # the second upsert simply updates what the first inserted.
+            if source_id in batch_ids:
+                skipped.append(f"{source_id}: duplicate of an earlier record in this batch")
+                continue
+
             # source and last_run are the framework's to set, not the adapter's.
             fields.pop("source", None)
             fields.pop("last_run", None)
 
-            objs.append(
+            batch.append(
                 self.model(
                     source=self.source,
                     source_id=source_id,
@@ -190,16 +275,15 @@ class SourceAdapter(ABC):
                     **fields,
                 )
             )
+            batch_ids.add(source_id)
 
-        if objs:
-            self.model.objects.bulk_create(
-                objs,
-                update_conflicts=True,
-                unique_fields=["source", "source_id"],
-                update_fields=self.upsert_update_fields(),
-            )
+            if len(batch) >= self.batch_size:
+                written += self._flush(batch)
+                batch = []
+                batch_ids = set()
 
-        return len(objs), skipped
+        written += self._flush(batch)
+        return written, skipped
 
     def run(self, aoi: AreaOfInterest) -> IngestRun:
         """fetch -> normalize -> load, wrapped in provenance. Returns the IngestRun."""
@@ -214,9 +298,9 @@ class SourceAdapter(ABC):
         )
 
         try:
-            raw = self.fetch(aoi)
-            records = self.normalize(raw)
-            written, skipped = self.load(records, run)
+            # Lazy: nothing is fetched until load() starts pulling, and only one
+            # batch is resident at a time regardless of how large the source is.
+            written, skipped = self.load(self.iter_records(aoi), run)
         except Exception as exc:
             run.finished_at = timezone.now()
             run.status = IngestRun.Status.FAILED

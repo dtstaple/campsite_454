@@ -12,7 +12,9 @@ would then skew every spatial query silently instead of failing loudly. Adapters
 where projection differences belong, because that is where they actually originate.
 """
 
-from dataclasses import dataclass
+import math
+from collections.abc import Iterator
+from dataclasses import dataclass, replace
 
 from django.contrib.gis.geos import Polygon
 
@@ -92,6 +94,48 @@ class AreaOfInterest:
         poly = Polygon.from_bbox(self.bbox)
         poly.srid = self.SRID
         return poly
+
+    def tile(self, max_degrees: float) -> Iterator["AreaOfInterest"]:
+        """Split into a grid of sub-areas, none wider or taller than max_degrees.
+
+        Used by adapters whose source cannot handle a whole region in one request --
+        deep ArcGIS paging, or an Overpass query that would time out. The tiles cover
+        exactly the same ground as the original with no gaps and no overlap: the outer
+        edges are snapped back to the original bounds so floating-point drift cannot
+        open a seam between adjacent tiles.
+
+        Yields self unchanged when the area already fits, so callers do not need to
+        special-case small regions.
+        """
+        if max_degrees <= 0:
+            raise InvalidAreaOfInterest(
+                f"{self.name}: max_degrees must be positive, got {max_degrees}"
+            )
+
+        min_lon, min_lat, max_lon, max_lat = self.bbox
+        width = max_lon - min_lon
+        height = max_lat - min_lat
+
+        # Round before ceil so 2.1 / 0.7 counts as 3 tiles rather than 4.
+        columns = max(1, math.ceil(round(width / max_degrees, 9)))
+        rows = max(1, math.ceil(round(height / max_degrees, 9)))
+
+        if columns == 1 and rows == 1:
+            yield self
+            return
+
+        lons = [min_lon + i * width / columns for i in range(columns + 1)]
+        lats = [min_lat + j * height / rows for j in range(rows + 1)]
+        lons[-1] = max_lon
+        lats[-1] = max_lat
+
+        for j in range(rows):
+            for i in range(columns):
+                yield replace(
+                    self,
+                    name=f"{self.name}/tile-{i}-{j}",
+                    bbox=(lons[i], lats[j], lons[i + 1], lats[j + 1]),
+                )
 
     def as_overpass_bbox(self) -> str:
         """Overpass and several other APIs want (min_lat, min_lon, max_lat, max_lon)."""

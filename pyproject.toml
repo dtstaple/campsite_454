@@ -3,10 +3,11 @@ testpaths = ["tests"]
 python_files = "test_*.py"
 DJANGO_SETTINGS_MODULE = "config.settings"
 pythonpath = ["backend"]
-addopts = "-v --strict-markers --cov --cov-report=term-missing --cov-report=xml"
+addopts = "-v --strict-markers -m 'not network' --cov --cov-report=term-missing --cov-report=xml"
 markers = [
     "unit: fast isolated tests",
     "integration: tests requiring the database or external services",
+    "network: hits a live third-party service; deselected by default so an upstream outage cannot turn CI red. Run with: pytest -m network",
 ]
 
 [tool.coverage.run]
