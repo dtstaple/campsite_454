@@ -1,0 +1,129 @@
+/*
+ * Design tokens, carried across from the v1 project's src/styles/tokens.ts.
+ *
+ * This is the only file that should contain a literal colour, size or shadow.
+ * Everything else -- stylesheets and the MapLibre paint properties alike -- reads
+ * from here, so retheming means editing this file and nothing else.
+ *
+ * The map layer colours are read at runtime by theme.ts via getComputedStyle, which
+ * is why they live here rather than in the TypeScript: MapLibre paint properties need
+ * real values, but there should still be one place to change them.
+ *
+ * A note on the palette: v1 ran two colour systems in parallel. The UI chrome is a
+ * warm, dark, earthy palette; the map layers are brighter and more saturated, and
+ * were hardcoded separately from the token file. Both are reproduced here on purpose
+ * -- the map needs that contrast to stay legible against a dark basemap.
+ */
+
+:root {
+  /* --- surfaces: brown-black rather than blue-black, which is the character --- */
+  --bg-base: #15130f;
+  --bg-surface: #1c1914;
+  --bg-raised: #24211a;
+
+  /* --- borders --- */
+  --border-subtle: #322d23;
+  --border-strong: #453f30;
+
+  /* --- text: warm off-white, deliberately not #fff --- */
+  --text-primary: #ede7d9;
+  --text-secondary: #a89e8a;
+  --text-tertiary: #6f6858;
+
+  /* --- semantic --- */
+  --accent: #c98f4e;
+  --info: #4f7f97;
+  --danger: #b3473a;
+  --success: #6f9660;
+
+  /* --- map layers -----------------------------------------------------------
+   * v1's hues, retuned for a dark basemap. The basemap (Stadia Alidade Smooth
+   * Dark) paints terrain at #333333 and its own water at #222222, and every
+   * value below was measured against those two surfaces rather than guessed.
+   *
+   * Opacities and widths live here too, so that retuning the map means editing
+   * this file and nothing else.
+   *
+   * Water and trails kept v1's exact hex -- both hues hold up on dark and only
+   * needed opacity raised. Campsites did not: see the note on that token.
+   */
+  --map-water: #4fc3f7;
+  --map-water-line-opacity: 0.95; /* was 0.7 on light: 3.90:1 -> 5.67:1 */
+  --map-water-line-width: 1.2;
+  --map-water-fill-opacity: 0.55; /* was 0.3: 1.81:1, effectively invisible */
+
+  --map-trails: #f4a261;
+  --map-trails-opacity: 0.95; /* was 0.8: 4.51:1 -> 5.67:1 */
+  --map-trails-width: 1.6;
+
+  /* Campsites are the clickable layer and should be the most prominent thing on
+   * screen, but v1's #e63946 was the *weakest* of the three on dark at 2.68:1 --
+   * a mid-dark red has nowhere to go against a dark background. Lifted to the
+   * same hue (355deg) at higher lightness and saturation, which is a tune rather
+   * than a hue change: 2.68:1 -> 4.16:1, and fully opaque. */
+  --map-campsites: #ff5a68;
+  --map-campsites-opacity: 1;
+  --map-campsites-radius: 6;
+  --map-campsites-stroke-width: 1.5;
+
+  /* Reserved for layers this prototype does not have an endpoint for yet. */
+  --map-public-land: #2d6a4f;
+
+  /* --- spacing --- */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-base: 16px;
+  --space-lg: 20px;
+  --space-xl: 24px;
+
+  /* --- radii --- */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+
+  /* --- shadows --- */
+  --shadow-float: 0 2px 8px rgba(0, 0, 0, 0.35);
+  --shadow-overlay: 0 4px 16px rgba(0, 0, 0, 0.45);
+
+  /* --- type --- */
+  --font-sans: "Public Sans", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 13px;
+  --text-md: 14px;
+  --text-lg: 16px;
+  --text-xl: 20px;
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+  --weight-extrabold: 800;
+
+  --leading-tight: 1.25;
+  --leading-snug: 1.4;
+  --leading-normal: 1.5;
+
+  /* v1 used uppercase 11px labels with generous tracking, and tightened its titles. */
+  --tracking-label: 0.06em;
+  --tracking-title: -0.01em;
+
+  /* --- motion --- */
+  --transition: 120ms ease;
+}
+
+/*
+ * Score gradient and letter grades from v1, recorded for when scoring lands.
+ * Nothing consumes these yet -- this prototype renders raw ingested features, not
+ * scored campsites -- but they are the two systems v1 used and are worth keeping
+ * together rather than rediscovering later.
+ *
+ *   gradient : #8a6a4a (clay, score 0)  ->  #6f9660 (moss, score 100)
+ *   grades   : A #2d9e5f  B #f4a261  C #e9c46a  D #e76f51  F #c0392b
+ *
+ * Note they disagree with each other: v1's map used the letter grades while its
+ * scoreScale.ts computed the gradient, and neither referenced the other.
+ */

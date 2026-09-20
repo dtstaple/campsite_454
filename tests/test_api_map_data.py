@@ -13,7 +13,7 @@ from django.contrib.gis.geos import GEOSGeometry, LineString, MultiLineString, P
 from django.test import Client
 
 from api.bbox import InvalidBbox, parse_bbox
-from api.layers import DEFAULT_LIMIT, MAX_LIMIT
+from api.layers import LIMIT_BEYOND, LIMIT_BY_AREA, MAX_LIMIT, limit_for_bbox
 from geodata.models import Campsite, Trail, WaterFeature
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
@@ -290,12 +290,15 @@ def test_the_limit_is_capped_at_the_maximum(client):
     assert metadata["limit"] == MAX_LIMIT
 
 
-def test_the_default_limit_applies_when_none_is_given(client):
+def test_the_default_limit_is_derived_from_the_bbox_area(client):
+    """No explicit limit means the cap scales inversely with how much ground is asked
+    for: generous zoomed in, tighter zoomed out. See LIMIT_BY_AREA."""
     make_campsite()
 
+    # INSIDE is 0.3 x 0.2 = 0.06 sq deg, which falls in the <= 0.1 band.
     metadata = client.get(f"/api/campsites/?bbox={INSIDE}").json()["metadata"]
 
-    assert metadata["limit"] == DEFAULT_LIMIT
+    assert metadata["limit"] == 4000
 
 
 @pytest.mark.parametrize(
@@ -409,3 +412,146 @@ def test_polygon_water_features_serialize_correctly(client):
     geometry = document["features"][0]["geometry"]
     assert geometry["type"] == "Polygon"
     assert GEOSGeometry(json.dumps(geometry)).valid
+
+
+# --- area-derived caps --------------------------------------------------------------
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "bbox,expected",
+    [
+        pytest.param((-74.05, 44.10, -74.00, 44.15), 6000, id="valley-0.0025sqdeg"),
+        pytest.param((-74.20, 44.00, -73.90, 44.20), 4000, id="medium-0.06sqdeg"),
+        pytest.param((-74.60, 43.60, -73.90, 44.30), 2500, id="sub-region-0.49sqdeg"),
+        pytest.param((-75.40, 43.00, -73.30, 44.90), 1500, id="adirondacks-3.99sqdeg"),
+        pytest.param((-80.00, 40.00, -70.00, 46.00), LIMIT_BEYOND, id="multi-region"),
+    ],
+)
+def test_the_cap_scales_inversely_with_area(bbox, expected):
+    assert limit_for_bbox(bbox) == expected
+
+
+@pytest.mark.unit
+def test_the_cap_bands_are_ordered_and_decreasing():
+    """A larger area must never earn a larger cap."""
+    areas = [area for area, _ in LIMIT_BY_AREA]
+    caps = [cap for _, cap in LIMIT_BY_AREA]
+
+    assert areas == sorted(areas)
+    assert caps == sorted(caps, reverse=True)
+    assert caps[-1] > LIMIT_BEYOND
+
+
+def test_an_explicit_limit_still_overrides_the_area_default(client):
+    make_campsite()
+
+    metadata = client.get(f"/api/campsites/?bbox={INSIDE}&limit=7").json()["metadata"]
+
+    assert metadata["limit"] == 7
+
+
+# --- the sample is deterministic and spatially spread ---------------------------------
+
+
+def test_the_same_bbox_returns_the_same_sample_twice(client):
+    """Deterministic ordering is what makes client caching and stable panning possible.
+
+    ORDER BY random() would pass the spread test but fail this one.
+    """
+    for index in range(30):
+        make_campsite(source_id=f"c{index}", lon=-74.05 + index * 0.002, lat=44.10)
+
+    first = client.get(f"/api/campsites/?bbox={INSIDE}&limit=10").json()
+    second = client.get(f"/api/campsites/?bbox={INSIDE}&limit=10").json()
+
+    assert [f["id"] for f in first["features"]] == [f["id"] for f in second["features"]]
+
+
+def test_the_sample_is_not_simply_the_first_rows_inserted(client):
+    """Insertion order is the blob this ordering exists to avoid."""
+    for index in range(40):
+        make_campsite(source_id=f"c{index:02d}", lon=-74.05 + index * 0.002, lat=44.10)
+
+    returned = {
+        f["id"] for f in client.get(f"/api/campsites/?bbox={INSIDE}&limit=10").json()["features"]
+    }
+    first_ten_inserted = {f"c{index:02d}" for index in range(10)}
+
+    assert returned != first_ten_inserted
+
+
+# --- payload size -----------------------------------------------------------------------
+
+
+def test_coordinates_are_not_shipped_at_millimetre_precision(client):
+    make_water()
+
+    geometry = client.get(f"/api/water/?bbox={INSIDE}").json()["features"][0]["geometry"]
+
+    for longitude, latitude in geometry["coordinates"]:
+        for value in (longitude, latitude):
+            decimals = len(str(value).split(".")[1]) if "." in str(value) else 0
+            assert decimals <= 6, f"{value} carries more precision than a map can use"
+
+
+def test_responses_are_gzipped_when_the_client_accepts_it(client):
+    make_water()
+
+    response = client.get(f"/api/water/?bbox={INSIDE}", headers={"accept-encoding": "gzip"})
+
+    assert response.status_code == 200
+    assert response.headers.get("Content-Encoding") == "gzip"
+
+
+# --- the layers parameter ---------------------------------------------------------------
+
+
+def test_map_data_returns_only_the_requested_layers(client):
+    make_campsite()
+    make_trail()
+    make_water()
+
+    document = client.get(f"/api/map-data/?bbox={INSIDE}&layers=campsites").json()
+
+    assert set(document["layers"]) == {"campsites"}
+    assert document["metadata"]["layers"] == ["campsites"]
+
+
+def test_map_data_accepts_several_layers(client):
+    make_campsite()
+    make_trail()
+    make_water()
+
+    document = client.get(f"/api/map-data/?bbox={INSIDE}&layers=trails,water").json()
+
+    assert set(document["layers"]) == {"trails", "water"}
+
+
+def test_map_data_defaults_to_every_layer(client):
+    make_campsite()
+
+    document = client.get(f"/api/map-data/?bbox={INSIDE}").json()
+
+    assert set(document["layers"]) == {"campsites", "trails", "water"}
+
+
+def test_an_unknown_layer_name_is_400_and_lists_the_valid_ones(client):
+    response = client.get(f"/api/map-data/?bbox={INSIDE}&layers=elevation")
+
+    assert response.status_code == 400
+    error = response.json()["error"]
+    assert "elevation" in error
+    assert "campsites" in error
+
+
+def test_skipping_a_layer_actually_shrinks_the_response(client):
+    """The whole point: not querying a layer must cost less than querying it."""
+    for index in range(50):
+        make_water(source_id=f"w{index}", lon=-74.05 + index * 0.001, lat=44.10)
+    make_campsite()
+
+    everything = client.get(f"/api/map-data/?bbox={INSIDE}").content
+    just_campsites = client.get(f"/api/map-data/?bbox={INSIDE}&layers=campsites").content
+
+    assert len(just_campsites) < len(everything) / 2

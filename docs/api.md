@@ -44,10 +44,30 @@ const [west, south, east, north] = map.getBounds().toArray().flat();
 const url = `/api/water/?bbox=${west},${south},${east},${north}`;
 ```
 
-### `limit` (optional, default 2000, max 5000)
+### `limit` (optional, max 6000)
 
-The most features to return per layer. See [Truncation](#truncation) — you almost
-certainly want the default.
+The most features to return per layer. **Leave it off.** With no `limit`, the cap is
+derived from the bounding box area, which is almost always what you want:
+
+| Bounding box area | Default cap | Roughly |
+|---|---|---|
+| ≤ 0.01 sq° | 6000 | one valley |
+| ≤ 0.1 sq° | 4000 | a cluster of valleys |
+| ≤ 1.0 sq° | 2500 | a large sub-region |
+| ≤ 5.0 sq° | 1500 | the whole Adirondack Park (3.99) |
+| above | 1000 | multi-region |
+
+The relationship is inverse on purpose. Zoomed in, the full set is usually smaller than
+the cap so nothing is lost. Zoomed out, a smaller well-spread sample both reads better
+and transfers faster than a larger one.
+
+### `layers` (optional, `/api/map-data/` only)
+
+Comma-separated subset of `campsites,trails,water`. Defaults to all three.
+
+Use it to skip layers you will not draw. Below zoom 9 an individual stream is well under
+a pixel, and asking for `layers=campsites` over the whole park is **223 bytes in 70 ms**
+against 138 kB in 416 ms for all three. An unknown name is a 400.
 
 ### `simplify` (optional, tolerance in degrees)
 
@@ -180,7 +200,13 @@ capped, and says when the cap bit:
 - `matched` — features that actually intersect the bbox
 - `truncated` — `true` when `returned < matched`
 
-When `truncated` is `true` the map is showing an arbitrary subset, so tell the user
+When the cap bites, the features you get are a **deterministic spatial sample**, not the
+first N rows. The same bounding box always returns the same features, so it is safe to
+cache them and a pan back is not a reshuffle. The sample is spread across the whole box
+rather than clustered — measured over a 10×10 grid of the park it covers 110 of 140
+occupied cells, against 14 for naive truncation.
+
+When `truncated` is `true` the map is showing a subset, so tell the user
 rather than letting them think they are seeing everything. Something like *"Showing 2,000
 of 63,407 — zoom in to see all"* is enough. `matched` is only computed when the cap bit,
 so it costs nothing on normal requests.
