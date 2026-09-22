@@ -66,6 +66,14 @@
   --map-campsites-radius: 6;
   --map-campsites-stroke-width: 1.5;
 
+  /* The widths above are what a line *looks* like; this is what it can be hit
+   * by. A 1.2px stream or a 1.6px trail is far thinner than a pointer is
+   * accurate, so each line layer is paired with a transparent copy drawn at
+   * this width, which catches the click without being seen. Shared by water
+   * and trails -- one forgiving target size reads as consistent, and tuning
+   * it per layer would just be two numbers to keep in sync. */
+  --map-hit-width: 14;
+
   /* Reserved for layers this prototype does not have an endpoint for yet. */
   --map-public-land: #2d6a4f;
 

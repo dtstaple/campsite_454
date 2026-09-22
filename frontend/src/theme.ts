@@ -49,5 +49,6 @@ export function mapPaint() {
     campsitesOpacity: numericToken("--map-campsites-opacity", 1),
     campsitesRadius: numericToken("--map-campsites-radius", 6),
     campsitesStrokeWidth: numericToken("--map-campsites-stroke-width", 1.5),
+    hitWidth: numericToken("--map-hit-width", 14),
   };
 }
