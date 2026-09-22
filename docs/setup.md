@@ -42,3 +42,27 @@ GEOS_LIBRARY_PATH=/opt/homebrew/opt/geos/lib/libgeos_c.dylib
 Those `/opt/homebrew/opt/...` paths are stable symlinks that follow Homebrew upgrades, so
 they do not need updating when GDAL bumps. On Intel Macs substitute `/usr/local`. On Linux
 the libraries are normally on the default search path and both variables can be omitted.
+
+## Sample data
+
+A fresh database is empty. Load the committed sample (about 160 features around Crawford
+Notch, NH) with:
+
+```
+cd backend
+python manage.py migrate
+python manage.py seed
+```
+
+To wipe the database back to a clean, seeded state at any time, run
+`python manage.py reset_db` (add `--noinput` to skip the confirmation). Both are Django
+management commands, so they work the same on macOS and Windows. The full Northeast
+dataset comes from the ingestion pipeline instead (see `docs/pipeline.md`).
+
+If Django reports `role "campsite" does not exist` even though Docker is running, another
+PostgreSQL (e.g. from Homebrew) is probably holding port 5432 ahead of Docker. Set
+`POSTGRES_PORT` to a free port such as 5434, use the same port in `DATABASE_URL`, and run
+`docker compose up -d` again.
+
+Pointing the app at a different database, including a hosted one, only means changing
+`DATABASE_URL`. See `docs/deployment.md`.

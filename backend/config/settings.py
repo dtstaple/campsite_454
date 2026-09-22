@@ -28,11 +28,14 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django.contrib.gis",
     "rest_framework",
+    "rest_framework.authtoken",
     "corsheaders",
+    "accounts",
     "health",
     "api",
     "geodata",
     "pipeline",
+    "devdata",
 ]
 
 MIDDLEWARE = [
