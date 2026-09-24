@@ -3,7 +3,7 @@
  *
  * Extracted from App.tsx so that component reads as composition rather than as ninety
  * lines of paint properties. Nothing here is stateful -- addMapLayers() is called once
- * on the map's `load` event and the sources are fed afterwards by useMapData.
+ * on the map's `load` event and the sources are fed afterwards by App's refresh().
  *
  * Every colour, width and opacity comes from theme.css via theme.ts. MapLibre paint
  * properties cannot take a `var(--x)`, so they are read back out of the stylesheet
