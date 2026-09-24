@@ -9,8 +9,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./App.css";
-import { mapColors, mapPaint } from "./theme";
 import type { FeatureCollection as GeoJsonFeatureCollection } from "geojson";
+import { addMapLayers, addMapSources, CLICKABLE, CLICKABLE_IDS, EMPTY, LAYERS } from "./map/layers";
+import { popupFor } from "./map/popups";
 import {
   ApiError,
   fetchMapData,
@@ -35,14 +36,6 @@ const MAP_STYLE_URL =
 const ADIRONDACKS: [number, number] = [-74.2, 44.1];
 const INITIAL_ZOOM = 10;
 const DEBOUNCE_MS = 400;
-
-const LAYERS: { name: LayerName; label: string }[] = [
-  { name: "water", label: "Water" },
-  { name: "trails", label: "Trails" },
-  { name: "campsites", label: "Campsites" },
-];
-
-const EMPTY: GeoJsonFeatureCollection = { type: "FeatureCollection", features: [] };
 
 export default function App() {
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -147,60 +140,8 @@ export default function App() {
     instance.addControl(new maplibregl.NavigationControl(), "top-right");
 
     instance.on("load", () => {
-      // Colours come from theme.css so there is one place to retheme.
-      const colour = mapColors();
-      const paint = mapPaint();
-
-      // One native GeoJSON source per layer; the API output goes in unmodified.
-      for (const layer of LAYERS) {
-        instance.addSource(layer.name, { type: "geojson", data: EMPTY });
-      }
-
-      // Water: polygons filled, lines stroked. docs/api.md says one collection
-      // carries both, so each is filtered by geometry type rather than endpoint.
-      instance.addLayer({
-        id: "water-fill",
-        type: "fill",
-        source: "water",
-        filter: ["==", ["geometry-type"], "Polygon"],
-        paint: { "fill-color": colour.water, "fill-opacity": paint.waterFillOpacity },
-      });
-      instance.addLayer({
-        id: "water-line",
-        type: "line",
-        source: "water",
-        filter: ["==", ["geometry-type"], "LineString"],
-        paint: {
-          "line-color": colour.water,
-          "line-width": paint.waterLineWidth,
-          "line-opacity": paint.waterLineOpacity,
-        },
-      });
-
-      instance.addLayer({
-        id: "trails-line",
-        type: "line",
-        source: "trails",
-        paint: {
-          "line-color": colour.trails,
-          "line-width": paint.trailsWidth,
-          "line-opacity": paint.trailsOpacity,
-        },
-      });
-
-      instance.addLayer({
-        id: "campsites-point",
-        type: "circle",
-        source: "campsites",
-        paint: {
-          "circle-radius": paint.campsitesRadius,
-          "circle-color": colour.campsites,
-          "circle-opacity": paint.campsitesOpacity,
-          "circle-stroke-width": paint.campsitesStrokeWidth,
-          "circle-stroke-color": colour.campsiteStroke,
-        },
-      });
-
+      addMapSources(instance);
+      addMapLayers(instance);
       styleReady.current = true;
       void refresh();
     });
@@ -214,20 +155,32 @@ export default function App() {
     instance.on("moveend", onIdle);
     instance.on("zoomend", onIdle);
 
-    // Campsite popups.
-    instance.on("click", "campsites-point", (event: maplibregl.MapLayerMouseEvent) => {
-      const feature = event.features?.[0];
-      if (!feature) return;
+    /*
+     * Popups for every clickable layer. One map-wide handler rather than one per layer,
+     * because a click often lands on several at once -- a campsite beside a stream on a
+     * trail -- and per-layer handlers would open a popup for each. CLICKABLE's order
+     * decides which one wins.
+     */
+    const topClickable = (point: maplibregl.PointLike) => {
+      if (!styleReady.current) return undefined;
+      const hits = instance.queryRenderedFeatures(point, { layers: CLICKABLE_IDS });
+      for (const entry of CLICKABLE) {
+        const feature = hits.find((hit) => hit.layer.id === entry.id);
+        if (feature) return { layer: entry.layer, feature };
+      }
+      return undefined;
+    };
+
+    instance.on("click", (event: maplibregl.MapMouseEvent) => {
+      const hit = topClickable(event.point);
+      if (!hit) return;
       new maplibregl.Popup({ closeButton: true })
         .setLngLat(event.lngLat)
-        .setHTML(campsitePopup(feature.properties))
+        .setHTML(popupFor(hit.layer, hit.feature.properties))
         .addTo(instance);
     });
-    instance.on("mouseenter", "campsites-point", () => {
-      instance.getCanvas().style.cursor = "pointer";
-    });
-    instance.on("mouseleave", "campsites-point", () => {
-      instance.getCanvas().style.cursor = "";
+    instance.on("mousemove", (event: maplibregl.MapMouseEvent) => {
+      instance.getCanvas().style.cursor = topClickable(event.point) ? "pointer" : "";
     });
 
     return () => {
@@ -309,59 +262,5 @@ export default function App() {
         </div>
       )}
     </div>
-  );
-}
-
-/**
- * Campsite popup.
- *
- * reservable and capacity are tri-state per docs/api.md: null means the source did not
- * say, which is different from false. Rendering a null as "Not reservable" would be
- * asserting something we do not know.
- */
-function campsitePopup(properties: Record<string, unknown> | null): string {
-  const name = (properties?.name as string) || "Unnamed campsite";
-  const siteType = ((properties?.site_type as string) ?? "unknown").replace(/_/g, " ");
-
-  const reservable = properties?.reservable;
-  const capacity = properties?.capacity;
-
-  // A value the source did not give us is styled as unknown rather than rendered as a
-  // fact -- null means "not recorded", which is not the same as "no".
-  const row = (label: string, value: string, unknown: boolean, numeric = false) => {
-    const classes = [unknown ? "unknown" : "", numeric && !unknown ? "numeric" : ""]
-      .filter(Boolean)
-      .join(" ");
-    return `<dt>${label}</dt><dd${classes ? ` class="${classes}"` : ""}>${escapeHtml(value)}</dd>`;
-  };
-
-  return `
-    <div class="popup">
-      <div class="popup-eyebrow">Campsite</div>
-      <h3 class="popup-title">${escapeHtml(name)}</h3>
-      <dl>
-        ${row("Type", siteType, siteType === "unknown")}
-        ${row(
-          "Reservable",
-          reservable === true ? "Yes" : reservable === false ? "No" : "Unknown",
-          reservable !== true && reservable !== false,
-        )}
-        ${row(
-          "Capacity",
-          capacity === null || capacity === undefined ? "Unknown" : `${capacity} people`,
-          capacity === null || capacity === undefined,
-          true,
-        )}
-      </dl>
-    </div>`;
-}
-
-function escapeHtml(value: string): string {
-  return value.replace(
-    /[&<>"']/g,
-    (character) =>
-      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
-        character
-      ]!,
   );
 }
