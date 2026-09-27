@@ -12,7 +12,7 @@ two cases don't even time differently), so there is nothing extra to special-cas
 """
 
 from django.contrib.auth import authenticate, get_user_model
-from django.shortcuts import get_object_or_404
+from django.http import Http404
 from rest_framework import status
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.authtoken.models import Token
@@ -64,8 +64,23 @@ def login_view(request):
 @api_view(["POST", "DELETE"])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
-def saved_campsite_view(request, campsite_id):
-    campsite = get_object_or_404(Campsite, pk=campsite_id)
+def saved_campsite_view(request, source_id):
+    """Save or unsave the campsite with this source_id.
+
+    Keyed on source_id rather than the primary key because source_id is what the map API
+    already puts in each GeoJSON Feature's `id`, and it is the identifier that survives.
+    The primary key is an internal artefact that a rebuild renumbers; source_id is the
+    upsert key every adapter loads on, so it still points at the same real campsite after
+    a re-ingest. A saved campsite has to outlive both.
+
+    Uniqueness in the database is on (source, source_id), so source_id alone is unique
+    only because each source namespaces its ids with its own prefix -- "campsite/" from
+    RIDB, "node/" and "way/" from OSM. first() keeps that assumption from turning into a
+    500 if a future source ever breaks it.
+    """
+    campsite = Campsite.objects.filter(source_id=source_id).order_by("pk").first()
+    if campsite is None:
+        raise Http404(f"No campsite with source_id {source_id!r}")
 
     if request.method == "POST":
         _, created = SavedCampsite.objects.get_or_create(user=request.user, campsite=campsite)

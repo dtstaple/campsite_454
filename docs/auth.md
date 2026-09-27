@@ -27,8 +27,8 @@ Authorization: Token <token>
 |---|---|---|---|
 | `/api/auth/register/` | `POST` | No | `201` with the new account |
 | `/api/auth/login/` | `POST` | No | `200` with a token |
-| `/api/saved-campsites/<campsite_id>/` | `POST` | Yes | `201` (or `200` if already saved) |
-| `/api/saved-campsites/<campsite_id>/` | `DELETE` | Yes | `204` |
+| `/api/saved-campsites/<source_id>/` | `POST` | Yes | `201` (or `200` if already saved) |
+| `/api/saved-campsites/<source_id>/` | `DELETE` | Yes | `204` |
 
 ---
 
@@ -97,8 +97,16 @@ confirms whether a username exists.
 
 Both require `Authorization: Token <token>`.
 
+The id in the path is the campsite's **`source_id`** -- the same string the map API puts in
+each GeoJSON Feature's `id`, documented in [api.md](api.md#feature-id). Take it from the
+feature you are looking at and send it back unchanged. It is *not* the database primary
+key, which is never exposed.
+
+It usually contains a slash (`campsite/73996`), so build the URL by appending the raw
+value; do not assume it is a single path segment and do not percent-encode the slash.
+
 ```
-POST /api/saved-campsites/42/
+POST /api/saved-campsites/campsite/73996/
 Authorization: Token 9a4f2c1e8b3d4a6f9c0e1b2d3a4f5c6d7e8f9a0b
 ```
 
@@ -108,7 +116,7 @@ Authorization: Token 9a4f2c1e8b3d4a6f9c0e1b2d3a4f5c6d7e8f9a0b
 - `401` — missing or invalid token.
 
 ```
-DELETE /api/saved-campsites/42/
+DELETE /api/saved-campsites/campsite/73996/
 Authorization: Token 9a4f2c1e8b3d4a6f9c0e1b2d3a4f5c6d7e8f9a0b
 ```
 

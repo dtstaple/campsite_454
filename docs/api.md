@@ -144,6 +144,26 @@ Real output, trimmed to two features and three coordinates each:
 MapLibre ignores what it does not recognise, so you can pass the whole document to
 `map.addSource()` unmodified.
 
+### Feature `id`
+
+Every Feature's `id` is the record's **`source_id`** -- the identifier the upstream source
+uses, kept verbatim. It is not the database primary key, and the primary key is never sent
+to a client.
+
+```
+water      "89344051"          NHD permanent identifier
+trails     "way/89344051"      OSM way
+campsites  "campsite/73996"    RIDB campsite id
+```
+
+This is the identifier to hold on to and to send back. `POST /api/saved-campsites/<id>/`
+takes exactly this string -- see [auth.md](auth.md). Two consequences worth knowing:
+
+- **It can contain a slash.** Do not assume one path segment when building a URL from it.
+- **It survives a re-ingest.** Adapters upsert on `(source, source_id)`, so the same real
+  feature keeps the same `id` across runs. A primary key does not survive a rebuild, which
+  is why a saved campsite is stored against `source_id` and not against a row number.
+
 `id` is the feature's stable source identifier — the OSM way ID for trails, NHD's
 `permanent_identifier` for water, and so on. It is stable across re-ingests, so it is safe
 to use with `map.setFeatureState()`.
