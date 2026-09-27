@@ -181,11 +181,38 @@ class PublicLand(SourceRecord):
     )
     public_access = models.CharField(max_length=16, choices=Access.choices, default=Access.UNKNOWN)
 
+    class GapStatus(models.TextChoices):
+        """PAD-US GAP status: what the land is actually managed *for*.
+
+        `public_access` says whether you may enter; this says what the manager is
+        obliged to protect, which is the better predictor of whether dispersed camping
+        is plausible. A GAP 4 parcel can be wide open to the public and still be
+        managed for timber extraction.
+        """
+
+        PERMANENT_NATURAL = "1", "1 - Permanent protection, natural state"
+        PERMANENT_MANAGED = "2", "2 - Permanent protection, some management"
+        PERMANENT_EXTRACTIVE = "3", "3 - Permanent protection, extractive use allowed"
+        UNPROTECTED = "4", "4 - No known protection mandate"
+        UNKNOWN = "", "Unknown"
+
+    gap_status = models.CharField(
+        max_length=1,
+        blank=True,
+        choices=GapStatus.choices,
+        default=GapStatus.UNKNOWN,
+        help_text="PAD-US GAP_Sts. Blank when the source did not say.",
+    )
+
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=["source", "source_id"], name="unique_publicland_source")
         ]
-        indexes = [models.Index(fields=["public_access"]), models.Index(fields=["manager"])]
+        indexes = [
+            models.Index(fields=["public_access"]),
+            models.Index(fields=["manager"]),
+            models.Index(fields=["gap_status"]),
+        ]
 
 
 class IngestRun(models.Model):

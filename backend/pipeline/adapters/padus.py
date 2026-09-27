@@ -161,10 +161,25 @@ class PadusAdapter(SourceAdapter):
             "manager": self._text(properties.get("MngNm_Desc"), 128),
             "designation": self._text(properties.get("DesTp_Desc"), 128),
             "public_access": self.map_public_access(properties),
-            # GAP_Sts and MngTp_Desc ride along untouched. GAP status is a conservation
-            # code, not an access code, and must never be read as one.
+            "gap_status": self.map_gap_status(properties),
+            # MngTp_Desc rides along untouched in raw.
             "raw": properties,
         }
+
+    def map_gap_status(self, properties: dict) -> str:
+        """GAP_Sts to a PublicLand.GapStatus value.
+
+        Unlike Pub_Access this does not fail loudly on an unrecognised value. The two
+        codes carry different risk: mis-reading an access code could mark closed land as
+        campable, whereas GAP status only ever sharpens a score. An unknown code degrades
+        to blank ("the source did not say"), which scoring must already handle, and the
+        original value stays in `raw` either way.
+
+        GAP status is a conservation code, not an access code, and must never be read as
+        one -- a GAP 4 parcel can be fully open to the public.
+        """
+        code = str(properties.get("GAP_Sts") or "").strip()
+        return code if code in PublicLand.GapStatus.values else ""
 
     def map_public_access(self, properties: dict) -> str:
         """Pub_Access code to a PublicLand.Access value, failing loudly on a new code."""

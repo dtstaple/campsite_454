@@ -16,7 +16,8 @@ the Vite dev server on port 5173.
 | `GET /api/campsites/` | Campsites — points |
 | `GET /api/trails/` | Trails — MultiLineStrings |
 | `GET /api/water/` | Streams, rivers, lakes, ponds, wetlands — LineStrings and Polygons |
-| `GET /api/map-data/` | All three at once, for the initial load |
+| `GET /api/public-land/` | Public land parcels and legal access — MultiPolygons |
+| `GET /api/map-data/` | All four at once, for the initial load |
 
 There is one endpoint per layer so you can fetch only what the user has toggled on, and a
 combined one so the first paint is a single round trip. They share the same code, so the
@@ -200,6 +201,41 @@ not name the feature — very common for trails, where roughly 40% of OSM ways a
 | `feature_type` | string | `stream`, `lake`, `wetland`, `spring`, `other` |
 | `perennial` | bool \| null | `true` year-round, `false` intermittent or ephemeral, `null` unknown |
 
+**Public land**
+
+| Property | Type | Notes |
+|---|---|---|
+| `name` | string | Unit name, e.g. "High Peaks Wilderness" |
+| `manager` | string | Managing agency, e.g. "State Department of Conservation" |
+| `designation` | string | e.g. "State Wilderness", "Conservation Easement" |
+| `public_access` | string | `open`, `restricted`, `closed`, `unknown` — may you enter |
+| `gap_status` | string | `1`–`4`, or `""` when unknown — what it is managed *for* |
+
+`public_access` and `gap_status` answer different questions and are easy to conflate.
+Access is about entry; GAP status is the conservation mandate, and it is the better
+signal for whether dispersed camping is plausible:
+
+| `gap_status` | Meaning |
+|---|---|
+| `1` | Permanent protection, natural state maintained |
+| `2` | Permanent protection, some management permitted |
+| `3` | Permanent protection, extractive use allowed |
+| `4` | No known protection mandate |
+
+A GAP 4 parcel can be entirely open to the public and still be managed for timber. Do not
+read one as the other.
+
+Two behaviours are specific to this layer, both caused by PAD-US publishing some parcels
+as a single record aggregating every unit of that name nationally:
+
+- **Membership is tested against the polygon, not its bounding box.** One record's
+  bounding box can span the country while none of its polygons are near you. On the
+  opening Adirondack viewport a bbox test returns 124 parcels against 87 that genuinely
+  intersect.
+- **Geometry is clipped to your bbox.** You get the part of each parcel inside the
+  viewport, not the whole parcel — 288 KB instead of 982 KB for that same viewport. Pan
+  and you get the next part. Do not cache a parcel's geometry as if it were complete.
+
 Three of these are deliberately tri-state. **`null` is not `false`.** For `perennial`,
 441 of 63,407 Adirondack water features are genuinely unknown, and rendering those as
 "dries up" would be wrong. Check for `null` explicitly before styling on them.
@@ -315,10 +351,5 @@ index.
 
 ## Not included yet
 
-**Public land** (`PublicLand`, 1,574 Adirondack parcels with legal camping access) is in
-the database and ingested, but has no endpoint. TM05-14's acceptance criteria name only
-campsites, trails and water. Adding `/api/public-land/` is a small change following the
-same pattern — raise it if the map needs legal-status shading.
-
-**Scoring** is not here either. These endpoints return raw ingested features, not scored
-campsites. The 0–100 score is a later story.
+**Scoring.** These endpoints return raw ingested features, not scored campsites. The
+0–100 score is a later story.

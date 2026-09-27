@@ -7,4 +7,5 @@ urlpatterns = [
     path("campsites/", layer_view, {"layer": "campsites"}, name="campsites"),
     path("trails/", layer_view, {"layer": "trails"}, name="trails"),
     path("water/", layer_view, {"layer": "water"}, name="water"),
+    path("public-land/", layer_view, {"layer": "public-land"}, name="public-land"),
 ]

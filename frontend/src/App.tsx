@@ -37,6 +37,7 @@ const INITIAL_ZOOM = 10;
 const DEBOUNCE_MS = 400;
 
 const LAYERS: { name: LayerName; label: string }[] = [
+  { name: "public-land", label: "Public land" },
   { name: "water", label: "Water" },
   { name: "trails", label: "Trails" },
   { name: "campsites", label: "Campsites" },
@@ -52,6 +53,7 @@ export default function App() {
   const debounce = useRef<number | undefined>(undefined);
 
   const [enabled, setEnabled] = useState<Record<LayerName, boolean>>({
+    "public-land": true,
     water: true,
     trails: true,
     campsites: true,
@@ -155,6 +157,29 @@ export default function App() {
       for (const layer of LAYERS) {
         instance.addSource(layer.name, { type: "geojson", data: EMPTY });
       }
+
+      // Public land first, so every other layer draws on top of it. It is background:
+      // a quiet tint saying which ground is legally campable, under the water, trails
+      // and campsites the user actually came to read.
+      instance.addLayer({
+        id: "public-land-fill",
+        type: "fill",
+        source: "public-land",
+        paint: {
+          "fill-color": colour.publicLand,
+          "fill-opacity": paint.publicLandFillOpacity,
+        },
+      });
+      instance.addLayer({
+        id: "public-land-outline",
+        type: "line",
+        source: "public-land",
+        paint: {
+          "line-color": colour.publicLand,
+          "line-width": paint.publicLandLineWidth,
+          "line-opacity": paint.publicLandLineOpacity,
+        },
+      });
 
       // Water: polygons filled, lines stroked. docs/api.md says one collection
       // carries both, so each is filtered by geometry type rather than endpoint.

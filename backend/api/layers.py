@@ -46,11 +46,11 @@ from dataclasses import dataclass
 from typing import Any
 
 from django.contrib.gis.db.models import GeometryField
-from django.contrib.gis.db.models.functions import AsGeoJSON
+from django.contrib.gis.db.models.functions import AsGeoJSON, Intersection
 from django.contrib.gis.geos import Polygon
 from django.db.models import Func, IntegerField, Value
 
-from geodata.models import Campsite, Trail, WaterFeature
+from geodata.models import Campsite, PublicLand, Trail, WaterFeature
 
 
 class SimplifyPreserveTopology(Func):
@@ -132,11 +132,28 @@ class Layer:
     model: Any
     #: Model fields exposed as GeoJSON Feature properties, in the order the frontend sees.
     properties: tuple[str, ...]
+    #: Test the geometry itself rather than only its bounding box. See `clip` below --
+    #: these two exist for the same reason and public land is the only layer that needs
+    #: either. Defaults keep the other three layers on the cheaper bbox-only path.
+    exact: bool = False
+    #: Serialise only the part of the geometry inside the viewport.
+    clip: bool = False
+
+    def matching(self, bounds: Polygon):
+        """Every row this layer considers inside `bounds`, before the cap.
+
+        Shared by the feature query and by the truncation count so the two can never
+        disagree about what "matched" means.
+        """
+        lookup = "geom__intersects" if self.exact else "geom__bboverlaps"
+        return self.model.objects.filter(**{lookup: bounds})
 
     def queryset(self, bounds: Polygon, limit: int, simplify: float | None):
-        geometry = SimplifyPreserveTopology("geom", Value(simplify)) if simplify else "geom"
+        geometry = Intersection("geom", Value(bounds)) if self.clip else "geom"
+        if simplify:
+            geometry = SimplifyPreserveTopology(geometry, Value(simplify))
         return (
-            self.model.objects.filter(geom__bboverlaps=bounds)
+            self.matching(bounds)
             .annotate(
                 geojson=AsGeoJSON(geometry, precision=COORDINATE_PRECISION),
                 sample_order=SampleOrder("id"),
@@ -161,6 +178,28 @@ LAYERS: dict[str, Layer] = {
         name="water",
         model=WaterFeature,
         properties=("name", "feature_type", "perennial"),
+    ),
+    "public-land": Layer(
+        name="public-land",
+        model=PublicLand,
+        properties=("name", "manager", "designation", "public_access", "gap_status"),
+        # The only layer that sets these, and it needs both.
+        #
+        # PAD-US publishes some parcels as one record aggregating every unit of that name
+        # nationally -- "Riverside Park" arrives as 230 polygons spanning -123 to -68
+        # degrees. Those are spatially correct, but their *bounding box* covers most of
+        # the country, so a bbox-only test matches them from anywhere. Measured on the
+        # opening Adirondack viewport: 124 rows by bounding box against 87 that genuinely
+        # intersect, so 30% of the layer was parcels with no polygon on screen. The exact
+        # test is also faster here (15 ms against 51 ms), because it hands back fewer rows.
+        #
+        # Clipping is the other half. Serialising those multipolygons whole costs 982 KB
+        # for one viewport; clipped to what is actually visible it is 288 KB, and nothing
+        # on screen looks different. Filtering on BndryExten was the obvious-looking
+        # alternative and is wrong: every one of the 1,574 rows is tagged "National",
+        # because that field describes the PAD-US dataset extent, not the parcel.
+        exact=True,
+        clip=True,
     ),
 }
 
@@ -199,9 +238,7 @@ def collect(
     # Only pay for the count when the cap might have bitten. On the full park this is
     # about 130 ms; on a small box the cap is never reached and it costs nothing.
     truncated = len(rows) >= limit
-    matched = (
-        layer.model.objects.filter(geom__bboverlaps=bounds).count() if truncated else len(rows)
-    )
+    matched = layer.matching(bounds).count() if truncated else len(rows)
 
     features = [
         {
