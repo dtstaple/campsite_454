@@ -12,6 +12,13 @@ import "./App.css";
 import { mapColors, mapPaint } from "./theme";
 import AuthPanel from "./AuthPanel";
 import { storedSession, type Session } from "./auth";
+import {
+  loadSaved,
+  save as saveCampsite,
+  SaveError,
+  unsave as unsaveCampsite,
+  type SavedCampsite,
+} from "./saved";
 import type { FeatureCollection as GeoJsonFeatureCollection } from "geojson";
 import {
   ApiError,
@@ -78,6 +85,32 @@ export default function App() {
   // Read once on mount rather than in an effect, so the first paint already knows
   // whether it is signed in and the panel does not flash "Sign in" at a signed-in user.
   const [session, setSession] = useState<Session | null>(storedSession);
+  const [saved, setSaved] = useState<SavedCampsite[]>(() => loadSaved(storedSession()));
+
+  // The popup's save button is a plain DOM node created inside the map-setup effect,
+  // which runs once. Reading session and saved through refs keeps that handler from
+  // closing over the values they had on the first render -- the same reason `enabled`
+  // is read through a ref above.
+  const sessionRef = useRef(session);
+  const savedRef = useRef(saved);
+  useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
+  useEffect(() => {
+    savedRef.current = saved;
+  }, [saved]);
+
+  // Signing in or out swaps whose list this is. loadSaved returns [] when signed out,
+  // so the panel empties rather than showing the previous user's saves.
+  useEffect(() => {
+    setSaved(loadSaved(session));
+    if (session) setSignInPrompt(false);
+  }, [session]);
+
+  // Set by the popup's save button when nobody is signed in, so the sign-in prompt is
+  // an answer to an action rather than a nag.
+  const [signInPrompt, setSignInPrompt] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   /** Fetch the viewport in one request and push each layer into its source. */
   const refresh = useCallback(async () => {
@@ -138,6 +171,34 @@ export default function App() {
     } finally {
       if (!controller.signal.aborted) setLoading(false);
     }
+  }, []);
+
+  /** Save or unsave from the popup. Stable, so the map effect never re-runs for it. */
+  const toggleSaved = useCallback(async (campsite: SavedCampsite) => {
+    const current = sessionRef.current;
+    if (!current) {
+      setSignInPrompt(true);
+      return;
+    }
+
+    setSaveError(null);
+    const list = savedRef.current;
+    const alreadySaved = list.some((entry) => entry.id === campsite.id);
+    try {
+      const next = alreadySaved
+        ? await unsaveCampsite(campsite.id, current, list)
+        : await saveCampsite(campsite, current, list);
+      setSaved(next);
+    } catch (caught) {
+      setSaveError(caught instanceof SaveError ? caught.message : String(caught));
+    }
+    // The setters are stable by contract, but listing them lets React Compiler verify
+    // that rather than skip optimising the component.
+  }, [setSaved, setSaveError, setSignInPrompt]);
+
+  /** Centre the map on a saved campsite. */
+  const flyToSaved = useCallback((campsite: SavedCampsite) => {
+    map.current?.flyTo({ center: [campsite.lon, campsite.lat], zoom: Math.max(13, INITIAL_ZOOM) });
   }, []);
 
   // --- map setup, once ------------------------------------------------------------
@@ -249,9 +310,46 @@ export default function App() {
     instance.on("click", "campsites-point", (event: maplibregl.MapLayerMouseEvent) => {
       const feature = event.features?.[0];
       if (!feature) return;
+
+      const campsite: SavedCampsite = {
+        // The Feature id is the campsite's source_id, which is what the save endpoint
+        // accepts -- see docs/api.md. Sent back unchanged, never parsed.
+        id: String(feature.id ?? ""),
+        name: String(feature.properties?.name || "") || "Unnamed campsite",
+        lon: event.lngLat.lng,
+        lat: event.lngLat.lat,
+      };
+
+      // setDOMContent rather than setHTML: the save button needs a real listener, and
+      // a string popup would mean re-finding the node and guessing when it exists.
+      const content = document.createElement("div");
+      content.innerHTML = campsitePopup(feature.properties);
+
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "popup-save";
+
+      const paint = () => {
+        const isSaved = savedRef.current.some((entry) => entry.id === campsite.id);
+        button.textContent = isSaved ? "Saved ✓" : "Save";
+        button.classList.toggle("is-saved", isSaved);
+        button.setAttribute("aria-pressed", String(isSaved));
+      };
+      paint();
+
+      button.addEventListener("click", async () => {
+        button.disabled = true;
+        await toggleSaved(campsite);
+        button.disabled = false;
+        paint();
+      });
+
+      // Only offer it when the feature carries an id to send back.
+      if (campsite.id) content.querySelector(".popup")?.appendChild(button);
+
       new maplibregl.Popup({ closeButton: true })
         .setLngLat(event.lngLat)
-        .setHTML(campsitePopup(feature.properties))
+        .setDOMContent(content)
         .addTo(instance);
     });
     instance.on("mouseenter", "campsites-point", () => {
@@ -268,7 +366,7 @@ export default function App() {
       instance.remove();
       map.current = null;
     };
-  }, [refresh]);
+  }, [refresh, toggleSaved]);
 
   // Toggling a layer refetches rather than hiding, so a layer turned back on is current.
   useEffect(() => {
@@ -322,6 +420,57 @@ export default function App() {
           fromCache && <div className="status cached">Cached · zoom {zoom.toFixed(1)}</div>
         )}
       </div>
+
+      {session && (
+        <div className="panel saved-panel">
+          <div className="panel-title">Saved</div>
+          {saved.length === 0 ? (
+            <div className="saved-empty">
+              Nothing saved yet. Open a campsite and choose Save.
+            </div>
+          ) : (
+            <ul className="saved-list">
+              {saved.map((campsite) => (
+                <li key={campsite.id}>
+                  <button
+                    type="button"
+                    className="saved-row"
+                    onClick={() => flyToSaved(campsite)}
+                    title="Show on the map"
+                  >
+                    {campsite.name}
+                  </button>
+                  <button
+                    type="button"
+                    className="saved-remove"
+                    onClick={() => void toggleSaved(campsite)}
+                    aria-label={`Unsave ${campsite.name}`}
+                    title="Unsave"
+                  >
+                    ×
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {/* TODO(TM05-32): this list is what *this browser* saved, not what the
+              account holds -- the accounts API has no GET /api/saved-campsites/ yet.
+              It is empty on another device and does not reflect a save made
+              elsewhere. Replace with a fetch once that story lands. */}
+          <div className="saved-caveat">Showing saves made in this browser.</div>
+        </div>
+      )}
+
+      {signInPrompt && !session && (
+        <div className="banner warn">
+          Sign in to save campsites.{" "}
+          <button type="button" className="auth-link" onClick={() => setSignInPrompt(false)}>
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {saveError && <div className="banner error">{saveError}</div>}
 
       {error && <div className="banner error">{error}</div>}
 

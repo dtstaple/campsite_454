@@ -441,3 +441,102 @@
   font-size: var(--text-sm);
   line-height: var(--leading-snug);
 }
+
+/* --- saved campsites ---------------------------------------------------------------
+ *
+ * Below the layers panel, same surface treatment, so the two read as one column of
+ * controls rather than two competing cards.
+ */
+.saved-panel {
+  top: auto;
+  bottom: var(--space-md);
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.saved-empty {
+  color: var(--text-tertiary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+}
+
+.saved-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.saved-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.saved-row {
+  flex: 1;
+  padding: var(--space-xs) 0;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  text-align: left;
+  cursor: pointer;
+}
+
+.saved-row:hover {
+  color: var(--map-campsites);
+}
+
+.saved-remove {
+  padding: 0 var(--space-xs);
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: var(--text-lg);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.saved-remove:hover {
+  color: var(--danger);
+}
+
+/* The list is browser-local until TM05-32 adds a read endpoint; saying so is better
+ * than letting someone assume their saves followed them to another machine. */
+.saved-caveat {
+  margin-top: var(--space-sm);
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+  line-height: var(--leading-snug);
+}
+
+/* --- save button inside a campsite popup --- */
+.popup-save {
+  width: 100%;
+  margin-top: var(--space-sm);
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--accent);
+  color: var(--bg-base);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+}
+
+.popup-save:hover:not(:disabled) {
+  background: var(--text-primary);
+}
+
+.popup-save.is-saved {
+  background: var(--bg-raised);
+  color: var(--success);
+  border: 1px solid var(--success);
+}
+
+.popup-save:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
