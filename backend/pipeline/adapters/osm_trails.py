@@ -45,9 +45,47 @@ from pipeline.overpass import OverpassClient
 
 # The tags that constitute a walkable trail for our purposes. footway is included even
 # though it also covers urban pavement, because in the Northeast it is widely used for
-# trail segments near trailheads and huts -- excluding it would lose real trail. Filtering
-# out sidewalks is a scoring concern, not an ingestion one.
+# trail segments near trailheads and huts -- excluding it wholesale would lose real trail.
 TRAIL_HIGHWAY_VALUES = ("path", "footway", "track", "bridleway")
+
+# What `highway=footway` means is decided by its `footway` subtag, and these four values
+# say "urban pedestrian infrastructure" unambiguously. A crossing is a painted line over a
+# road; a sidewalk runs beside one. Neither is somewhere you can camp, and on the previous
+# ingest they were 7,471 of 26,005 rows -- Saranac Lake and Lake Placid street furniture
+# sitting in a backcountry trail network.
+EXCLUDED_FOOTWAY_VALUES = ("sidewalk", "crossing", "traffic_island", "access_aisle")
+
+# Golf cart paths. Tagged highway=path or footway with a `golf` key; 548 rows previously.
+EXCLUDED_IF_TAGGED = ("golf",)
+
+# Deliberately NOT excluded, though it looks tempting:
+#
+#   tiger:*        2,578 rows carry tags from the US Census road import. Excluding them
+#                  wholesale would drop 2,573 ways that are not urban at all -- 2,154 of
+#                  them highway=track, 958 named, 51 carrying sac_scale. Those are
+#                  Adirondack forest roads and logging tracks that happen to have come in
+#                  through TIGER. They are exactly the kind of approach route this project
+#                  cares about.
+#
+#   no sac_scale   Only 758 of 26,005 ways carry a hiking difficulty grade, so requiring
+#                  one would discard 97% of the network including most real trail. Absence
+#                  of the tag means nobody graded it, not that it is a pavement.
+#
+#   informal=yes   650 rows. Herd paths are unofficial but genuinely walked, and in the
+#                  High Peaks they are often the only route up a trailless summit.
+
+
+def is_hiking_trail(tags: dict) -> bool:
+    """Whether a way with these tags belongs in the trail network.
+
+    The Overpass query already excludes these server-side -- this is the same rule
+    expressed once more, applied to whatever actually comes back. Keeping it as a
+    predicate means the decision is testable without the network, and means a change in
+    Overpass semantics shows up as a filtered record rather than a sidewalk on the map.
+    """
+    if (tags.get("footway") or "").strip() in EXCLUDED_FOOTWAY_VALUES:
+        return False
+    return all(key not in tags for key in EXCLUDED_IF_TAGGED)
 
 
 @register
@@ -81,11 +119,21 @@ class OsmTrailsAdapter(SourceAdapter):
     # --- fetch ------------------------------------------------------------------------
 
     def build_query(self, aoi: AreaOfInterest) -> str:
-        """Overpass QL for every trail way intersecting `aoi`."""
+        """Overpass QL for every trail way intersecting `aoi`.
+
+        The exclusions run server-side so the urban paths are never transferred at all.
+        In Overpass a negated match also succeeds when the key is absent, so
+        ["footway"!~"..."] keeps every way that has no footway subtag.
+        """
         pattern = "|".join(TRAIL_HIGHWAY_VALUES)
+        excluded_footway = "|".join(EXCLUDED_FOOTWAY_VALUES)
+        drop_if_tagged = "".join(f'["{key}"!~"."]' for key in EXCLUDED_IF_TAGGED)
         return (
             f"[out:json][timeout:{self.query_timeout_seconds}];"
-            f'way["highway"~"^({pattern})$"]({aoi.as_overpass_bbox()});'
+            f'way["highway"~"^({pattern})$"]'
+            f'["footway"!~"^({excluded_footway})$"]'
+            f"{drop_if_tagged}"
+            f"({aoi.as_overpass_bbox()});"
             f"out geom;"
         )
 
@@ -103,6 +151,8 @@ class OsmTrailsAdapter(SourceAdapter):
         for elements in raw:
             for element in elements:
                 if element.get("type") != "way":
+                    continue
+                if not is_hiking_trail(element.get("tags") or {}):
                     continue
                 yield self.to_record(element)
 
@@ -148,6 +198,8 @@ class OsmTrailsAdapter(SourceAdapter):
         parameters.update(
             endpoint=self.client.endpoint,
             highway_values=list(TRAIL_HIGHWAY_VALUES),
+            excluded_footway_values=list(EXCLUDED_FOOTWAY_VALUES),
+            excluded_if_tagged=list(EXCLUDED_IF_TAGGED),
             max_tile_degrees=self.max_tile_degrees,
         )
         return parameters
