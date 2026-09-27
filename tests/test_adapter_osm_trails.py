@@ -20,7 +20,12 @@ import pytest
 import requests
 
 from geodata.models import IngestRun, Trail
-from pipeline.adapters.osm_trails import TRAIL_HIGHWAY_VALUES, OsmTrailsAdapter
+from pipeline.adapters.osm_trails import (
+    EXCLUDED_FOOTWAY_VALUES,
+    TRAIL_HIGHWAY_VALUES,
+    OsmTrailsAdapter,
+    is_hiking_trail,
+)
 from pipeline.aoi import AreaOfInterest
 from pipeline.geometry import geodesic_length_m
 from pipeline.overpass import (
@@ -468,3 +473,98 @@ def test_live_overpass_returns_usable_trails():
         assert all(isinstance(n, int) for n in trail.osm_node_ids)
         assert trail.length_m > 0
         assert trail.trail_type in TRAIL_HIGHWAY_VALUES
+
+
+# --- filtering urban paths out of the trail network ------------------------------------
+#
+# Roughly 30% of what the unfiltered query returned was not trail: 7,471 sidewalks and
+# street crossings and 548 golf cart paths out of 26,005 ways. The filter runs server-side
+# in the query and again over the response, so both are tested -- the query so the bytes
+# are never transferred, the predicate so a change in Overpass semantics surfaces as a
+# dropped record rather than a sidewalk on the map.
+
+
+@pytest.mark.parametrize("value", EXCLUDED_FOOTWAY_VALUES)
+def test_urban_footway_subtags_are_dropped(value):
+    assert not is_hiking_trail({"highway": "footway", "footway": value})
+
+
+def test_a_golf_cart_path_is_dropped():
+    assert not is_hiking_trail({"highway": "path", "golf": "cartpath"})
+
+
+def test_a_plain_footway_with_no_subtag_is_kept():
+    """The case the exclusions must not overreach into.
+
+    Near trailheads and huts a real trail segment is often just highway=footway with
+    nothing else on it. Absence of a footway subtag is not evidence of pavement.
+    """
+    assert is_hiking_trail({"highway": "footway"})
+
+
+def test_a_tiger_imported_forest_track_is_kept():
+    """2,573 non-urban ways carry tiger:* tags, 2,154 of them highway=track.
+
+    Adirondack forest roads came in through the US Census import. Excluding on tiger:*
+    would have discarded them, so this pins the decision not to.
+    """
+    tags = {
+        "highway": "track",
+        "name": "Corey's Road",
+        "tiger:cfcc": "A41",
+        "tiger:county": "Franklin, NY",
+    }
+    assert is_hiking_trail(tags)
+
+
+def test_an_ungraded_path_is_kept():
+    """Only 758 of 26,005 ways carry sac_scale. Requiring one would drop 97% of them."""
+    assert is_hiking_trail({"highway": "path"})
+
+
+def test_a_herd_path_is_kept():
+    assert is_hiking_trail({"highway": "path", "informal": "yes"})
+
+
+def test_the_query_excludes_urban_paths_server_side():
+    adapter = adapter_for([])
+
+    query = adapter.build_query(TINY)
+
+    assert '["footway"!~"^(sidewalk|crossing|traffic_island|access_aisle)$"]' in query
+    assert '["golf"!~"."]' in query
+    # A negated match in Overpass also succeeds when the key is absent, which is what
+    # keeps every way that has no footway subtag at all.
+    assert '["highway"~"^(path|footway|track|bridleway)$"]' in query, "still trail-scoped"
+
+
+def test_normalize_drops_an_excluded_way_that_the_server_returned_anyway():
+    adapter = adapter_for([])
+    sidewalk = {
+        "type": "way",
+        "id": 1,
+        "tags": {"highway": "footway", "footway": "sidewalk"},
+        "nodes": [1, 2],
+        "geometry": [{"lon": -74.1, "lat": 44.1}, {"lon": -74.09, "lat": 44.11}],
+    }
+    trail = {
+        "type": "way",
+        "id": 2,
+        "tags": {"highway": "path", "name": "Van Hoevenberg"},
+        "nodes": [3, 4],
+        "geometry": [{"lon": -74.1, "lat": 44.1}, {"lon": -74.09, "lat": 44.11}],
+    }
+
+    records = list(adapter.normalize([[sidewalk, trail]]))
+
+    assert [record["source_id"] for record in records] == ["way/2"]
+
+
+def test_the_exclusions_are_recorded_in_run_parameters():
+    """A run has to say what it filtered, or its record count is uninterpretable."""
+    adapter = adapter_for([])
+
+    parameters = adapter.run_parameters(TINY)
+
+    assert parameters["excluded_footway_values"] == list(EXCLUDED_FOOTWAY_VALUES)
+    assert parameters["excluded_if_tagged"] == ["golf"]

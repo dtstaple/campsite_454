@@ -94,7 +94,7 @@ roughly these numbers, it worked; if it returns a fraction of them, something is
 | Command | Rows loaded | Skipped | Status |
 |---|---|---|---|
 | `ingest padus adirondacks` | 1,574 | 149 | partial |
-| `ingest osm-trails adirondacks` | 26,005 | 0 | success |
+| `ingest osm-trails adirondacks` | 18,067 | 0 | success |
 | `ingest nhd-flowlines adirondacks` | 46,589 | 0 | success |
 | `ingest nhd-waterbodies adirondacks` | 16,818 | 3 | partial |
 | `ingest ridb white-mountains-nh` | 660 | 64 | partial |
@@ -292,6 +292,35 @@ Program, because 3DHP classifies flowlines topologically — Canal, Channel Line
 — and has no perennial/intermittent equivalent. That distinction feeds the campsite score
 directly, so moving to 3DHP would silently cost a scoring input. Worth revisiting if 3DHP
 gains a flow-regime attribute.
+
+**OSM trail ingestion filters out urban pedestrian infrastructure.** The first Adirondack
+ingest returned 26,005 "trails", and roughly 30% of them were not trails: 7,471 sidewalks
+and street crossings, plus 548 golf cart paths. In and around Saranac Lake and Lake Placid
+the backcountry map was largely street furniture. The query now excludes them server-side,
+so they are never transferred, and `is_hiking_trail()` applies the same rule again to
+whatever comes back.
+
+Excluded:
+
+| Rule | Why |
+|---|---|
+| `footway` in `sidewalk`, `crossing`, `traffic_island`, `access_aisle` | These four values are what make a `highway=footway` urban. A crossing is a painted line over a road; a sidewalk runs beside one. |
+| any `golf` tag | Cart paths, tagged `highway=path` or `footway`. |
+
+Deliberately **not** excluded, each of which looked tempting and is wrong:
+
+| Candidate | Why it was rejected |
+|---|---|
+| `tiger:*` tags | 2,578 ways carry them, but 2,573 are not urban — 2,154 are `highway=track`, 958 are named, 51 carry `sac_scale`. Adirondack forest roads and logging tracks came in through the US Census import, and they are exactly the approach routes this project wants. |
+| requiring `sac_scale` | Only 758 of 26,005 ways are graded. Requiring a grade would discard 97% of the network, most of it real trail. Absence means nobody graded it, not that it is pavement. |
+| `informal=yes` | 650 herd paths. Unofficial but genuinely walked, and often the only route up a trailless High Peak. |
+
+`highway=footway` itself stays in the query. Near trailheads and huts a real trail segment
+is frequently just `highway=footway` with nothing else on it, so excluding the value
+wholesale would lose real trail — which is why the filter keys on the *subtag* instead.
+
+Each run records `excluded_footway_values` and `excluded_if_tagged` in its `parameters`,
+so a row count is interpretable against the filter that produced it.
 
 **Overpass requires a User-Agent** and rejects requests without one using HTTP 406, which
 is not retryable. The public instance allows two concurrent slots, so the client retries
