@@ -10,6 +10,8 @@ import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./App.css";
 import { mapColors, mapPaint } from "./theme";
+import AuthPanel from "./AuthPanel";
+import { storedSession, type Session } from "./auth";
 import type { FeatureCollection as GeoJsonFeatureCollection } from "geojson";
 import {
   ApiError,
@@ -72,6 +74,10 @@ export default function App() {
 
   const [zoom, setZoom] = useState(INITIAL_ZOOM);
   const [fromCache, setFromCache] = useState(false);
+
+  // Read once on mount rather than in an effect, so the first paint already knows
+  // whether it is signed in and the panel does not flash "Sign in" at a signed-in user.
+  const [session, setSession] = useState<Session | null>(storedSession);
 
   /** Fetch the viewport in one request and push each layer into its source. */
   const refresh = useCallback(async () => {
@@ -274,6 +280,8 @@ export default function App() {
   return (
     <div className="app">
       <div ref={mapContainer} className="map" />
+
+      <AuthPanel session={session} onChange={setSession} />
 
       <div className="panel">
         <div className="panel-title">Layers</div>
