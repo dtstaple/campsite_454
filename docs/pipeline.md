@@ -81,6 +81,7 @@ automatically. An unknown name lists what is available instead of failing obscur
 | `nhd-flowlines` | `WaterFeature` | Streams and rivers from USGS NHD |
 | `nhd-waterbodies` | `WaterFeature` | Lakes, ponds, reservoirs and wetlands from USGS NHD |
 | `ridb` | `Campsite` | Federal campsites from Recreation.gov |
+| `osm-campsites` | `Campsite` | Backcountry campsites from OpenStreetMap |
 
 Naming follows one rule: a source that yields a single dataset gets its bare name
 (`padus`, `ridb`), and a source yielding several gets `source-dataset` (`osm-trails`,
@@ -98,6 +99,7 @@ roughly these numbers, it worked; if it returns a fraction of them, something is
 | `ingest nhd-flowlines adirondacks` | 46,589 | 0 | success |
 | `ingest nhd-waterbodies adirondacks` | 16,818 | 3 | partial |
 | `ingest ridb white-mountains-nh` | 660 | 64 | partial |
+| `ingest osm-campsites adirondacks` | 563 | 0 | success |
 
 Two things worth noticing. Three of the five finish *partial*, and that is the normal
 outcome — see section 4. And `ridb` is run against the White Mountains rather than the
@@ -335,6 +337,32 @@ circumscribing radius of about 84. At 0.5 degrees a tile fits inside a 25-mile c
 about 15% margin. RIDB is also the only source queried by circle rather than bounding box,
 so the circle over-fetches roughly 27% beyond the tile and results are filtered back to the
 tile in `normalize`.
+
+**Campsites come from two sources, and that is not redundancy.** RIDB covers Forest
+Service and Park Service land; the Adirondacks are New York State Forest Preserve, so RIDB
+returns essentially nothing there. Before `osm-campsites` existed the database held 660
+campsites in the White Mountains and 92,000 trails and water features in the Adirondacks,
+three hundred kilometres apart, and **no viewport anywhere on the map showed a campsite and
+a stream at the same time**. Adding OSM campsites is what made one region complete: the
+Adirondacks now hold 563 campsites alongside 18,067 trails, 63,407 water features and
+1,574 public land parcels.
+
+The two sources share the `Campsite` table and stay distinct by `source_id` namespace --
+RIDB writes `campsite/73996`, OSM writes `node/4270946202` or `way/32002985`. That matters
+beyond tidiness: `/api/saved-campsites/<source_id>/` resolves a campsite by `source_id`
+alone, so a collision between the two would be a wrong-site bug.
+
+`osm-campsites` asks Overpass for `out center` rather than `out geom`, because a campsite
+way is an area you pitch inside and the model stores one Point. Relations are not ingested,
+for the same reason `osm-trails` skips `route=hiking` relations: a `tourism=camp_site`
+relation groups ways the query already returns, so ingesting it would duplicate sites
+rather than add them. Each run records its queried `element_types` in `parameters`.
+
+Site type is mapped narrowly. `backcountry=yes` (153 of 230 sampled High Peaks features)
+becomes `primitive`, `group_only=yes` becomes `group`, a lean-to shelter becomes `lean_to`,
+and **everything else stays `unknown`**. `tourism=camp_site` on its own says somebody
+mapped a camping spot, not that it is a developed campground, so promoting the residual to
+`designated` would assert something the source never said.
 
 **RIDB is federal-only.** It covers Forest Service and Park Service land and knows nothing
 about state land. Adirondack Park is New York state land, so running `ingest ridb

@@ -1,0 +1,236 @@
+{
+  "version": 0.6,
+  "generator": "Overpass API 0.7.62.11 87bfad18",
+  "elements": [
+    {
+      "type": "node",
+      "id": 3241289584,
+      "lat": 44.1994209,
+      "lon": -74.0563812,
+      "tags": {
+        "backcountry": "yes",
+        "name": "Wanika Falls campsite",
+        "openfire": "yes",
+        "operator": "NYSDEC",
+        "tourism": "camp_site"
+      }
+    },
+    {
+      "type": "node",
+      "id": 4210910664,
+      "lat": 44.1047831,
+      "lon": -74.0217619,
+      "tags": {
+        "backcountry": "yes",
+        "description": "NYSDEC designated campsite.",
+        "name": "Calamity Brook",
+        "operator": "NYSDEC",
+        "tourism": "camp_site"
+      }
+    },
+    {
+      "type": "node",
+      "id": 5921593903,
+      "lat": 44.3818311,
+      "lon": -74.3084302,
+      "tags": {
+        "backcountry": "yes",
+        "tourism": "camp_site"
+      }
+    },
+    {
+      "type": "node",
+      "id": 6778547127,
+      "lat": 44.0287829,
+      "lon": -74.366727,
+      "tags": {
+        "backcountry": "yes",
+        "tents": "yes",
+        "tourism": "camp_site"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2778755689,
+      "lat": 44.1533083,
+      "lon": -73.939981,
+      "tags": {
+        "tourism": "camp_site"
+      }
+    },
+    {
+      "type": "node",
+      "id": 3133638558,
+      "lat": 44.0602741,
+      "lon": -73.8089247,
+      "tags": {
+        "description": "NYSDEC designated campsite",
+        "operator": "NYSDEC",
+        "tourism": "camp_site"
+      }
+    },
+    {
+      "type": "way",
+      "id": 32002985,
+      "center": {
+        "lat": 44.3057841,
+        "lon": -74.1785732
+      },
+      "nodes": [
+        5746093057,
+        358647373,
+        5746093056,
+        358647418,
+        358647420,
+        358647411,
+        358647413,
+        358647404,
+        5746093055,
+        5746093054,
+        5746093053,
+        5746093052,
+        358647407,
+        5746093051,
+        5746093050,
+        358647396,
+        358647401,
+        358647337,
+        5746093049,
+        5746093048,
+        5746093047,
+        358647333,
+        5746093046,
+        5746093045,
+        5746093044,
+        5746093043,
+        5746093042,
+        358647240,
+        358647237,
+        358647223,
+        5746093041,
+        358647220,
+        5746093040,
+        358647230,
+        358647226,
+        5746093039,
+        5746093038,
+        5746093037,
+        358647258,
+        5746093036,
+        5746093035,
+        358647255,
+        5746093034,
+        358647264,
+        358647261,
+        358647247,
+        5746093033,
+        5746093032,
+        358647242,
+        5746093031,
+        5746093030,
+        5746093029,
+        5746093028,
+        358647253,
+        5746093027,
+        5746093026,
+        5746093025,
+        358647249,
+        5746093024,
+        358647391,
+        358647393,
+        358647386,
+        5746093023,
+        358647388,
+        5746093022,
+        358647376,
+        5746093021,
+        358647383,
+        5746093020,
+        5746093019,
+        358647369,
+        5746093018,
+        5746093017,
+        5746093057
+      ],
+      "tags": {
+        "ele": "476",
+        "gnis:feature_id": "963156",
+        "name": "Sable Island",
+        "place": "islet",
+        "tourism": "camp_site",
+        "wikidata": "Q34713359"
+      }
+    },
+    {
+      "type": "way",
+      "id": 32003005,
+      "center": {
+        "lat": 44.299542,
+        "lon": -74.2024935
+      },
+      "nodes": [
+        5746093066,
+        5746093065,
+        5746093064,
+        5746093063,
+        5746093062,
+        358635445,
+        358635436,
+        5746093061,
+        358635439,
+        358635429,
+        358635434,
+        358635427,
+        5746093060,
+        358635457,
+        358635460,
+        358635452,
+        5746093059,
+        5746093058,
+        358635454,
+        358635447,
+        358635450,
+        358635441,
+        5746093066
+      ],
+      "tags": {
+        "place": "islet",
+        "tourism": "camp_site"
+      }
+    },
+    {
+      "type": "relation",
+      "id": 6378239,
+      "center": {
+        "lat": 44.3021977,
+        "lon": -74.369465
+      },
+      "members": [
+        {
+          "type": "way",
+          "ref": 428829922,
+          "role": "outer"
+        },
+        {
+          "type": "way",
+          "ref": 428829923,
+          "role": "outer"
+        }
+      ],
+      "tags": {
+        "boundary": "protected_area",
+        "governance": "government_managed",
+        "name": "Fish Creek Pond Campground",
+        "ownership": "state",
+        "protect_class": "21",
+        "protection_object": "recreation",
+        "protection_title": "Intensive Use",
+        "related_law": "New York State Constitution, Article XIV",
+        "source": "http://gis.ny.gov/gisdata/inventories/details.cfm?DSID=1114",
+        "tourism": "camp_site",
+        "type": "multipolygon",
+        "website": "https://www.dec.ny.gov/outdoor/24466.html"
+      }
+    }
+  ]
+}
