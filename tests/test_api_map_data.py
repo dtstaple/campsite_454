@@ -9,12 +9,19 @@ render; parsing the geometry proves it is real.
 import json
 
 import pytest
-from django.contrib.gis.geos import GEOSGeometry, LineString, MultiLineString, Point, Polygon
+from django.contrib.gis.geos import (
+    GEOSGeometry,
+    LineString,
+    MultiLineString,
+    MultiPolygon,
+    Point,
+    Polygon,
+)
 from django.test import Client
 
 from api.bbox import InvalidBbox, parse_bbox
 from api.layers import LIMIT_BEYOND, LIMIT_BY_AREA, MAX_LIMIT, limit_for_bbox
-from geodata.models import Campsite, Trail, WaterFeature
+from geodata.models import Campsite, PublicLand, Trail, WaterFeature
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
@@ -95,14 +102,33 @@ def make_water(source_id="w1", lon=-74.05, lat=44.10):
     )
 
 
+def make_public_land(source_id="p1", lon=-74.05, lat=44.10, span=0.01, **kwargs):
+    """A square parcel. `span` is how many degrees wide, so a test can make one that
+    dwarfs the viewport the way PAD-US national aggregates do."""
+    square = Polygon.from_bbox((lon, lat, lon + span, lat + span))
+    square.srid = 4326
+    return PublicLand.objects.create(
+        source=PublicLand.Source.PADUS,
+        source_id=source_id,
+        name=kwargs.pop("name", "High Peaks Wilderness"),
+        geom=MultiPolygon(square, srid=4326),
+        manager=kwargs.pop("manager", "State Department of Conservation"),
+        designation=kwargs.pop("designation", "State Wilderness"),
+        public_access=kwargs.pop("public_access", PublicLand.Access.OPEN),
+        gap_status=kwargs.pop("gap_status", PublicLand.GapStatus.PERMANENT_NATURAL),
+        **kwargs,
+    )
+
+
 # --- shape ------------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("layer", ["campsites", "trails", "water"])
+@pytest.mark.parametrize("layer", ["campsites", "trails", "water", "public-land"])
 def test_a_valid_bbox_returns_wellformed_geojson(client, layer):
     make_campsite()
     make_trail()
     make_water()
+    make_public_land()
 
     response = client.get(f"/api/{layer}/?bbox={INSIDE}")
 
@@ -158,11 +184,12 @@ def test_water_properties_expose_the_perennial_tristate(client):
 # --- emptiness ----------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("layer", ["campsites", "trails", "water"])
+@pytest.mark.parametrize("layer", ["campsites", "trails", "water", "public-land"])
 def test_an_empty_area_is_200_with_an_empty_collection(client, layer):
     make_campsite()
     make_trail()
     make_water()
+    make_public_land()
 
     response = client.get(f"/api/{layer}/?bbox={ELSEWHERE}")
 
@@ -360,14 +387,15 @@ def test_map_data_returns_every_layer_separately(client):
     make_campsite()
     make_trail()
     make_water()
+    make_public_land()
 
     document = client.get(f"/api/map-data/?bbox={INSIDE}").json()
 
-    assert set(document["layers"]) == {"campsites", "trails", "water"}
+    assert set(document["layers"]) == {"campsites", "trails", "water", "public-land"}
     for collection in document["layers"].values():
         assert_valid_geojson(collection)
         assert len(collection["features"]) == 1
-    assert document["metadata"]["returned"] == 3
+    assert document["metadata"]["returned"] == 4
     assert document["metadata"]["truncated"] is False
 
 
@@ -533,7 +561,7 @@ def test_map_data_defaults_to_every_layer(client):
 
     document = client.get(f"/api/map-data/?bbox={INSIDE}").json()
 
-    assert set(document["layers"]) == {"campsites", "trails", "water"}
+    assert set(document["layers"]) == {"campsites", "trails", "water", "public-land"}
 
 
 def test_an_unknown_layer_name_is_400_and_lists_the_valid_ones(client):
@@ -555,3 +583,105 @@ def test_skipping_a_layer_actually_shrinks_the_response(client):
     just_campsites = client.get(f"/api/map-data/?bbox={INSIDE}&layers=campsites").content
 
     assert len(just_campsites) < len(everything) / 2
+
+
+# --- public land ------------------------------------------------------------------------
+#
+# This layer is the only one that tests the geometry itself rather than its bounding box,
+# and the only one that clips what it serialises. Both exist because PAD-US publishes some
+# parcels as a single record aggregating every unit of that name nationally, so one row's
+# bounding box can cover most of the country while none of its polygons are on screen.
+
+
+def test_public_land_properties_are_the_ones_the_frontend_needs(client):
+    make_public_land()
+
+    feature = client.get(f"/api/public-land/?bbox={INSIDE}").json()["features"][0]
+
+    assert feature["properties"] == {
+        "name": "High Peaks Wilderness",
+        "manager": "State Department of Conservation",
+        "designation": "State Wilderness",
+        "public_access": "open",
+        "gap_status": "1",
+    }
+
+
+def test_gap_status_is_served_as_its_own_property_not_buried_in_raw(client):
+    make_public_land(gap_status=PublicLand.GapStatus.PERMANENT_EXTRACTIVE)
+
+    feature = client.get(f"/api/public-land/?bbox={INSIDE}").json()["features"][0]
+
+    assert feature["properties"]["gap_status"] == "3"
+
+
+def test_a_parcel_whose_bbox_overlaps_but_whose_polygon_does_not_is_excluded(client):
+    """The national-aggregate case, in miniature.
+
+    An L-shaped parcel: two far-apart squares in one multipolygon. Its bounding box
+    covers the viewport between them, but neither square is inside it. A bbox-only
+    layer would return this; public land must not.
+    """
+    west = Polygon.from_bbox((-76.0, 44.0, -75.9, 44.1))
+    east = Polygon.from_bbox((-73.0, 44.0, -72.9, 44.1))
+    west.srid = east.srid = 4326
+    straddling = MultiPolygon(west, east, srid=4326)
+    PublicLand.objects.create(
+        source=PublicLand.Source.PADUS,
+        source_id="aggregate",
+        name="Riverside Park",
+        geom=straddling,
+        public_access=PublicLand.Access.OPEN,
+    )
+    # INSIDE sits in the gap between the two squares.
+    assert straddling.extent[0] < -74.20 and straddling.extent[2] > -73.90
+
+    document = client.get(f"/api/public-land/?bbox={INSIDE}").json()
+
+    assert document["features"] == [], "a parcel with no polygon on screen must not appear"
+    assert document["metadata"]["matched"] == 0
+
+
+def test_a_parcel_larger_than_the_viewport_is_clipped_to_it(client):
+    """A 10-degree parcel must not serialise 10 degrees of coordinates."""
+    make_public_land(lon=-80.0, lat=40.0, span=10.0)
+
+    document = client.get(f"/api/public-land/?bbox={INSIDE}").json()
+    assert len(document["features"]) == 1
+
+    geometry = GEOSGeometry(json.dumps(document["features"][0]["geometry"]))
+    west, south, east, north = geometry.extent
+    viewport = parse_bbox(INSIDE)
+
+    assert west >= viewport[0] - 1e-6, "clipped geometry escaped the viewport to the west"
+    assert east <= viewport[2] + 1e-6, "clipped geometry escaped the viewport to the east"
+    assert south >= viewport[1] - 1e-6
+    assert north <= viewport[3] + 1e-6
+
+
+def test_clipping_leaves_a_parcel_smaller_than_the_viewport_alone(client):
+    """Clipping must not nibble at parcels that already fit."""
+    parcel = make_public_land(lon=-74.05, lat=44.10, span=0.01)
+
+    feature = client.get(f"/api/public-land/?bbox={INSIDE}").json()["features"][0]
+    served = GEOSGeometry(json.dumps(feature["geometry"]))
+
+    # Not an exact comparison: COORDINATE_PRECISION rounds output to 6 decimal places,
+    # so a stored -74.03999999999999 is served as -74.04 whether it was clipped or not.
+    # What must hold is that clipping took nothing away -- the two cover the same ground
+    # to well within that rounding.
+    drift = served.sym_difference(parcel.geom).area
+    assert (
+        drift < parcel.geom.area * 1e-6
+    ), f"clipping altered a parcel that already fitted the viewport (drift {drift})"
+
+
+def test_public_land_respects_the_limit_like_every_other_layer(client):
+    for index in range(5):
+        make_public_land(source_id=f"p{index}", lon=-74.05 + index * 0.001)
+
+    document = client.get(f"/api/public-land/?bbox={INSIDE}&limit=2").json()
+
+    assert len(document["features"]) == 2
+    assert document["metadata"]["truncated"] is True
+    assert document["metadata"]["matched"] == 5
