@@ -33,16 +33,24 @@ from pipeline.aoi import AreaOfInterest
 
 FIXTURE_PATH = Path(__file__).resolve().parent / "fixtures" / "sample.json"
 
-# Crawford Notch in the White Mountains, roughly 5 x 7 km. Chosen because it has every
-# layer in a small area: several PAD-US parcels, the Appalachian Trail and its side trails,
-# the Saco River, and ponds. An Adirondack box was tried first, but the one PAD-US parcel
-# there (the Forest Preserve) has invalid geometry and the adapter skips it, leaving no
-# public land in the sample.
+# The Essex Chain Lakes in the central Adirondacks, roughly 7 x 7 km. Chosen because it is
+# where the app opens: the map starts centred on the Adirondacks at zoom 10 and this box
+# sits inside that first view, so a freshly seeded database shows data without the user
+# having to know where to look. It has every layer in a small area: fifteen DEC primitive
+# campsites on the lakes, Pine Lake and the Essex Chain with their ponds and streams, the
+# canoe carries and trails between them, and the Essex Chain and Pine Lake Primitive Areas.
+#
+# Tirrell Pond, just west, was tried first and held only three campsites. The sample used
+# to be Crawford Notch, NH, because campsites then came only from RIDB, which is federal
+# and needs a key, and an earlier Adirondack attempt found no valid PAD-US parcel. Neither
+# holds now: OSM campsites need no key, and PAD-US returns the Forest Preserve here as
+# individual units. (Blue Mountain Wild Forest, which also touches this box, is still
+# skipped as invalid geometry; the others load.)
 SAMPLE_AOI = AreaOfInterest(
-    name="sample-crawford-notch",
-    label="Crawford Notch sample",
-    bbox=(-71.44, 44.17, -71.38, 44.23),
-    states=("NH",),
+    name="sample-essex-chain",
+    label="Essex Chain Lakes sample",
+    bbox=(-74.29, 43.825, -74.20, 43.885),
+    states=("NY",),
     notes="Committed dev sample. Built by manage.py build_sample; loaded by manage.py seed.",
 )
 
@@ -50,8 +58,13 @@ SAMPLE_AOI = AreaOfInterest(
 SAMPLE_MODELS = [IngestRun, PublicLand, Trail, WaterFeature, Campsite]
 FEATURE_MODELS = [PublicLand, Trail, WaterFeature, Campsite]
 
-# Keyless sources. RIDB is added by build_sample only when RIDB_API_KEY is set.
-KEYLESS_ADAPTERS = ["padus", "osm-trails", "nhd-flowlines", "nhd-waterbodies"]
+# Keyless sources, which between them fill every layer. RIDB is added by build_sample only
+# when RIDB_API_KEY is set; it is federal-only, so it adds nothing in the Adirondacks anyway.
+KEYLESS_ADAPTERS = ["padus", "osm-trails", "osm-campsites", "nhd-flowlines", "nhd-waterbodies"]
+
+# The fixture is committed to git; keep it small enough that nobody minds cloning it.
+# build_sample refuses to write anything larger, and the test suite checks it too.
+MAX_FIXTURE_BYTES = 1_000_000
 
 COORDINATE_PRECISION = 6
 
@@ -69,6 +82,12 @@ _KEEP = {
 def feature_count() -> int:
     """Total feature rows across every geodata layer."""
     return sum(model.objects.count() for model in FEATURE_MODELS)
+
+
+def empty_layers(counts: dict[str, int]) -> list[str]:
+    """Feature layers that `counts` (as returned by dump_sample) has no rows for."""
+    labels = [model._meta.label_lower for model in FEATURE_MODELS]
+    return [label for label in labels if not counts.get(label)]
 
 
 def clip(geom: GEOSGeometry, target: str, box: GEOSGeometry) -> GEOSGeometry | None:

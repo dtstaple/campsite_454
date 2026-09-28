@@ -17,15 +17,14 @@ from django.utils import timezone
 from devdata.sample import (
     FEATURE_MODELS,
     FIXTURE_PATH,
+    MAX_FIXTURE_BYTES,
     SAMPLE_AOI,
     clip,
     dump_sample,
+    empty_layers,
     feature_count,
 )
 from geodata.models import IngestRun, PublicLand, Trail, WaterFeature
-
-# The fixture is committed to git; keep it small enough that nobody minds cloning it.
-MAX_FIXTURE_BYTES = 1_000_000
 
 
 def _fixture_counts() -> dict[str, int]:
@@ -65,10 +64,21 @@ def test_fixture_geometries_are_4326_and_inside_sample_box():
 
 
 @pytest.mark.unit
-def test_fixture_has_several_layers():
+def test_fixture_has_every_layer():
+    # Every layer, not "most": a sample with no campsites seeds cleanly and then shows a
+    # map indistinguishable from a broken one.
     counts = _fixture_counts()
-    populated = [label for label, n in counts.items() if n and label != "geodata.ingestrun"]
-    assert len(populated) >= 3, counts
+    missing = empty_layers(counts)
+    assert not missing, (
+        f"Committed sample has no rows for {', '.join(missing)} ({counts}). "
+        "Rebuild it with `python manage.py build_sample` against a scratch database."
+    )
+
+
+@pytest.mark.unit
+def test_empty_layers_names_each_missing_layer():
+    counts = {"geodata.publicland": 3, "geodata.trail": 5, "geodata.waterfeature": 0}
+    assert empty_layers(counts) == ["geodata.waterfeature", "geodata.campsite"]
 
 
 # --- seed ------------------------------------------------------------------------------
@@ -210,9 +220,19 @@ def test_dump_sample_round_trips_through_seed(tmp_path, monkeypatch):
 
 # --- build_sample (network replaced by a stub adapter) ----------------------------------
 
+BUILD_SAMPLE = "devdata.management.commands.build_sample"
 
-@pytest.mark.django_db
-def test_build_sample_runs_adapters_then_dumps(monkeypatch, tmp_path, capsys):
+EVERY_LAYER = {
+    "geodata.ingestrun": 1,
+    "geodata.publicland": 1,
+    "geodata.trail": 1,
+    "geodata.waterfeature": 1,
+    "geodata.campsite": 1,
+}
+
+
+def _stub_build(monkeypatch, tmp_path, *, counts=EVERY_LAYER, size=10):
+    """Replace the network and the dump. Returns (adapter names run, fixture path)."""
     ran = []
 
     class StubAdapter:
@@ -225,44 +245,68 @@ def test_build_sample_runs_adapters_then_dumps(monkeypatch, tmp_path, capsys):
                 source="osm", region=aoi.name, started_at=timezone.now(), record_count=0
             )
 
-    module = "devdata.management.commands.build_sample"
-    monkeypatch.setattr(f"{module}.get_adapter", lambda name: lambda: StubAdapter(name))
-    monkeypatch.setattr(f"{module}.dump_sample", lambda: {"geodata.trail": 0})
-    monkeypatch.setattr(f"{module}.FIXTURE_PATH", tmp_path / "sample.json")
-    (tmp_path / "sample.json").write_text("[]")
+    def fake_dump(path):
+        path.write_text("x" * size)
+        return dict(counts)
+
+    fixture = tmp_path / "sample.json"
+    fixture.write_text("[]")
+    monkeypatch.setattr(f"{BUILD_SAMPLE}.get_adapter", lambda name: lambda: StubAdapter(name))
+    monkeypatch.setattr(f"{BUILD_SAMPLE}.dump_sample", fake_dump)
+    monkeypatch.setattr(f"{BUILD_SAMPLE}.FIXTURE_PATH", fixture)
+    return ran, fixture
+
+
+@pytest.mark.django_db
+def test_build_sample_runs_adapters_then_dumps(monkeypatch, tmp_path, capsys):
+    ran, fixture = _stub_build(monkeypatch, tmp_path)
     monkeypatch.setenv("RIDB_API_KEY", "")
 
     call_command("build_sample")
 
-    assert [name for name, _ in ran] == ["padus", "osm-trails", "nhd-flowlines", "nhd-waterbodies"]
+    assert [name for name, _ in ran] == [
+        "padus",
+        "osm-trails",
+        "osm-campsites",
+        "nhd-flowlines",
+        "nhd-waterbodies",
+    ]
     assert {region for _, region in ran} == {SAMPLE_AOI.name}
-    assert "no campsites" in capsys.readouterr().out
+    assert fixture.read_text() == "x" * 10
+    assert not list(tmp_path.glob("*.tmp"))
 
 
 @pytest.mark.django_db
 def test_build_sample_includes_ridb_when_key_set(monkeypatch, tmp_path):
-    ran = []
-    module = "devdata.management.commands.build_sample"
-
-    class StubAdapter:
-        def run(self, aoi):
-            return IngestRun.objects.create(
-                source="osm", region=aoi.name, started_at=timezone.now()
-            )
-
-    def get(name):
-        ran.append(name)
-        return StubAdapter
-
-    monkeypatch.setattr(f"{module}.get_adapter", get)
-    monkeypatch.setattr(f"{module}.dump_sample", lambda: {})
-    monkeypatch.setattr(f"{module}.FIXTURE_PATH", tmp_path / "sample.json")
-    (tmp_path / "sample.json").write_text("[]")
+    ran, _ = _stub_build(monkeypatch, tmp_path)
     monkeypatch.setenv("RIDB_API_KEY", "test-key")
 
     call_command("build_sample")
 
-    assert ran[-1] == "ridb"
+    assert ran[-1][0] == "ridb"
+
+
+@pytest.mark.django_db
+def test_build_sample_fails_and_keeps_fixture_when_a_layer_is_empty(monkeypatch, tmp_path):
+    no_campsites = {**EVERY_LAYER, "geodata.campsite": 0}
+    _, fixture = _stub_build(monkeypatch, tmp_path, counts=no_campsites)
+
+    with pytest.raises(CommandError, match="no rows for geodata.campsite"):
+        call_command("build_sample")
+
+    assert fixture.read_text() == "[]"
+    assert not list(tmp_path.glob("*.tmp"))
+
+
+@pytest.mark.django_db
+def test_build_sample_fails_and_keeps_fixture_when_too_large(monkeypatch, tmp_path):
+    _, fixture = _stub_build(monkeypatch, tmp_path, size=MAX_FIXTURE_BYTES + 1)
+
+    with pytest.raises(CommandError, match="budget"):
+        call_command("build_sample")
+
+    assert fixture.read_text() == "[]"
+    assert not list(tmp_path.glob("*.tmp"))
 
 
 @pytest.mark.django_db

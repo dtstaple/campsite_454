@@ -202,7 +202,7 @@ shell scripts, Makefiles, or Postgres client tools. Run them from `/backend` wit
 `DATABASE_URL` pointing at the target:
 
 - `python manage.py seed` loads the committed sample fixture
-  (`backend/devdata/fixtures/sample.json`, ~230 KB) into an empty, migrated database. It
+  (`backend/devdata/fixtures/sample.json`, ~490 KB) into an empty, migrated database. It
   refuses if the database already has features, because fixture rows have fixed primary
   keys and would overwrite real rows.
 - `python manage.py reset_db` drops every app table, re-runs migrations, and seeds. It
@@ -210,14 +210,18 @@ shell scripts, Makefiles, or Postgres client tools. Run them from `/backend` wit
   PostGIS extension.
 - `python manage.py build_sample` regenerates the fixture from the live sources for the
   sample area. It needs network access and an **empty scratch database**, and is only
-  needed when the models or adapters change. The committed sample has **no campsites**
-  because it was built without an `RIDB_API_KEY`. Rebuilding it with a key set adds them.
+  needed when the models or adapters change. No API key is needed: campsites come from
+  OpenStreetMap. It fails, and leaves the committed fixture unchanged, if any layer comes
+  back empty or the file would exceed 1 MB.
 
-The sample is a small bounding box around Crawford Notch, NH, with geometries clipped to
-the box. A box in the Adirondacks was tried first, but PAD-US's Forest Preserve polygon
-there has invalid geometry and the pipeline skips it. The same thing happens to the large
-White Mountain National Forest parcel. That is a data-quality issue for the pipeline
-itself: the largest public-land units may be missing from the full database too.
+The sample is a small bounding box around the Essex Chain Lakes, in the Adirondacks, with
+geometries clipped to the box. It sits inside the map's opening view, so a freshly
+seeded app shows data without panning. It used to be Crawford Notch, NH, because
+campsites then came only from RIDB, which needs a key, and because an earlier Adirondack
+box found only an invalid Forest Preserve polygon in PAD-US. Neither holds now: OSM
+campsites are keyless, and PAD-US returns individual Forest Preserve units there. The
+large White Mountain National Forest parcel is still skipped as invalid, so the largest
+public-land units may be missing from the full database.
 
 ## What was tested and what wasn't
 
