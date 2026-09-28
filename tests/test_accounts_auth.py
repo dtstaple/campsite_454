@@ -124,3 +124,126 @@ def test_login_with_nonexistent_user_returns_401_identically_to_wrong_password(c
 
     assert no_such_user.status_code == wrong_password.status_code == 401
     assert no_such_user.json() == wrong_password.json() == {"error": "Invalid credentials."}
+
+
+# --- logout -----------------------------------------------------------------------------
+#
+# The guarantee being tested is revocation, not the 204. A logout that returned 204 and
+# left the token working would pass a status-code assertion and still be broken, so every
+# test here follows the logout with a real authenticated request.
+
+
+LOGOUT_URL = "/api/auth/logout/"
+ME_URL = "/api/auth/me/"
+
+
+def token_for(client, username="rania", password="a-strong-passw0rd!"):
+    """Register a user and return a client already carrying their token."""
+    register(client, username=username, email=f"{username}@example.com", password=password)
+    response = client.post(LOGIN_URL, {"username": username, "password": password}, format="json")
+    return response.json()["token"]
+
+
+def test_logout_returns_204_and_deletes_the_token(client):
+    token = token_for(client)
+    client.credentials(HTTP_AUTHORIZATION=f"Token {token}")
+
+    response = client.post(LOGOUT_URL)
+
+    assert response.status_code == 204
+    assert not Token.objects.filter(key=token).exists()
+
+
+def test_the_revoked_token_stops_working(client):
+    token = token_for(client)
+    client.credentials(HTTP_AUTHORIZATION=f"Token {token}")
+    assert client.get(ME_URL).status_code == 200
+
+    client.post(LOGOUT_URL)
+
+    assert client.get(ME_URL).status_code == 401
+
+
+def test_logout_without_a_token_returns_401(client):
+    response = client.post(LOGOUT_URL)
+
+    assert response.status_code == 401
+
+
+def test_logging_out_twice_returns_401_the_second_time(client):
+    token = token_for(client)
+    client.credentials(HTTP_AUTHORIZATION=f"Token {token}")
+
+    first = client.post(LOGOUT_URL)
+    second = client.post(LOGOUT_URL)
+
+    assert first.status_code == 204
+    assert second.status_code == 401
+
+
+def test_logging_out_does_not_revoke_another_users_token(client):
+    other_client = APIClient()
+    other_token = token_for(other_client, username="davis")
+    token = token_for(client)
+    client.credentials(HTTP_AUTHORIZATION=f"Token {token}")
+
+    client.post(LOGOUT_URL)
+
+    assert Token.objects.filter(key=other_token).exists()
+    other_client.credentials(HTTP_AUTHORIZATION=f"Token {other_token}")
+    assert other_client.get(ME_URL).status_code == 200
+
+
+def test_logging_back_in_after_logout_issues_a_working_token(client):
+    old_token = token_for(client)
+    client.credentials(HTTP_AUTHORIZATION=f"Token {old_token}")
+    client.post(LOGOUT_URL)
+
+    response = client.post(
+        LOGIN_URL, {"username": "rania", "password": "a-strong-passw0rd!"}, format="json"
+    )
+
+    assert response.status_code == 200
+    new_token = response.json()["token"]
+    assert new_token != old_token
+    client.credentials(HTTP_AUTHORIZATION=f"Token {new_token}")
+    assert client.get(ME_URL).status_code == 200
+
+
+# --- current user -----------------------------------------------------------------------
+
+
+def test_current_user_returns_the_token_owner(client):
+    token = token_for(client)
+    client.credentials(HTTP_AUTHORIZATION=f"Token {token}")
+
+    response = client.get(ME_URL)
+
+    assert response.status_code == 200
+    assert response.json() == {"username": "rania", "email": "rania@example.com"}
+
+
+def test_current_user_without_a_token_returns_401(client):
+    response = client.get(ME_URL)
+
+    assert response.status_code == 401
+
+
+def test_current_user_with_a_garbage_token_returns_401(client):
+    client.credentials(HTTP_AUTHORIZATION="Token not-a-real-token")
+
+    response = client.get(ME_URL)
+
+    assert response.status_code == 401
+
+
+def test_each_token_resolves_to_its_own_user(client):
+    rania_token = token_for(client, username="rania")
+    davis_client = APIClient()
+    davis_token = token_for(davis_client, username="davis")
+
+    client.credentials(HTTP_AUTHORIZATION=f"Token {rania_token}")
+    davis_client.credentials(HTTP_AUTHORIZATION=f"Token {davis_token}")
+
+    assert client.get(ME_URL).json()["username"] == "rania"
+    assert davis_client.get(ME_URL).json()["username"] == "davis"

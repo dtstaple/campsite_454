@@ -10,9 +10,12 @@ GeoJSON Feature's `id`. It contains a slash, so these tests also pin the routing
 converter that cannot match "campsite/73996" would 404 every real campsite.
 """
 
+from datetime import timedelta
+
 import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.gis.geos import Point
+from django.utils import timezone
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
@@ -172,3 +175,143 @@ def test_the_map_api_feature_id_is_the_campsites_source_id(auth_client, campsite
     listing = auth_client.get("/api/campsites/?bbox=-74.20,44.00,-73.90,44.20")
 
     assert listing.json()["features"][0]["id"] == campsite.source_id
+
+
+# --- listing ----------------------------------------------------------------------------
+#
+# The list is what makes saving worth anything: before this endpoint a user could save a
+# campsite and never see it again. Two properties matter beyond "it returns rows". First,
+# each entry carries enough to render a list row and move the map -- a name and a pair of
+# coordinates -- so the frontend needs no second request per saved site. Second, the `id`
+# is the same source_id the map API puts in each Feature, which is what lets the map mark
+# its own pins as saved.
+
+
+LIST_URL = "/api/saved-campsites/"
+
+
+@pytest.fixture
+def other_campsite():
+    return Campsite.objects.create(
+        source=Campsite.Source.OSM,
+        source_id="node/4821",
+        name="Flowed Lands",
+        geom=Point(-73.98, 44.12, srid=4326),
+        site_type=Campsite.SiteType.PRIMITIVE,
+    )
+
+
+def test_listing_returns_the_users_saved_campsites(auth_client, user, campsite):
+    SavedCampsite.objects.create(user=user, campsite=campsite)
+
+    response = auth_client.get(LIST_URL)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["id"] == campsite.source_id
+    assert body[0]["name"] == "Marcy Dam"
+
+
+def test_a_listed_entry_carries_enough_to_render_it_and_move_the_map(auth_client, user, campsite):
+    SavedCampsite.objects.create(user=user, campsite=campsite)
+
+    entry = auth_client.get(LIST_URL).json()[0]
+
+    assert entry["name"] == "Marcy Dam"
+    assert entry["site_type"] == "lean_to"
+    # The coordinates the map needs to fly to, as plain numbers rather than GeoJSON.
+    assert entry["latitude"] == pytest.approx(44.10)
+    assert entry["longitude"] == pytest.approx(-74.05)
+    assert entry["saved_at"]
+
+
+def test_unknown_reservable_stays_null_rather_than_false(auth_client, user, campsite):
+    # The fixture campsite leaves reservable unset, which the model documents as "the
+    # source didn't say". Serialising that as false would assert something untrue.
+    assert campsite.reservable is None
+    SavedCampsite.objects.create(user=user, campsite=campsite)
+
+    entry = auth_client.get(LIST_URL).json()[0]
+
+    assert entry["reservable"] is None
+    assert entry["capacity"] is None
+
+
+def test_listing_returns_an_empty_list_when_nothing_is_saved(auth_client):
+    response = auth_client.get(LIST_URL)
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_listing_without_a_token_returns_401(client, user, campsite):
+    SavedCampsite.objects.create(user=user, campsite=campsite)
+
+    response = client.get(LIST_URL)
+
+    assert response.status_code == 401
+
+
+def test_listing_with_a_garbage_token_returns_401(client):
+    client.credentials(HTTP_AUTHORIZATION="Token not-a-real-token")
+
+    response = client.get(LIST_URL)
+
+    assert response.status_code == 401
+
+
+def test_one_user_cannot_see_another_users_saved_campsites(
+    auth_client, user, campsite, other_campsite
+):
+    other = User.objects.create_user(username="other", password="another-strong-pw!")
+    SavedCampsite.objects.create(user=other, campsite=other_campsite)
+    SavedCampsite.objects.create(user=user, campsite=campsite)
+
+    body = auth_client.get(LIST_URL).json()
+
+    assert [entry["id"] for entry in body] == [campsite.source_id]
+
+
+def test_a_user_with_no_saves_sees_an_empty_list_even_when_others_have_saved(auth_client, campsite):
+    other = User.objects.create_user(username="other", password="another-strong-pw!")
+    SavedCampsite.objects.create(user=other, campsite=campsite)
+
+    assert auth_client.get(LIST_URL).json() == []
+
+
+def test_listing_is_newest_first(auth_client, user, campsite, other_campsite):
+    older = SavedCampsite.objects.create(user=user, campsite=campsite)
+    newer = SavedCampsite.objects.create(user=user, campsite=other_campsite)
+    # created_at is auto_now_add, so two rows inserted in the same test are microseconds
+    # apart and their order is technically a race. Setting the timestamps through an
+    # UPDATE (which auto_now_add does not touch) makes the assertion about ordering
+    # rather than about how fast the test ran.
+    SavedCampsite.objects.filter(pk=older.pk).update(created_at=timezone.now() - timedelta(days=1))
+    SavedCampsite.objects.filter(pk=newer.pk).update(created_at=timezone.now())
+
+    body = auth_client.get(LIST_URL).json()
+
+    assert [entry["id"] for entry in body] == [other_campsite.source_id, campsite.source_id]
+
+
+def test_saving_then_listing_round_trips_the_map_api_feature_id(auth_client, campsite):
+    listing = auth_client.get("/api/campsites/?bbox=-74.20,44.00,-73.90,44.20")
+    feature_id = listing.json()["features"][0]["id"]
+
+    auth_client.post(saved_url(feature_id))
+
+    saved_ids = [entry["id"] for entry in auth_client.get(LIST_URL).json()]
+    assert saved_ids == [feature_id], (
+        "the id the map handed the client must come back unchanged from the saved list, "
+        "or the frontend cannot tell which pins are already saved"
+    )
+
+
+def test_unsaving_removes_the_entry_from_the_list(auth_client, user, campsite):
+    auth_client.post(saved_url(campsite.source_id))
+    assert len(auth_client.get(LIST_URL).json()) == 1
+
+    auth_client.delete(saved_url(campsite.source_id))
+
+    assert auth_client.get(LIST_URL).json() == []
