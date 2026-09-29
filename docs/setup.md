@@ -59,6 +59,29 @@ To wipe the database back to a clean, seeded state at any time, run
 management commands, so they work the same on macOS and Windows. The full Northeast
 dataset comes from the ingestion pipeline instead (see `docs/pipeline.md`).
 
+## Checking the data makes sense
+
+The unit suite (`pytest`) tests code against fixture input and never looks at the rows in
+your database. A second set of checks does. From the repo root, with the database seeded
+or ingested:
+
+```
+pytest -m data
+```
+
+They run against whatever `DATABASE_URL` points at, read only, and are skipped by a plain
+`pytest` and by CI. They check that:
+
+- at least one ingest region holds all four layers (public land, trails, water, campsites)
+- at least 75% of each region's campsites have water and a trail within 1 km
+- every feature touches the bbox of the region it was ingested for (1 km tolerance)
+- no more than 1% of trails are sidewalks, crossings, golf paths or non-path highways
+
+A failure says what is wrong and where, for example
+`region adirondacks has 0 campsites but 26,005 trails ... Did an ingest fail?`.
+Run them after any ingest or after rebuilding the sample. The thresholds and the
+reasoning behind them are at the top of `tests/data_checks/test_data_coherence.py`.
+
 If Django reports `role "campsite" does not exist` even though Docker is running, another
 PostgreSQL (e.g. from Homebrew) is probably holding port 5432 ahead of Docker. Set
 `POSTGRES_PORT` to a free port such as 5434, use the same port in `DATABASE_URL`, and run

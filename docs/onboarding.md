@@ -86,6 +86,9 @@ We have pytest + coverage + ruff set up. Before you push:
 
 CI runs the same checks on every push and pull request. If CI is red, your story isn't done.
 
+After an ingest or a new sample, also run `pytest -m data`. It checks that the rows in your
+database make sense together, not just that the code works. See `docs/setup.md`.
+
 ---
 
 ## 7. Jira habits (these are graded)
