@@ -1,16 +1,9 @@
 /**
  * Saving campsites. Contract: docs/auth.md
  *
- * Writes go to the server and are authoritative. Reads do not, and cannot yet:
- *
- *     TODO(TM05-32): there is no `GET /api/saved-campsites/`. The accounts API has
- *     POST and DELETE only, so a signed-in user's saved campsites cannot be fetched.
- *     Until that story lands, the list below is a local record of what *this browser*
- *     saved, which means it is empty on a second device and after clearing site data,
- *     and it does not reflect a save made anywhere else. When the endpoint exists,
- *     `loadSaved()` should fetch it and this cache should become a rendering detail
- *     rather than the source of truth. Do not build features that assume it is
- *     complete.
+ * Reads and writes both go to the server, so the list belongs to the account and
+ * follows the user between devices. It was a per-browser localStorage record until
+ * TM05-32 added `GET /api/saved-campsites/`; this reads from that.
  *
  * The id used throughout is the campsite's `source_id`, the same string the map API
  * puts in each Feature's `id` (see docs/api.md). It is what the save endpoint accepts.
@@ -30,29 +23,38 @@ export interface SavedCampsite {
 
 export class SaveError extends Error {}
 
-/** Namespaced per user, so two accounts on one browser do not see each other's list. */
-function storageKey(username: string): string {
-  return `campsite.saved.${username}`;
+/** One row of `GET /api/saved-campsites/`. */
+interface SavedCampsiteResponse {
+  id: string;
+  name: string;
+  latitude: number;
+  longitude: number;
 }
 
-export function loadSaved(session: Session | null): SavedCampsite[] {
-  // TODO(TM05-32): replace with GET /api/saved-campsites/ once it exists.
+/**
+ * The account's saved campsites, from the server.
+ *
+ * Signed out means an empty list without a request. A failed request also yields an
+ * empty list rather than throwing: the saved panel is secondary to the map and should
+ * not be able to take the page down, and a save still reports its own errors.
+ */
+export async function loadSaved(session: Session | null): Promise<SavedCampsite[]> {
   if (!session) return [];
   try {
-    const raw = localStorage.getItem(storageKey(session.username));
-    return raw ? (JSON.parse(raw) as SavedCampsite[]) : [];
+    const response = await fetch(`${API_BASE_URL}/api/saved-campsites/`, {
+      headers: authHeaders(session),
+    });
+    if (!response.ok) return [];
+    const rows = (await response.json()) as SavedCampsiteResponse[];
+    // The API names them latitude/longitude; the map wants lon/lat.
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      lon: row.longitude,
+      lat: row.latitude,
+    }));
   } catch {
-    // Unreadable or unparseable: an empty list is the honest answer, and it is about
-    // to be overwritten by the next save anyway.
     return [];
-  }
-}
-
-function persist(session: Session, campsites: SavedCampsite[]) {
-  try {
-    localStorage.setItem(storageKey(session.username), JSON.stringify(campsites));
-  } catch {
-    /* Storage unavailable: the list still works for this page's lifetime. */
   }
 }
 
@@ -84,11 +86,9 @@ export async function save(
   current: SavedCampsite[],
 ): Promise<SavedCampsite[]> {
   await send("POST", campsite.id, session);
-  const next = current.some((entry) => entry.id === campsite.id)
+  return current.some((entry) => entry.id === campsite.id)
     ? current
     : [...current, campsite];
-  persist(session, next);
-  return next;
 }
 
 /** Unsave a campsite. Returns the updated list. */
@@ -98,7 +98,5 @@ export async function unsave(
   current: SavedCampsite[],
 ): Promise<SavedCampsite[]> {
   await send("DELETE", id, session);
-  const next = current.filter((entry) => entry.id !== id);
-  persist(session, next);
-  return next;
+  return current.filter((entry) => entry.id !== id);
 }

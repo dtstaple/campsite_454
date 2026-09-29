@@ -13,7 +13,6 @@ import * as maplibregl from "maplibre-gl";
 // maplibre-gl.css is imported in main.tsx, not here: it has to load before
 // App.css or `.maplibregl-map` overrides `.map` and the container collapses.
 import "../App.css";
-import { mapColors, mapPaint } from "../theme";
 import {
   bboxCenter,
   DEFAULT_REGION,
@@ -26,7 +25,6 @@ import {
 import { addMapLayers, addMapSources, CLICKABLE, CLICKABLE_IDS, EMPTY, LAYERS } from "../map/layers";
 import { popupFor } from "../map/popups";
 import { Link } from "react-router-dom";
-import { storedSession } from "../auth";
 import { useSession } from "../session";
 import {
   loadSaved,
@@ -91,10 +89,11 @@ export default function Discover() {
   const [fromCache, setFromCache] = useState(false);
 
   // From the provider above the router, so signing out in the header reaches the Saved
-  // panel below. storedSession() is still read directly for the initial `saved` value,
-  // to fill the list on the first paint rather than a tick later.
+  // panel below.
   const { session } = useSession();
-  const [saved, setSaved] = useState<SavedCampsite[]>(() => loadSaved(storedSession()));
+  // Starts empty and is filled by the effect below, because the list now comes from the
+  // server rather than from this browser's storage.
+  const [saved, setSaved] = useState<SavedCampsite[]>([]);
 
   // The popup's save button is a plain DOM node created inside the map-setup effect,
   // which runs once. Reading session and saved through refs keeps that handler from
@@ -118,9 +117,18 @@ export default function Discover() {
 
   // Signing in or out swaps whose list this is. loadSaved returns [] when signed out,
   // so the panel empties rather than showing the previous user's saves.
+  //
+  // `cancelled` guards against a fast sign-out landing before the previous user's
+  // in-flight response, which would otherwise repopulate the panel after it emptied.
   useEffect(() => {
-    setSaved(loadSaved(session));
+    let cancelled = false;
+    void loadSaved(session).then((list) => {
+      if (!cancelled) setSaved(list);
+    });
     if (session) setSignInPrompt(false);
+    return () => {
+      cancelled = true;
+    };
   }, [session]);
 
   /** Fetch the viewport in one request and push each layer into its source. */
@@ -435,11 +443,6 @@ export default function Discover() {
               ))}
             </ul>
           )}
-          {/* TODO(TM05-32): this list is what *this browser* saved, not what the
-              account holds -- the accounts API has no GET /api/saved-campsites/ yet.
-              It is empty on another device and does not reflect a save made
-              elsewhere. Replace with a fetch once that story lands. */}
-          <div className="saved-caveat">Showing saves made in this browser.</div>
         </div>
       )}
 
