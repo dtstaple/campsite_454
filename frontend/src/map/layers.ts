@@ -1,6 +1,9 @@
 /**
  * The MapLibre source and layer definitions, as data.
  *
+ * Extracted from App.tsx so that component reads as composition rather than as ninety
+ * lines of paint properties. Nothing here is stateful -- addMapLayers() is called once
+ * on the map's `load` event and the sources are fed afterwards by App's refresh().
  * The only place layers are defined. Discover.tsx calls addMapSources() and
  * addMapLayers() once on the map's `load` event and feeds the sources afterwards from
  * its refresh(). Kept out of the component so it reads as composition rather than as a
