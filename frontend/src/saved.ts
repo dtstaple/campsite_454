@@ -49,7 +49,9 @@ export async function loadSaved(session: Session | null): Promise<SavedCampsite[
     // The API names them latitude/longitude; the map wants lon/lat.
     return rows.map((row) => ({
       id: row.id,
-      name: row.name,
+      // Same fallback the popup uses. Plenty of OSM campsites are unnamed, and a row
+      // labelled with an empty string is an invisible, unclickable line in the panel.
+      name: row.name || "Unnamed campsite",
       lon: row.longitude,
       lat: row.latitude,
     }));
