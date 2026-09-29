@@ -45,14 +45,36 @@ the libraries are normally on the default search path and both variables can be 
 
 ## Sample data
 
-A fresh database is empty. Load the committed sample (about 160 features around Crawford
-Notch, NH) with:
+A fresh database is empty. Load the committed sample with:
 
 ```
 cd backend
 python manage.py migrate
 python manage.py seed
 ```
+
+### What you should see after seeding
+
+`seed` prints one line with a count for every layer:
+
+```
+Seeded sample dataset: 6 public lands, 25 trails, 134 water features, 15 campsites.
+```
+
+All four numbers should be non-zero. If any is `0`, the fixture is broken, not your setup.
+Say so in the team channel rather than debugging your machine.
+
+The sample covers one small box, about 7 x 7 km, around the Essex Chain Lakes in the
+central Adirondacks (`-74.29, 43.825` to `-74.20, 43.885`). With the backend and frontend
+running, open http://localhost:5173 and go to **Discover**. The map opens over the
+Adirondacks, and the sample is the one patch of data in the lower half of the screen,
+south of centre: green public land, blue lakes and streams, trail lines, and fifteen red
+campsite markers along the lakes. Zoom in on it. **Everywhere else on the map is empty,
+and that is expected**: only the full ingest (`docs/pipeline.md`) fills the rest of the
+Northeast.
+
+Trails and water are hidden below zoom 9 by design, so if you zoom far out and only see
+public land and campsites, zoom back in.
 
 To wipe the database back to a clean, seeded state at any time, run
 `python manage.py reset_db` (add `--noinput` to skip the confirmation). Both are Django
