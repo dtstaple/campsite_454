@@ -379,15 +379,6 @@
   color: var(--danger);
 }
 
-/* The list is browser-local until TM05-32 adds a read endpoint; saying so is better
- * than letting someone assume their saves followed them to another machine. */
-.saved-caveat {
-  margin-top: var(--space-sm);
-  color: var(--text-tertiary);
-  font-size: var(--text-xs);
-  line-height: var(--leading-snug);
-}
-
 /* --- region shortcuts, at the top of the layers panel --- */
 .regions {
   display: flex;
