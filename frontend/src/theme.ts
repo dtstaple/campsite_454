@@ -29,6 +29,7 @@ export function mapColors() {
      * 10.25:1 and lifts the marker clear of the terrain; a dark ring manages only
      * 1.47:1 and the marker's edge dissolves into the basemap. */
     campsiteStroke: token("--text-primary") || "#ede7d9",
+    publicLand: token("--map-public-land") || "#2d6a4f",
   };
 }
 
@@ -50,5 +51,8 @@ export function mapPaint() {
     campsitesRadius: numericToken("--map-campsites-radius", 6),
     campsitesStrokeWidth: numericToken("--map-campsites-stroke-width", 1.5),
     hitWidth: numericToken("--map-hit-width", 14),
+    publicLandFillOpacity: numericToken("--map-public-land-fill-opacity", 0.22),
+    publicLandLineOpacity: numericToken("--map-public-land-line-opacity", 0.55),
+    publicLandLineWidth: numericToken("--map-public-land-line-width", 0.8),
   };
 }

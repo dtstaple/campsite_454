@@ -74,8 +74,17 @@
    * it per layer would just be two numbers to keep in sync. */
   --map-hit-width: 14;
 
-  /* Reserved for layers this prototype does not have an endpoint for yet. */
+  /* Public land is context, not content -- it says "this is where you are allowed
+   * to be" underneath everything you actually came to look at. So it is drawn
+   * first, beneath the other three, and kept deliberately quiet: a low-opacity
+   * fill that tints the terrain rather than covering it, with a slightly stronger
+   * outline so adjoining parcels stay distinguishable where they touch. Raising
+   * the fill much past this starts competing with the campsite markers, which are
+   * the one thing on the map that must never lose. */
   --map-public-land: #2d6a4f;
+  --map-public-land-fill-opacity: 0.22;
+  --map-public-land-line-opacity: 0.55;
+  --map-public-land-line-width: 0.8;
 
   /* --- spacing --- */
   --space-xs: 4px;

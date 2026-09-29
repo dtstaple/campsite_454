@@ -81,6 +81,7 @@ automatically. An unknown name lists what is available instead of failing obscur
 | `nhd-flowlines` | `WaterFeature` | Streams and rivers from USGS NHD |
 | `nhd-waterbodies` | `WaterFeature` | Lakes, ponds, reservoirs and wetlands from USGS NHD |
 | `ridb` | `Campsite` | Federal campsites from Recreation.gov |
+| `osm-campsites` | `Campsite` | Backcountry campsites from OpenStreetMap |
 
 Naming follows one rule: a source that yields a single dataset gets its bare name
 (`padus`, `ridb`), and a source yielding several gets `source-dataset` (`osm-trails`,
@@ -94,10 +95,11 @@ roughly these numbers, it worked; if it returns a fraction of them, something is
 | Command | Rows loaded | Skipped | Status |
 |---|---|---|---|
 | `ingest padus adirondacks` | 1,574 | 149 | partial |
-| `ingest osm-trails adirondacks` | 26,005 | 0 | success |
+| `ingest osm-trails adirondacks` | 18,067 | 0 | success |
 | `ingest nhd-flowlines adirondacks` | 46,589 | 0 | success |
 | `ingest nhd-waterbodies adirondacks` | 16,818 | 3 | partial |
 | `ingest ridb white-mountains-nh` | 660 | 64 | partial |
+| `ingest osm-campsites adirondacks` | 563 | 0 | success |
 
 Two things worth noticing. Three of the five finish *partial*, and that is the normal
 outcome — see section 4. And `ridb` is run against the White Mountains rather than the
@@ -293,6 +295,35 @@ Program, because 3DHP classifies flowlines topologically — Canal, Channel Line
 directly, so moving to 3DHP would silently cost a scoring input. Worth revisiting if 3DHP
 gains a flow-regime attribute.
 
+**OSM trail ingestion filters out urban pedestrian infrastructure.** The first Adirondack
+ingest returned 26,005 "trails", and roughly 30% of them were not trails: 7,471 sidewalks
+and street crossings, plus 548 golf cart paths. In and around Saranac Lake and Lake Placid
+the backcountry map was largely street furniture. The query now excludes them server-side,
+so they are never transferred, and `is_hiking_trail()` applies the same rule again to
+whatever comes back.
+
+Excluded:
+
+| Rule | Why |
+|---|---|
+| `footway` in `sidewalk`, `crossing`, `traffic_island`, `access_aisle` | These four values are what make a `highway=footway` urban. A crossing is a painted line over a road; a sidewalk runs beside one. |
+| any `golf` tag | Cart paths, tagged `highway=path` or `footway`. |
+
+Deliberately **not** excluded, each of which looked tempting and is wrong:
+
+| Candidate | Why it was rejected |
+|---|---|
+| `tiger:*` tags | 2,578 ways carry them, but 2,573 are not urban — 2,154 are `highway=track`, 958 are named, 51 carry `sac_scale`. Adirondack forest roads and logging tracks came in through the US Census import, and they are exactly the approach routes this project wants. |
+| requiring `sac_scale` | Only 758 of 26,005 ways are graded. Requiring a grade would discard 97% of the network, most of it real trail. Absence means nobody graded it, not that it is pavement. |
+| `informal=yes` | 650 herd paths. Unofficial but genuinely walked, and often the only route up a trailless High Peak. |
+
+`highway=footway` itself stays in the query. Near trailheads and huts a real trail segment
+is frequently just `highway=footway` with nothing else on it, so excluding the value
+wholesale would lose real trail — which is why the filter keys on the *subtag* instead.
+
+Each run records `excluded_footway_values` and `excluded_if_tagged` in its `parameters`,
+so a row count is interpretable against the filter that produced it.
+
 **Overpass requires a User-Agent** and rejects requests without one using HTTP 406, which
 is not retryable. The public instance allows two concurrent slots, so the client retries
 with backoff rather than assuming a request will succeed. On overload Overpass serves an
@@ -306,6 +337,32 @@ circumscribing radius of about 84. At 0.5 degrees a tile fits inside a 25-mile c
 about 15% margin. RIDB is also the only source queried by circle rather than bounding box,
 so the circle over-fetches roughly 27% beyond the tile and results are filtered back to the
 tile in `normalize`.
+
+**Campsites come from two sources, and that is not redundancy.** RIDB covers Forest
+Service and Park Service land; the Adirondacks are New York State Forest Preserve, so RIDB
+returns essentially nothing there. Before `osm-campsites` existed the database held 660
+campsites in the White Mountains and 92,000 trails and water features in the Adirondacks,
+three hundred kilometres apart, and **no viewport anywhere on the map showed a campsite and
+a stream at the same time**. Adding OSM campsites is what made one region complete: the
+Adirondacks now hold 563 campsites alongside 18,067 trails, 63,407 water features and
+1,574 public land parcels.
+
+The two sources share the `Campsite` table and stay distinct by `source_id` namespace --
+RIDB writes `campsite/73996`, OSM writes `node/4270946202` or `way/32002985`. That matters
+beyond tidiness: `/api/saved-campsites/<source_id>/` resolves a campsite by `source_id`
+alone, so a collision between the two would be a wrong-site bug.
+
+`osm-campsites` asks Overpass for `out center` rather than `out geom`, because a campsite
+way is an area you pitch inside and the model stores one Point. Relations are not ingested,
+for the same reason `osm-trails` skips `route=hiking` relations: a `tourism=camp_site`
+relation groups ways the query already returns, so ingesting it would duplicate sites
+rather than add them. Each run records its queried `element_types` in `parameters`.
+
+Site type is mapped narrowly. `backcountry=yes` (153 of 230 sampled High Peaks features)
+becomes `primitive`, `group_only=yes` becomes `group`, a lean-to shelter becomes `lean_to`,
+and **everything else stays `unknown`**. `tourism=camp_site` on its own says somebody
+mapped a camping spot, not that it is a developed campground, so promoting the residual to
+`designated` would assert something the source never said.
 
 **RIDB is federal-only.** It covers Forest Service and Park Service land and knows nothing
 about state land. Adirondack Park is New York state land, so running `ingest ridb

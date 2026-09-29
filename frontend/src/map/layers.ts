@@ -4,6 +4,10 @@
  * Extracted from App.tsx so that component reads as composition rather than as ninety
  * lines of paint properties. Nothing here is stateful -- addMapLayers() is called once
  * on the map's `load` event and the sources are fed afterwards by App's refresh().
+ * The only place layers are defined. Discover.tsx calls addMapSources() and
+ * addMapLayers() once on the map's `load` event and feeds the sources afterwards from
+ * its refresh(). Kept out of the component so it reads as composition rather than as a
+ * hundred lines of paint properties.
  *
  * Every colour, width and opacity comes from theme.css via theme.ts. MapLibre paint
  * properties cannot take a `var(--x)`, so they are read back out of the stylesheet
@@ -16,6 +20,7 @@ import { mapColors, mapPaint } from "../theme";
 import type { LayerName } from "../api";
 
 export const LAYERS: readonly { name: LayerName; label: string }[] = [
+  { name: "public-land", label: "Public land" },
   { name: "water", label: "Water" },
   { name: "trails", label: "Trails" },
   { name: "campsites", label: "Campsites" },
@@ -35,7 +40,9 @@ export const EMPTY: GeoJsonFeatureCollection = { type: "FeatureCollection", feat
  * layers still answer queryRenderedFeatures, so the visible lines stay hairline-thin
  * while the target stays comfortable.
  */
-export const CLICKABLE: readonly { id: string; layer: LayerName }[] = [
+export type ClickableLayer = Exclude<LayerName, "public-land">;
+
+export const CLICKABLE: readonly { id: string; layer: ClickableLayer }[] = [
   { id: "campsites-point", layer: "campsites" },
   { id: "trails-hit", layer: "trails" },
   { id: "water-line-hit", layer: "water" },
@@ -51,10 +58,36 @@ export function addMapSources(map: maplibregl.Map): void {
   }
 }
 
-/** Every draw layer, bottom to top: water, then trails, then campsite markers. */
+/**
+ * Every draw layer, bottom to top: public land, water, trails, then campsite markers.
+ * Each `-hit` layer sits directly above the line it widens.
+ */
 export function addMapLayers(map: maplibregl.Map): void {
   const colour = mapColors();
   const paint = mapPaint();
+
+  // Public land first, so every other layer draws on top of it. It is background:
+  // a quiet tint saying which ground is legally campable, under the water, trails
+  // and campsites the user actually came to read.
+  map.addLayer({
+    id: "public-land-fill",
+    type: "fill",
+    source: "public-land",
+    paint: {
+      "fill-color": colour.publicLand,
+      "fill-opacity": paint.publicLandFillOpacity,
+    },
+  });
+  map.addLayer({
+    id: "public-land-outline",
+    type: "line",
+    source: "public-land",
+    paint: {
+      "line-color": colour.publicLand,
+      "line-width": paint.publicLandLineWidth,
+      "line-opacity": paint.publicLandLineOpacity,
+    },
+  });
 
   // Water: polygons filled, lines stroked. docs/api.md says one collection carries
   // both, so each is filtered by geometry type rather than by endpoint.

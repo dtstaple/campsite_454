@@ -8,6 +8,7 @@
  */
 
 import type { LayerName } from "../api";
+import type { ClickableLayer } from "./layers";
 
 type Properties = Record<string, unknown> | null;
 
@@ -31,6 +32,7 @@ const METRES_PER_MILE = 1609.344;
 
 /** Popup HTML for a feature from `layer`. */
 export function popupFor(layer: LayerName, properties: Properties): string {
+export function popupFor(layer: ClickableLayer, properties: Properties): string {
   switch (layer) {
     case "campsites":
       return campsitePopup(properties);

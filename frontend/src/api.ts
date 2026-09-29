@@ -14,7 +14,7 @@ import type { Feature } from "geojson";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
 
-export type LayerName = "campsites" | "trails" | "water";
+export type LayerName = "campsites" | "trails" | "water" | "public-land";
 
 export interface Metadata {
   layer: LayerName;
@@ -59,7 +59,12 @@ export function simplifyForZoom(zoom: number): number | null {
 export const MIN_ZOOM_FOR_LINEWORK = 9;
 
 export function layerVisibleAtZoom(layer: LayerName, zoom: number): boolean {
-  if (layer === "campsites") return true;
+  // Points and polygons stay legible at any zoom. The threshold exists for linework,
+  // where an individual stream or trail falls under a pixel wide and the request is
+  // all cost and no picture. A public land parcel is measured in miles, so zooming
+  // out makes it *more* readable, not less -- and it is the layer that tells you
+  // which part of an empty-looking map is even campable.
+  if (layer === "campsites" || layer === "public-land") return true;
   return zoom >= MIN_ZOOM_FOR_LINEWORK;
 }
 

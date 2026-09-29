@@ -1,13 +1,22 @@
 /**
- * Throwaway prototype to prove the TM05-14 render path end to end.
+ * Routes and the shell they render into.
  *
- * Not the real TM05-15 implementation -- see the notes at the bottom of the handover
- * message for what would need to change. Everything here follows docs/api.md.
+ * React Router, because it is the default for a React SPA and nothing here needs more:
+ * four routes, no data loading in the router, no server rendering. The alternative worth
+ * naming is TanStack Router, whose draw is typed routes -- not enough to justify a less
+ * familiar dependency on a team of four.
+ *
+ * The map lives at /discover rather than /map because "discover" is the product's own
+ * word for it: CLAUDE.md describes the two planned views as "a discover view ranking
+ * sites in the current map area, and a trip planning view". /map would name the
+ * component; /discover names what the user is doing, and leaves room for /plan beside
+ * it later.
+ *
+ * SessionProvider sits above the router so every route sees the same session, which is
+ * what lets the header sign out from anywhere.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import * as maplibregl from "maplibre-gl";
-import "maplibre-gl/dist/maplibre-gl.css";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import "./App.css";
 import type { FeatureCollection as GeoJsonFeatureCollection } from "geojson";
 import { addMapLayers, addMapSources, CLICKABLE, CLICKABLE_IDS, EMPTY, LAYERS } from "./map/layers";
@@ -200,67 +209,25 @@ export default function App() {
   const truncated = LAYERS.filter((layer) => meta[layer.name]?.truncated);
 
   return (
-    <div className="app">
-      <div ref={mapContainer} className="map" />
-
-      <div className="panel">
-        <div className="panel-title">Layers</div>
-        {LAYERS.map((layer) => {
-          const info = meta[layer.name];
-          const on = enabled[layer.name];
-          const zoomedOut = !layerVisibleAtZoom(layer.name, zoom);
-          return (
-            <label key={layer.name} className={`row${on && !zoomedOut ? "" : " off"}`}>
-              <input
-                type="checkbox"
-                checked={on}
-                onChange={(event) =>
-                  setEnabled((previous) => ({
-                    ...previous,
-                    [layer.name]: event.target.checked,
-                  }))
-                }
-              />
-              <span className="swatch" style={{ background: `var(--map-${layer.name})` }} />
-              {layer.label}
-              <span className="count">
-                {on && zoomedOut
-                  ? `z${MIN_ZOOM_FOR_LINEWORK}+`
-                  : on && info
-                    ? `${info.returned.toLocaleString()}${info.truncated ? ` / ${info.matched.toLocaleString()}` : ""}`
-                    : ""}
-              </span>
-            </label>
-          );
-        })}
-        {loading ? (
-          <div className="status">
-            <span className="spinner" />
-            Loading…
+    <SessionProvider>
+      <BrowserRouter>
+        <div className="shell">
+          <Header />
+          <div className="shell-body">
+            <Routes>
+              <Route path="/" element={<Landing />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/discover" element={<Discover />} />
+              {/* Anything else is a typo, not a page. Send it to the front door rather
+                  than showing a blank shell. */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
           </div>
-        ) : (
-          fromCache && <div className="status cached">Cached · zoom {zoom.toFixed(1)}</div>
-        )}
-      </div>
-
-      {error && <div className="banner error">{error}</div>}
-
-      {truncated.length > 0 && !error && (
-        <div className="banner warn">
-          Zoom in to see all features — showing{" "}
-          {truncated.map((layer, index) => {
-            const info = meta[layer.name]!;
-            return (
-              <span key={layer.name}>
-                {index > 0 ? ", " : ""}
-                <b>{info.returned.toLocaleString()}</b> of{" "}
-                <b>{info.matched.toLocaleString()}</b> {layer.label.toLowerCase()}
-              </span>
-            );
-          })}
-          .
         </div>
       )}
     </div>
+      </BrowserRouter>
+    </SessionProvider>
   );
 }

@@ -27,8 +27,11 @@ Authorization: Token <token>
 |---|---|---|---|
 | `/api/auth/register/` | `POST` | No | `201` with the new account |
 | `/api/auth/login/` | `POST` | No | `200` with a token |
-| `/api/saved-campsites/<campsite_id>/` | `POST` | Yes | `201` (or `200` if already saved) |
-| `/api/saved-campsites/<campsite_id>/` | `DELETE` | Yes | `204` |
+| `/api/auth/logout/` | `POST` | Yes | `204`, token revoked |
+| `/api/auth/me/` | `GET` | Yes | `200` with the token's owner |
+| `/api/saved-campsites/` | `GET` | Yes | `200` with this user's saved campsites |
+| `/api/saved-campsites/<source_id>/` | `POST` | Yes | `201` (or `200` if already saved) |
+| `/api/saved-campsites/<source_id>/` | `DELETE` | Yes | `204` |
 
 ---
 
@@ -50,8 +53,16 @@ to username/email, not fully numeric) — a rejected password comes back as `400
 specific reason(s):
 
 ```json
-{ "password": ["This password is too common."] }
+{ "non_field_errors": ["This password is too common."] }
 ```
+
+The key is `non_field_errors`, not `password`. Validation runs in the serializer's
+object-level `validate()` rather than in a per-field method, because
+`UserAttributeSimilarityValidator` has to compare the password against the username and
+email in the same payload — it cannot see them from inside a `validate_password` field
+method. DRF files object-level errors under `non_field_errors`, so that is where these
+land. (This page previously documented `{"password": [...]}`, which the server has never
+returned.)
 
 A taken **username** is a normal `400`:
 
@@ -93,12 +104,118 @@ confirms whether a username exists.
 
 ---
 
+## Log out
+
+```
+POST /api/auth/logout/
+Authorization: Token 9a4f2c1e8b3d4a6f9c0e1b2d3a4f5c6d7e8f9a0b
+```
+
+`204`, no body. The token row is **deleted**, not flagged — tokens carry no expiry and no
+refresh flow, so the row's existence is the session and removing it is what actually
+revokes access. Every later request with that token gets `401`, including a second logout.
+
+Logging in again issues a fresh token; the old string never works again. Clearing the
+token client-side without calling this endpoint leaves a working credential on the server,
+so sign-out must go through here.
+
+- `204` — signed out.
+- `401` — missing, invalid, or already-revoked token.
+
+Only the presented token is revoked. Other accounts are untouched.
+
+---
+
+## Current user
+
+Who does this token belong to — for restoring a session on page load, when the client has
+a stored token but no user.
+
+```
+GET /api/auth/me/
+Authorization: Token 9a4f2c1e8b3d4a6f9c0e1b2d3a4f5c6d7e8f9a0b
+```
+
+`200`:
+
+```json
+{ "username": "rania", "email": "rania@example.com" }
+```
+
+Same shape as the registration response, so a client has one idea of what an account looks
+like. The user's database id is deliberately not included — no endpoint here exposes an
+internal row id.
+
+- `401` — missing or invalid token.
+
+---
+
+## List saved campsites
+
+```
+GET /api/saved-campsites/
+Authorization: Token 9a4f2c1e8b3d4a6f9c0e1b2d3a4f5c6d7e8f9a0b
+```
+
+`200` with a JSON array, **newest save first**:
+
+```json
+[
+  {
+    "id": "campsite/73996",
+    "name": "Marcy Dam",
+    "site_type": "lean_to",
+    "reservable": null,
+    "capacity": null,
+    "latitude": 44.1,
+    "longitude": -74.05,
+    "saved_at": "2026-09-28T14:02:11.482913Z"
+  }
+]
+```
+
+An empty list (`[]`) when nothing is saved — not a `404`. Scoped to the token's owner, so
+one user can never see another's saves; there is no id in the URL to tamper with.
+
+- `401` — missing or invalid token.
+
+### Why this shape
+
+**`id` is the `source_id`** — the same string the map API puts in each GeoJSON Feature's
+`id` ([api.md](api.md#feature-id)) and the same string you `POST` and `DELETE` to save and
+unsave. All three being identical is the point: the frontend can fetch this list once and
+mark which pins on the map are already saved, with no per-site lookup and no id
+translation anywhere.
+
+**Flat JSON, not GeoJSON.** A campsite is a Point, so returning full geometry would cost a
+handful of bytes — this is not a size decision. It is that the two things a client does
+with this list are render a row and call `flyTo(longitude, latitude)`, and neither wants to
+unwrap `geometry.coordinates`. The map layers stay GeoJSON because MapLibre consumes them
+directly; this list is not fed to MapLibre.
+
+**Properties mirror the map API's campsite layer** (`name`, `site_type`, `reservable`,
+`capacity`), so a saved entry and a map feature describe a campsite the same way.
+
+`reservable` and `capacity` are `null` when the source didn't say. Null is not `false` and
+not `0` — "unknown" and "not reservable" are different answers, and the serializer keeps
+them apart.
+
+---
+
 ## Save / unsave a campsite
 
 Both require `Authorization: Token <token>`.
 
+The id in the path is the campsite's **`source_id`** -- the same string the map API puts in
+each GeoJSON Feature's `id`, documented in [api.md](api.md#feature-id). Take it from the
+feature you are looking at and send it back unchanged. It is *not* the database primary
+key, which is never exposed.
+
+It usually contains a slash (`campsite/73996`), so build the URL by appending the raw
+value; do not assume it is a single path segment and do not percent-encode the slash.
+
 ```
-POST /api/saved-campsites/42/
+POST /api/saved-campsites/campsite/73996/
 Authorization: Token 9a4f2c1e8b3d4a6f9c0e1b2d3a4f5c6d7e8f9a0b
 ```
 
@@ -108,7 +225,7 @@ Authorization: Token 9a4f2c1e8b3d4a6f9c0e1b2d3a4f5c6d7e8f9a0b
 - `401` — missing or invalid token.
 
 ```
-DELETE /api/saved-campsites/42/
+DELETE /api/saved-campsites/campsite/73996/
 Authorization: Token 9a4f2c1e8b3d4a6f9c0e1b2d3a4f5c6d7e8f9a0b
 ```
 
@@ -120,6 +237,12 @@ Authorization: Token 9a4f2c1e8b3d4a6f9c0e1b2d3a4f5c6d7e8f9a0b
 
 ## Not included yet
 
-No endpoint lists a user's saved campsites (`GET /api/saved-campsites/`) — TM05-16's
-acceptance criteria only call for saving and unsaving. Add it when a frontend view
-actually needs the list.
+No pagination on the saved list. A user's saves are inherently few — tens, not thousands —
+and the endpoint returns a bare array so a client can render it directly. If that ever
+stops being true, paginating changes the response from an array to an object with a
+`results` key, which is a breaking change; better to make it deliberately later than to
+carry the wrapper now.
+
+No token expiry or refresh. Tokens live until logout deletes them. Worth revisiting before
+anything is deployed publicly, but it is a change to the auth model rather than a gap in
+these endpoints.
