@@ -13,6 +13,16 @@ import * as maplibregl from "maplibre-gl";
 // maplibre-gl.css is imported in main.tsx, not here: it has to load before
 // App.css or `.maplibregl-map` overrides `.map` and the container collapses.
 import "../App.css";
+import { mapColors, mapPaint } from "../theme";
+import {
+  bboxCenter,
+  DEFAULT_REGION,
+  DEFAULT_ZOOM,
+  REGIONS,
+  regionAt,
+  regionCamera,
+  type Region,
+} from "../regions";
 import { addMapLayers, addMapSources, CLICKABLE, CLICKABLE_IDS, EMPTY, LAYERS } from "../map/layers";
 import { popupFor } from "../map/popups";
 import { Link } from "react-router-dom";
@@ -46,9 +56,8 @@ const MAP_STYLE_URL =
   import.meta.env.VITE_MAP_STYLE_URL ??
   "https://tiles.stadiamaps.com/styles/alidade_smooth_dark.json";
 
-// The Adirondacks: where the ingested data actually is.
-const ADIRONDACKS: [number, number] = [-74.2, 44.1];
-const INITIAL_ZOOM = 10;
+// Opens on the region with the most data -- see DEFAULT_REGION in regions.ts.
+const INITIAL_CENTER = bboxCenter(DEFAULT_REGION.bbox);
 const DEBOUNCE_MS = 400;
 
 export default function Discover() {
@@ -76,7 +85,9 @@ export default function Discover() {
   const [error, setError] = useState<string | null>(null);
   const [meta, setMeta] = useState<Partial<Record<LayerName, Metadata>>>({});
 
-  const [zoom, setZoom] = useState(INITIAL_ZOOM);
+  const [zoom, setZoom] = useState(DEFAULT_ZOOM);
+  // Tracked only to say which region shortcut is current; the map owns the real camera.
+  const [center, setCenter] = useState<[number, number]>(INITIAL_CENTER);
   const [fromCache, setFromCache] = useState(false);
 
   // From the provider above the router, so signing out in the header reaches the Saved
@@ -198,8 +209,16 @@ export default function Discover() {
 
   /** Centre the map on a saved campsite. */
   const flyToSaved = useCallback((campsite: SavedCampsite) => {
-    map.current?.flyTo({ center: [campsite.lon, campsite.lat], zoom: Math.max(13, INITIAL_ZOOM) });
+    map.current?.flyTo({ center: [campsite.lon, campsite.lat], zoom: Math.max(13, DEFAULT_ZOOM) });
   }, []);
+
+  /** Jump to one of the regions that has data. */
+  const flyToRegion = useCallback((region: Region) => {
+    const current = map.current;
+    if (current) current.flyTo(regionCamera(current, region));
+  }, []);
+
+  const currentRegion = regionAt(center);
 
   // --- map setup, once ------------------------------------------------------------
 
@@ -209,8 +228,8 @@ export default function Discover() {
     const instance = new maplibregl.Map({
       container: mapContainer.current,
       style: MAP_STYLE_URL,
-      center: ADIRONDACKS,
-      zoom: INITIAL_ZOOM,
+      center: INITIAL_CENTER,
+      zoom: DEFAULT_ZOOM,
     });
     map.current = instance;
     instance.addControl(new maplibregl.NavigationControl(), "top-right");
@@ -226,6 +245,8 @@ export default function Discover() {
     // Refetch when the viewport settles, debounced so a drag is one request.
     const onIdle = () => {
       setZoom(instance.getZoom());
+      const { lng, lat } = instance.getCenter();
+      setCenter([lng, lat]);
       window.clearTimeout(debounce.current);
       debounce.current = window.setTimeout(() => void refresh(), DEBOUNCE_MS);
     };
@@ -323,6 +344,26 @@ export default function Discover() {
       <div ref={mapContainer} className="map" />
 
       <div className="panel">
+        {/* Data sits in a few regions hundreds of miles apart, so free panning mostly
+            finds empty map. These jump straight to the places that have something. */}
+        <div className="panel-title">Regions</div>
+        <div className="regions" role="group" aria-label="Jump to a region">
+          {REGIONS.map((region) => {
+            const isCurrent = region.id === currentRegion?.id;
+            return (
+              <button
+                key={region.id}
+                type="button"
+                className={`region-button${isCurrent ? " is-current" : ""}`}
+                aria-pressed={isCurrent}
+                onClick={() => flyToRegion(region)}
+              >
+                {region.label}
+              </button>
+            );
+          })}
+        </div>
+
         <div className="panel-title">Layers</div>
         {LAYERS.map((layer) => {
           const info = meta[layer.name];
