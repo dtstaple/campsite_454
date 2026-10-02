@@ -144,5 +144,16 @@ Most of the original 15 s was not 3DEP. Each sample point was reprojected on its
 building a GDAL transformation costs ~14 ms. Reprojecting all samples in one call cut the
 computation to 3.8 s with identical results.
 
+**Long routes.** Sampling is capped at 2,000 points (`MAX_SAMPLES`), so spacing widens
+on long routes. The 137-mile Northville-Placid Trail would be ~8,800 samples at 25 m; at the
+cap it is 110 m spacing, which is still finer than a chart can draw. At that spacing the
+100 m smoothing window is a single sample, so only the 3 m threshold filters noise. That
+route's first computation measured **40.2 s** (2,001 samples, 5 requests — 3DEP is slower
+per point on large spread-out batches). Precomputing the longest routes is worthwhile:
+
+```
+python manage.py route_profile "Northville-Placid Trail"
+```
+
 Profiles are therefore computed on first request and cached, rather than precomputed for all
 452 routes. Precomputing would mean several thousand 3DEP requests at once.
