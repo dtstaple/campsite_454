@@ -201,14 +201,3 @@ create it first.
 - **Logging:** one module-level `logger = logging.getLogger(__name__)`; no `print` in
   application code. Never log secrets. The RIDB API key, for example, must never appear
   in logs or in `IngestRun.parameters`.
-
-## 9. Team agreement
-
-Each team member fills in their own row to record agreement with these conventions.
-
-| Team Member | Agreed (Y/N) | Date |
-|---|---|---|
-| Davis Stapleton | | |
-| Bleron Balidemaj | | |
-| Abdulrahman Shaalan | | |
-| Sahaj Soni | | |
