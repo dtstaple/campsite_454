@@ -390,6 +390,7 @@ The parts are also stored as columns (`analysis`, `version`, `geom`, `window_sta
 | Analysis | TTL | Grid | Why |
 |---|---|---|---|
 | `weather` (Open-Meteo) | **1 hour** | 0.05° (~5 km) | Open-Meteo refreshes hourly; its models answer per grid cell anyway (two points 2 km apart came back as the same cell). |
+| `route_profile` (3DEP, TM05-59) | 1 year | none (keyed by route geometry) | Terrain does not change; a changed route geometry is a new key. See docs/elevation.md. |
 | slope / aspect (3DEP, planned) | 1 year | none | Terrain does not change; a year bounds how long a bad answer could survive. |
 | land cover / NDVI (Sentinel-2, planned) | 30 days | none | Revisit is ~5 days, but vegetation changes on a seasonal scale. |
 | soil drainage (SSURGO, planned) | 1 year | none | Survey data is updated annually at most. |
