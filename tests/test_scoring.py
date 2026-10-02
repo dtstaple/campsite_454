@@ -9,6 +9,8 @@ never breaks a test.
 """
 
 import copy
+import json
+from pathlib import Path
 
 import pytest
 from django.contrib.gis.geos import LineString, MultiLineString, MultiPolygon, Point, Polygon
@@ -25,6 +27,23 @@ M_PER_DEG_LAT = 111_120
 
 def north(metres, lon=LON, lat=LAT):
     return Point(lon, lat + metres / M_PER_DEG_LAT, srid=4326)
+
+
+FORECAST = json.loads((Path(__file__).parent / "fixtures" / "open_meteo_forecast.json").read_text())
+
+
+@pytest.fixture(autouse=True)
+def recorded_weather(monkeypatch):
+    """Weather is a live factor; every test here answers it from a recorded response so
+    no test touches the network. test_analysis.py covers the analysis itself."""
+    calls = []
+
+    def fake_fetch(url, params):
+        calls.append(params)
+        return copy.deepcopy(FORECAST)
+
+    monkeypatch.setattr("analysis.analyses.weather.fetch_json", fake_fetch)
+    return calls
 
 
 def shipped():
@@ -74,7 +93,7 @@ class TestPeakCurve:
 class TestConfig:
     def test_shipped_config_loads_with_every_factor(self):
         config = shipped()
-        assert set(config.weights) == {"water", "legal", "trail", "slope", "land_cover"}
+        assert set(config.weights) == {"water", "legal", "trail", "weather", "slope", "land_cover"}
         assert config.factor("water")["ideal_m"] == 60
 
     def test_capacity_is_not_a_factor(self):
@@ -292,7 +311,10 @@ class TestEngine:
         }
         assert result["contract"] == 1
         assert [f["key"] for f in result["factors"]] == list(shipped().weights)
-        assert result["score"] == pytest.approx(100, abs=2)
+        weather = factor_by_key(result, "weather")
+        assert weather["status"] == "scored"
+        # Perfect water, trail and legal; the recorded forecast is a rainy day.
+        assert 80 < result["score"] < 100
         for factor in result["factors"]:
             assert set(factor) == {
                 "key",
@@ -356,7 +378,11 @@ class TestEngine:
         assert factor_by_key(result, "trail")["status"] == "no_data"
         assert factor_by_key(result, "legal")["status"] == "no_data"
         weights = shipped().weights
-        expected = 15 * weights["legal"] / (weights["water"] + weights["legal"] + weights["trail"])
+        weather = factor_by_key(result, "weather")["score"]
+        counted = ("water", "legal", "trail", "weather")
+        expected = (15 * weights["legal"] + weather * weights["weather"]) / sum(
+            weights[key] for key in counted
+        )
         assert result["score"] == round(expected)
 
     def test_capacity_does_not_change_a_campsite_score(self):
@@ -370,7 +396,11 @@ class TestEngine:
             geom=Point(LON, LAT, srid=4326),
             capacity=40,
         )
-        assert score_campsite(small) == score_campsite(large)
+        a, b = score_campsite(small), score_campsite(large)
+        # Compare scores, not whole results: the second call's weather is a cache hit, so
+        # its measurement says cached: true.
+        assert a["score"] == b["score"]
+        assert [f["score"] for f in a["factors"]] == [f["score"] for f in b["factors"]]
 
     @pytest.mark.parametrize("lon, lat", [(200, 44), (-73, 95)])
     def test_invalid_coordinates_are_rejected(self, lon, lat):
@@ -380,3 +410,53 @@ class TestEngine:
     def test_unknown_factor_in_config_is_rejected(self):
         with pytest.raises(ScoringConfigError):
             score_location(LON, LAT, parse(raw_config(water=1, altitude=1)))
+
+
+@pytest.mark.django_db
+@pytest.mark.integration
+class TestWeatherFactor:
+    def evaluate(self):
+        from scoring.factors import WeatherFactor
+
+        return WeatherFactor(shipped().factor("weather")).evaluate(LON, LAT)
+
+    def test_scores_the_forecast_day_with_explained_penalties(self):
+        result = self.evaluate()
+        day = FORECAST["daily"]
+        rain, wind = day["precipitation_sum"][0], day["wind_speed_10m_max"][0]
+        settings = shipped().factor("weather")
+        expected = 100 - min(40, rain * 4) - min(30, max(0, wind - 25))
+        assert result.status == "scored"
+        assert result.score == pytest.approx(expected)
+        assert result.measurement["date"] == day["time"][0]
+        assert result.measurement["precipitation_mm"] == rain
+        assert settings["precipitation_penalty_per_mm"] == 4
+        assert "mm of rain" in result.explanation
+
+    def test_second_call_is_served_from_the_cache(self, recorded_weather):
+        assert self.evaluate().measurement["cached"] is False
+        assert self.evaluate().measurement["cached"] is True
+        assert len(recorded_weather) == 1
+
+    def test_frost_is_penalised(self, monkeypatch):
+        frosty = copy.deepcopy(FORECAST)
+        frosty["daily"]["temperature_2m_min"][0] = -5
+        frosty["daily"]["precipitation_sum"][0] = 0
+        frosty["daily"]["wind_speed_10m_max"][0] = 10
+        monkeypatch.setattr("analysis.analyses.weather.fetch_json", lambda url, params: frosty)
+        result = self.evaluate()
+        assert result.score == pytest.approx(85)
+        assert result.measurement["penalties"]["freezing"] == 15
+
+    def test_unreachable_source_is_not_available_and_excluded(self, monkeypatch):
+        from analysis.base import AnalysisError
+
+        def down(url, params):
+            raise AnalysisError("down")
+
+        monkeypatch.setattr("analysis.analyses.weather.fetch_json", down)
+        result = score_location(LON, LAT)
+        weather = factor_by_key(result, "weather")
+        assert weather["status"] == "not_available"
+        assert weather["score"] is None
+        assert weather["effective_weight"] == 0
