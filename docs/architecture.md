@@ -154,6 +154,87 @@ we already have, instead of re-downloading everything from the network.
 
 ---
 
+## Measuring distance in metres (TM05-42)
+
+Scoring is mostly distance: how far to water, how far to a trail. The tables store
+latitude/longitude (EPSG:4326), and a distance computed on those numbers comes back in
+*degrees*, which is not a usable unit and is not even consistent — at Adirondack latitude a
+degree of longitude is ~79 km and a degree of latitude ~111 km. Before this change there
+were two ways to ask "how far is the nearest water", and neither was acceptable: one was
+fast but answered in degrees, the other answered in metres but could not use the index.
+
+**What we chose: a projected metre column.** Campsites, trails and water each carry a second
+geometry column, `geom_m`, holding the same shape projected to **EPSG:5070** (the US
+Albers projection, units of metres), with its own spatial index. The database generates it
+from `geom` (`GENERATED ALWAYS AS (ST_Transform(geom, 5070)) STORED`), so nothing that
+writes data — the pipeline, fixtures, the admin — can forget to update it. All distance
+queries go through `backend/geodata/distance.py` (`nearest()`, `nearest_distance_m()`,
+`within()`), which measure on `geom_m` and order nearest-first with the index-aware `<->`
+operator.
+
+**The alternative we rejected: a geography index.** PostGIS can index the "geography"
+(round-earth) version of each shape and answer in metres directly. It works and is slightly
+more accurate, but it measured 28× slower than the projected column on the same query,
+because every candidate comparison is done on the spheroid, and lakes with thousands of
+vertices make that expensive. The projected column's accuracy loss is measured and small
+(below), so the speed wins.
+
+### Measured, not estimated
+
+Same query — nearest water for each of 150 candidate campsites (the first 150 by id in the
+Adirondack box) against all 76,551 water features. Median of 5 warm runs of `EXPLAIN
+ANALYZE`, reproducible with `python manage.py bench_distance`. Measured 2026-10-02 on the
+local Docker PostGIS (emulated on Apple Silicon, see Known limitations, so absolute numbers
+are pessimistic; the ratios are what matter).
+
+| Query | Units | Index used on water? | Time |
+|---|---|---|---|
+| Before: KNN on the 4326 index | degrees (wrong) | yes | 15.3 ms |
+| Before: geography cast, ~1 km bbox prefilter | metres | yes (prefilter only) | 441 ms |
+| Before: geography cast, ~5 km bbox prefilter | metres | yes (prefilter only) | 2,515 ms |
+| Before: geography cast, no prefilter | metres | **no — sequential scan** | > 5 min (cancelled) |
+| Geography GiST index + KNN (rejected) | metres | yes | 406 ms |
+| **After: KNN on `geom_m` (5070)** | **metres** | **yes** | **14.6 ms** |
+
+The story's original figures (51 ms and 608 ms) were single cold runs; the first cold run
+of the degree KNN here was 61 ms, consistent with that. Through the ORM, as scoring will call
+it, 150 `nearest_distance_m()` calls take 217 ms in total (~1.4 ms each including the round
+trip), and water plus trail for all 150 sites takes 365 ms.
+
+The "after" plan, from `EXPLAIN ANALYZE` on a single nearest-water lookup:
+
+```
+Limit (actual time=0.277..0.278 rows=1 loops=1)
+  ->  Index Scan using water_geom_m_gist on geodata_waterfeature (actual rows=1 loops=1)
+        Order By: (geom_m <-> '...'::geometry)
+Execution Time: 0.449 ms
+```
+
+A radius query (`within()`, ST_DWithin 500 m) is an `Index Scan using water_geom_m_gist`
+with `Index Cond: (geom_m && st_expand(...))`, 1.1–1.8 ms.
+
+**Accuracy.** For every ingested campsite whose nearest water is more than 1 m away (1,276
+sites), the 5070 distance was compared with the true geodesic distance PostGIS computes on
+the spheroid: mean error **0.22%**, worst **0.55%**, largest absolute error **3.5 m**. The
+water curve peaks at 60 m, so this is well inside what scoring can notice.
+
+**Two traps, both handled in `distance.py`:**
+
+- *Ordering by `ST_Distance` looks like nearest-first and is not index-assisted* — it computes
+  the distance to every row. Only `ORDER BY geom_m <-> point` walks the index.
+- *Transform the query point in the database, not in Python.* 4326 → 5070 includes a datum
+  step, and the PROJ inside PostGIS and the one linked by local GDAL chose different
+  transformations, measured 0.26 m apart. `geom_m` is computed by PostGIS, so the query
+  point is too (`ST_Transform` of a constant is folded once, so the index still applies).
+
+**What did not change.** `geom` is untouched and every existing API query still uses it, so
+the map endpoints behave exactly as before (their tests pass unchanged). Public land is not
+given a metric column: scoring asks *which* parcel a point is in, a containment question
+that units do not affect. The pipeline's upsert now skips generated columns, which the
+database refuses to have written.
+
+---
+
 ## Knowing where the data came from
 
 Every time the pipeline runs, it writes a record of that run: which source, which region,
@@ -278,16 +359,11 @@ This is a decision, not an oversight. **Planned** — not yet built.
 
 Three things are worth knowing before building on this.
 
-**Distances in the database are measured in degrees, not metres.** Locations are stored as
-latitude and longitude numbers, and measuring the plain arithmetic distance between two
-such numbers produces an answer in degrees of arc. That is not a distance in any useful
-sense, and worse, it is inconsistent: in the Adirondacks one degree of longitude is about
-79 km while one degree of latitude is about 111 km. A naive distance calculation would
-therefore distort east-west versus north-south, and the distortion changes as you move
-north. The fix is to explicitly ask the database to treat the coordinates as points on a
-globe when measuring, which must be done in the scoring code. Storage is not affected —
-this is purely about how queries are written, and it is documented in the code where
-someone would hit it.
+**The metre column only covers the contiguous US.** Distances are measured in EPSG:5070
+(see "Measuring distance in metres"), which is designed for the lower 48 states. The
+Northeast and the planned West Coast regions are inside it; **Alaska is not**, and
+distances there would be distorted. Adding an Alaska region means switching that region to
+EPSG:3338 (Alaska Albers) first — decide this before ingesting Alaska data, not after.
 
 **Recreation.gov only covers federal land.** It is a federal system, so it lists Forest
 Service and Park Service campsites but knows nothing about state land. That is a real gap
@@ -318,10 +394,13 @@ backend/pipeline/
 
 backend/geodata/
   models.py                       the four data tables and the run record
+  distance.py                     metre-correct, indexed distance queries
+  management/commands/bench_distance.py   re-measures the numbers above
   migrations/                     the database schema history
 
 tests/
   test_pipeline_regions.py        configuration and bounding-box validation
   test_pipeline_adapters.py       the framework, using throwaway sources
   test_geodata_models.py          the tables, including the no-duplicates rule
+  test_geodata_distance.py        distances in metres, checked against geodesic truth
 ```
