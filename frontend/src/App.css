@@ -160,6 +160,11 @@
   transition: opacity var(--transition);
 }
 
+/* Hillshade has no single colour, so its swatch is a lit-to-shaded ramp. */
+.swatch-terrain {
+  background: linear-gradient(135deg, var(--text-secondary), var(--bg-base));
+}
+
 .row.off .swatch {
   opacity: 0.3;
 }

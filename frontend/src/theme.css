@@ -86,6 +86,17 @@
   --map-public-land-line-opacity: 0.55;
   --map-public-land-line-width: 0.8;
 
+  /* Terrain hillshade, drawn under every data layer and under the basemap's labels.
+   * The basemap is dark, so the shadow side does most of the work and the highlight is
+   * kept faint -- a bright highlight on dark reads as fog rather than as relief. The
+   * highlight is --text-primary at low alpha so the lit slopes share the chrome's warmth.
+   * Exaggeration is MapLibre's 0-1 intensity; past ~0.6 the shading starts to compete
+   * with the public land tint and the trail linework. */
+  --map-hillshade-shadow: rgba(0, 0, 0, 0.55);
+  --map-hillshade-highlight: rgba(237, 231, 217, 0.16);
+  --map-hillshade-accent: rgba(0, 0, 0, 0.3);
+  --map-hillshade-exaggeration: 0.45;
+
   /* --- spacing --- */
   --space-xs: 4px;
   --space-sm: 8px;

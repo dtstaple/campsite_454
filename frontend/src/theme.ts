@@ -56,3 +56,13 @@ export function mapPaint() {
     publicLandLineWidth: numericToken("--map-public-land-line-width", 0.8),
   };
 }
+
+/** Hillshade colours and strength, from the --map-hillshade-* tokens. */
+export function mapHillshade() {
+  return {
+    shadow: token("--map-hillshade-shadow") || "rgba(0, 0, 0, 0.55)",
+    highlight: token("--map-hillshade-highlight") || "rgba(237, 231, 217, 0.16)",
+    accent: token("--map-hillshade-accent") || "rgba(0, 0, 0, 0.3)",
+    exaggeration: numericToken("--map-hillshade-exaggeration", 0.45),
+  };
+}

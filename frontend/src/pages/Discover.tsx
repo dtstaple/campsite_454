@@ -23,6 +23,7 @@ import {
 } from "../regions";
 import { addMapLayers, addMapSources, CLICKABLE, CLICKABLE_IDS, EMPTY, LAYERS } from "../map/layers";
 import { popupFor } from "../map/popups";
+import { addHillshade, setHillshadeVisible } from "../map/terrain";
 import { Link } from "react-router-dom";
 import { useSession } from "../session";
 import ModeSwitcher from "../modes/ModeSwitcher";
@@ -76,9 +77,20 @@ export default function Discover() {
     ...modeById(DEFAULT_MODE_ID).layers,
   }));
 
+  // Hillshade is a raster the map fetches itself, so it is shown and hidden in place
+  // rather than going through refresh(). The ref lets the once-only load handler read it.
+  const [terrain, setTerrain] = useState(() => modeById(DEFAULT_MODE_ID).terrain);
+  const terrainRef = useRef(terrain);
+  useEffect(() => {
+    terrainRef.current = terrain;
+    if (map.current && styleReady.current) setHillshadeVisible(map.current, terrain);
+  }, [terrain]);
+
   const switchMode = useCallback((id: ModeId) => {
+    const next = modeById(id);
     setModeId(id);
-    setEnabled({ ...modeById(id).layers });
+    setEnabled({ ...next.layers });
+    setTerrain(next.terrain);
   }, []);
 
   const toggleLayer = useCallback((layer: LayerName, on: boolean) => {
@@ -256,6 +268,8 @@ export default function Discover() {
     instance.addControl(new maplibregl.NavigationControl(), "top-right");
 
     instance.on("load", () => {
+      // First, so it lands under the basemap labels and under every data layer.
+      addHillshade(instance, terrainRef.current);
       addMapSources(instance);
       addMapLayers(instance);
 
@@ -375,6 +389,8 @@ export default function Discover() {
           fromCache={fromCache}
           currentRegionId={currentRegion?.id}
           onToggle={toggleLayer}
+          terrain={terrain}
+          onTerrain={setTerrain}
           onRegion={flyToRegion}
         />
       </div>

@@ -26,6 +26,8 @@ interface Props {
   fromCache: boolean;
   currentRegionId: string | undefined;
   onToggle: (layer: LayerName, on: boolean) => void;
+  terrain: boolean;
+  onTerrain: (on: boolean) => void;
   onRegion: (region: Region) => void;
 }
 
@@ -45,6 +47,8 @@ export default function LayerPanel({
   fromCache,
   currentRegionId,
   onToggle,
+  terrain,
+  onTerrain,
   onRegion,
 }: Props) {
   const [open, setOpen] = useState(true);
@@ -96,6 +100,17 @@ export default function LayerPanel({
               </label>
             );
           })}
+
+          {/* Not an API layer: shading the map draws by itself, so it has no count. */}
+          <label className={`row${terrain ? "" : " off"}`}>
+            <input
+              type="checkbox"
+              checked={terrain}
+              onChange={(event) => onTerrain(event.target.checked)}
+            />
+            <span className="swatch swatch-terrain" />
+            Terrain shading
+          </label>
 
           {/* Data sits in a few regions hundreds of miles apart, so free panning mostly
               finds empty map. These jump straight to the places that have something. */}

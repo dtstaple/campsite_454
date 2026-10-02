@@ -25,6 +25,8 @@ export interface ActivityMode {
   enabled: boolean;
   /** Which layers are on when the user switches into this mode. */
   layers: Readonly<Record<LayerName, boolean>>;
+  /** Whether terrain hillshading starts on. Not an API layer, so kept separate. */
+  terrain: boolean;
   /**
    * Layers in the order the layer panel lists them, most important first. The first
    * entry is the mode's primary layer and is visually emphasised.
@@ -41,6 +43,7 @@ export const MODES: readonly ActivityMode[] = [
     // Hiking is about the trail network. Campsites start off so they do not crowd it;
     // one click brings them back.
     layers: { trails: true, water: true, "public-land": true, campsites: false },
+    terrain: true,
     emphasis: ["trails", "water", "public-land", "campsites"],
   },
   {
@@ -49,6 +52,7 @@ export const MODES: readonly ActivityMode[] = [
     icon: "camping",
     enabled: true,
     layers: { trails: true, water: true, "public-land": true, campsites: true },
+    terrain: true,
     emphasis: ["campsites", "water", "public-land", "trails"],
   },
   {
@@ -57,6 +61,7 @@ export const MODES: readonly ActivityMode[] = [
     icon: "ski",
     enabled: false,
     layers: { trails: true, water: false, "public-land": true, campsites: false },
+    terrain: true,
     emphasis: ["trails", "public-land", "water", "campsites"],
   },
 ];
