@@ -25,12 +25,23 @@ import {
   SELECTED_SOURCE,
 } from "./mapLayers";
 import TrailPanel, { type DetailState } from "./TrailPanel";
+import ThreeDControls from "./ThreeDControls";
+import { CAMERA, easeBearing, rigFor } from "./camera";
+import { disable3D, enable3D, prefersReducedMotion } from "./terrain3d";
 import "./trails.css";
 
 /** Below this zoom a route list would be most of a region; skip the request. */
 const MIN_ROUTE_ZOOM = 9;
 const DEBOUNCE_MS = 400;
 const DEFAULT_WITHIN_M = 500;
+/** Flythrough speed bounds, metres per second: a short trail still takes a while, a long
+ * one does not take all day. Aim for about 45 s end to end in between. */
+const FLY_MIN_MPS = 60;
+const FLY_MAX_MPS = 400;
+const FLY_TARGET_S = 45;
+/** With reduced motion the flythrough steps rather than glides. */
+const REDUCED_STEP_M = 500;
+const REDUCED_STEP_MS = 1500;
 
 interface Props {
   map: maplibregl.Map | null;
@@ -52,6 +63,99 @@ export default function TrailInsight({ map }: Props) {
   useEffect(() => {
     lineRef.current = line;
   }, [line]);
+
+  // --- 3D: terrain, scrubber camera, flythrough ----------------------------------------
+
+  const [is3D, setIs3D] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const previousMaxPitch = useRef<number | null>(null);
+  const rig = useMemo(() => (line ? rigFor(line) : null), [line]);
+  const cursorRef = useRef(cursorM);
+  useEffect(() => {
+    cursorRef.current = cursorM;
+  }, [cursorM]);
+
+  /** Put the camera behind and above `distance`, easing its bearing by `easing` (0-1). */
+  const placeCamera = useCallback(
+    (distance: number, easing: number) => {
+      if (!map || !rig) return;
+      const camera = rig.at(distance);
+      map.jumpTo({
+        center: camera.center,
+        bearing: easeBearing(map.getBearing(), camera.bearing, easing),
+        pitch: CAMERA.pitch,
+        zoom: CAMERA.zoom,
+      });
+    },
+    [map, rig],
+  );
+
+  const turn3DOn = useCallback(() => {
+    if (!map) return;
+    previousMaxPitch.current = enable3D(map);
+    setIs3D(true);
+    placeCamera(cursorRef.current ?? 0, 1);
+  }, [map, placeCamera]);
+
+  const turn3DOff = useCallback(() => {
+    setPlaying(false);
+    if (map) disable3D(map, previousMaxPitch.current ?? 60);
+    setIs3D(false);
+  }, [map]);
+
+  const scrub = useCallback(
+    (distance: number) => {
+      setCursorM(distance);
+      if (is3D) placeCamera(distance, 0.5);
+    },
+    [is3D, placeCamera],
+  );
+
+  const play = useCallback(() => {
+    if (!is3D) turn3DOn();
+    setPlaying(true);
+  }, [is3D, turn3DOn]);
+
+  useEffect(() => {
+    if (!playing || !map || !line) return;
+    let distance = cursorRef.current ?? 0;
+    if (distance >= line.length - 1) distance = 0;
+    const speed = Math.min(FLY_MAX_MPS, Math.max(FLY_MIN_MPS, line.length / FLY_TARGET_S));
+    const stop = () => setPlaying(false);
+    // Grabbing the map is a clear "I'll take it from here".
+    map.on("dragstart", stop);
+
+    let frame = 0;
+    let timer: number | undefined;
+    if (prefersReducedMotion()) {
+      const step = () => {
+        distance = Math.min(line.length, distance + REDUCED_STEP_M);
+        setCursorM(distance);
+        placeCamera(distance, 1);
+        if (distance >= line.length) stop();
+        else timer = window.setTimeout(step, REDUCED_STEP_MS);
+      };
+      timer = window.setTimeout(step, 0);
+    } else {
+      let last = performance.now();
+      const tick = (now: number) => {
+        const dt = Math.min(0.1, (now - last) / 1000);
+        last = now;
+        distance = Math.min(line.length, distance + speed * dt);
+        setCursorM(distance);
+        // Ease the bearing a little each frame so turns are turns, not cuts.
+        placeCamera(distance, Math.min(1, dt * 2.5));
+        if (distance >= line.length) stop();
+        else frame = requestAnimationFrame(tick);
+      };
+      frame = requestAnimationFrame(tick);
+    }
+    return () => {
+      cancelAnimationFrame(frame);
+      window.clearTimeout(timer);
+      map.off("dragstart", stop);
+    };
+  }, [playing, map, line, placeCamera]);
 
   // --- layers and viewport routes ----------------------------------------------------
 
@@ -193,13 +297,14 @@ export default function TrailInsight({ map }: Props) {
   // --- closing -------------------------------------------------------------------------
 
   const close = useCallback(() => {
+    if (is3D) turn3DOff();
     setSelected(null);
     setState(null);
     setCursorM(null);
     framed.current = null;
     (map?.getSource(SELECTED_SOURCE) as maplibregl.GeoJSONSource | undefined)?.setData(EMPTY);
     (map?.getSource(ALONG_SOURCE) as maplibregl.GeoJSONSource | undefined)?.setData(EMPTY);
-  }, [map]);
+  }, [map, is3D, turn3DOff]);
 
   useEffect(() => {
     if (!selected) return;
@@ -225,9 +330,20 @@ export default function TrailInsight({ map }: Props) {
       cursorM={cursorM}
       withinM={withinM}
       onCursor={setCursorM}
+      onScrub={scrub}
       onWithin={setWithinM}
       onCampsite={showCampsite}
       onClose={close}
+      controls={
+        <ThreeDControls
+          is3D={is3D}
+          playing={playing}
+          reducedMotion={prefersReducedMotion()}
+          onToggle3D={is3D ? turn3DOff : turn3DOn}
+          onPlay={play}
+          onPause={() => setPlaying(false)}
+        />
+      }
     />
   );
 }

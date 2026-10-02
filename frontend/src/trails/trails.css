@@ -274,6 +274,45 @@
   text-align: center;
 }
 
+/* --- 3D controls ------------------------------------------------------------------ */
+
+.trail-3d {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.trail-3d-button {
+  padding: var(--space-xs) var(--space-md);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+  transition:
+    color var(--transition),
+    border-color var(--transition);
+}
+
+.trail-3d-button:hover {
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+.trail-3d-button.is-active {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.trail-3d-hint {
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+}
+
 /* --- map marker that follows the chart cursor ---------------------------------------- */
 
 .trail-cursor-marker {
