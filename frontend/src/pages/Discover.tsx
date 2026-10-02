@@ -10,9 +10,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as maplibregl from "maplibre-gl";
-// maplibre-gl.css is imported in main.tsx, not here: it has to load before
-// App.css or `.maplibregl-map` overrides `.map` and the container collapses.
-import "../App.css";
+// No stylesheet imports here. maplibre-gl.css is imported in main.tsx and App.css in
+// App.tsx: the vendor sheet has to load before ours or `.maplibregl-map` overrides `.map`
+// and the container collapses, so the order is decided in one place only.
 import {
   bboxCenter,
   DEFAULT_REGION,
