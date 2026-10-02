@@ -105,8 +105,8 @@ The basemap is Stadia Alidade Smooth Dark (keyless on localhost), overridable wi
 | Q8 | `source?.setData(collection as unknown as GeoJsonFeatureCollection)` — a double cast because `api.ts` declares its own `FeatureCollection` that adds `metadata`. Making the API type `extends GeoJSON.FeatureCollection` would remove the cast | `pages/Discover.tsx`, `api.ts` | safe, but deferred: it is a type refactor across files a teammate is likely to touch in TM05-47/48; noted, not changed |
 | Q9 | Two oxlint `set-state-in-effect` warnings in `Discover.tsx` (`setSignInPrompt(false)` inside the session effect; `refresh()` on `enabled` change), plus `only-export-components` in `session.tsx` | frontend | safe in principle, but fixing either changes render timing, which the brief says cleanup must not do. Left alone and reported |
 | Q10 | The campsite save button is built with `document.createElement` inside the map effect, with refs mirroring React state so it doesn't go stale. It works, but it is the most fragile code in the frontend. A React portal into the popup would remove the refs | `pages/Discover.tsx` + `map/popups.ts` | touches a protected file (popups) |
-| Q12 | The `prefers-reduced-motion` block in `App.css` has a pasted copy of the `.status.cached` rule inside it, which is identical to the rule outside it and does nothing | `App.css` | **safe to fix now** |
 | Q11 | `api.ts` hardcodes `http://127.0.0.1:8000` as the fallback API base. That's fine for dev, but it should be documented next to `VITE_MAP_STYLE_URL` in `.env.example` | `api.ts` | note only |
+| Q12 | The `prefers-reduced-motion` block in `App.css` has a pasted copy of the `.status.cached` rule inside it, which is identical to the rule outside it and does nothing | `App.css` | **safe to fix now** |
 
 No `any`, no `console.*`, no `TODO`/`FIXME`, and no `print()`/`breakpoint()` were found in
 `frontend/src` or `backend/` (migrations excluded). Naming is consistent: kebab-case layer ids,
@@ -191,3 +191,138 @@ Estimates are Fibonacci suggestions for the team to re-point in planning.
   tuning; note that Alaska's OSM coverage is sparse).
 - Self-hosted or cached terrain tiles if the public terrain tile source becomes a reliability
   or rate concern (Bleron).
+
+---
+
+## Overnight run summary
+
+Branch `TM05-XX-backcountry-ui-shell`, 11 commits on top of `main` at `d9b86a9`. The full
+gate (`ruff check . && ruff format --check . && pytest`, then `npm run lint && npm run build`)
+was run before every commit and passed every time: 440 passed, 10 deselected; lint 0 errors.
+No change needed a revert. The three oxlint warnings that remain were all on `main` before this
+run (see Q9).
+
+### Completed
+
+| Phase | What | Commit subject |
+|---|---|---|
+| 1 | This audit | `TM05-XX add UI direction audit …` |
+| 2 | Removed unreferenced starter assets (Q1) | `… remove unreferenced Vite starter assets` |
+| 2 | Removed the duplicate `App.css` import in `Discover.tsx` (Q2) | `… drop the duplicate App.css import …` |
+| 2 | Removed the unused `cacheStats`/`clearCache` exports (Q3) | `… remove the unused cacheStats …` |
+| 2 | Removed the duplicated rule in the reduced-motion block (Q12) | `… remove a duplicated rule …` |
+| 3a | `frontend/src/modes/`: `modes.ts` (typed config), `icons.tsx` (original SVGs), `ModeSwitcher.tsx`. Hiking is the default; Camping is enabled; Backcountry Ski is `enabled: false` and never rendered | `… add activity modes …` |
+| 3b | `components/LayerPanel.tsx` (floating, collapsible, mode-ordered, primary layer emphasised, quiet counts, regions inside), `components/SavedPanel.tsx` (extracted), `modes/visibility.ts` | `… replace the map sidebar …` |
+| 3c | `map/terrain.ts`: hillshade from a keyless raster-dem source, a Terrain shading toggle, `--map-hillshade-*` tokens | `… add terrain hillshade …` |
+| 3d | Slim header on `/discover`; zoom and compass in a floating group at the bottom right; `--shadow-panel` and `--bg-floating` elevation on all chrome; the zoom-in notice is now a quiet pill; the tab title says CampSite | `… polish the map shell …` |
+| 3e | Landing copy reframed ("Backcountry exploration" / "Find where to spend the night." / "Explore the map"), same structure | `… reframe the landing copy …` |
+
+`Discover.tsx` went from 480 to about 400 lines.
+
+### Hillshade source: verification record
+
+- **URL:** `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png` (AWS Terrain
+  Tiles / Tilezen Joerd, AWS Open Data registry). No API key.
+- **Encoding:** `"terrarium"`, set explicitly in `map/terrain.ts`. `tileSize: 256`, `maxzoom: 15`.
+- **Verification (curl, 2026-10-01):** three tiles, all `200 image/png`, all 256×256 8-bit RGB
+  PNGs, all with different MD5s, so none is a placeholder. I decoded them with the Terrarium
+  formula `(R·256 + G + B/256) − 32768` to confirm the encoding:
+  - Adirondacks z10/301/371: max **1600 m**. Mt Marcy is 1629 m.
+  - White Mountains z12/1236/1485: max **1916 m**. Mt Washington is 1917 m.
+  - Pacific z6/7/32: −4895 to −1575 m (ocean floor).
+
+  Decoding the same tiles as Mapbox RGB would have given nonsense values, which confirms the
+  encoding is right.
+- **CORS:** with `Origin: http://localhost:5173`, the response carries
+  `Access-Control-Allow-Origin: *`. WebGL needs that to read DEM pixels.
+- **Attribution:** added on the source ("Terrain: Mapzen, USGS 3DEP and others", linking to the
+  Joerd attribution doc).
+
+### Skipped
+
+- **No frontend unit tests.** The frontend has no test runner, and adding Vitest would be a new
+  dependency the brief says to avoid unless clearly necessary. The `modes` config is checked by
+  `tsc` in `npm run build`, but `orderedLayers`/`modeById` would be the first things to test if
+  a runner is added.
+- **Q8, Q9 and Q10 were not fixed.** They're either type refactors across shared files or
+  render-timing changes, which a behaviour-neutral cleanup shouldn't make.
+- **No new dependencies.** None were added.
+
+### Judgment calls
+
+1. **The issue key is the literal `TM05-XX`.** I didn't guess a real issue number, because a
+   wrong key would link this work to someone else's story. **Before opening the PR, create or
+   pick the real story and rename the branch.** Commits with `TM05-XX` won't link in Jira. A
+   squash-merge titled with the real key is the least invasive fix, since rewriting history
+   would mean a force-push.
+2. **I edited `Discover.tsx` and `App.css` even though Sahaj touched them in TM05-30/31.**
+   Those changes are merged, no Sprint 4 branch exists on the remote, and the brief is
+   specifically about these files. `regions.ts`, which Sahaj also touched, was left alone; the
+   layer panel only reads `REGIONS`.
+3. **Switching mode resets all layer toggles to that mode's defaults.** Manual toggles aren't
+   remembered per mode, and the mode isn't persisted across reloads. Hiking is always the
+   starting mode.
+4. **Terrain shading is a mode-level `terrain: boolean`, not a `LayerName`.** It's a raster the
+   map fetches itself, not an API layer, so it doesn't go through `refresh()` or `meta`. It is
+   shown and hidden with `setLayoutProperty('visibility')`.
+5. **The hillshade sits beneath the basemap's first symbol layer.** It is added before our data
+   layers, so it ends up under the labels and under public land, water, trails and campsites,
+   and `layers.ts` needed no edit.
+6. **Count and zoom hint wording.** The zoom hint now reads `zoom 9+` instead of `z9+`. The
+   loading spinner moved from the panel footer into the panel header, so it's visible when the
+   panel is collapsed.
+7. **Control placement.** Zoom and compass moved to the bottom right, and the Saved panel moved
+   from the bottom left to the top right, where the controls used to be.
+8. **New tokens in `theme.css`:** `--opacity-quiet`, `--radius-pill`, `--shadow-panel`,
+   `--bg-floating`, `--blur-floating`, and `--map-hillshade-{shadow,highlight,accent,exaggeration}`.
+   `theme.ts` gained `mapHillshade()`, with literal fallbacks matching the existing
+   `mapColors()` idiom.
+9. **The landing lede now names the White Mountains alongside the Adirondacks,** because
+   `regions.ts` lists both as ingested.
+
+### Proposed changes to protected files (not made)
+
+- **`frontend/src/map/layers.ts`** (Sahaj):
+  - Delete the stale first paragraph of the header docstring (Q6).
+  - Consider moving `orderedLayers()` from `modes/visibility.ts` next to `LAYERS`, so layer
+    order has one home.
+  - Optionally register the hillshade in `addMapLayers()` (or a sibling
+    `addTerrainLayers()`) so all layer creation lives in one module. If so, keep the
+    `firstSymbolLayerId` insertion point and the explicit `encoding: "terrarium"`.
+  - For mode-specific *paint* emphasis (e.g. thicker trails in Hiking, larger campsite markers
+    in Camping), `layers.ts` would need to export a `setModeEmphasis(map, mode)` that calls
+    `setPaintProperty`. Nothing in this run needed it.
+- **`frontend/src/map/popups.ts`** (Sahaj): move the campsite save button into the popup as a
+  React portal, so `Discover` can drop `sessionRef`/`savedRef` (Q10). The new floating panels
+  use `--bg-floating`/`--shadow-panel`; restyling `.maplibregl-popup-content` the same way
+  would make popups match. That rule lives in `App.css`, so it isn't strictly protected, but it
+  was left alone so it lands with the popup work.
+- **`pyproject.toml`** (Bleron): deduplicate `known-first-party` (Q7) to silence ruff's
+  "multiple import sections" warning.
+- **`backend/api/`** (Abdulrahman): the Sprint 5 endpoints in the roadmap
+  (`/api/trails/<id>/`, `/api/trails/<id>/campsites/`). No changes made.
+
+### What to check in the browser
+
+1. **`/discover` opens in Hiking:** campsites are unchecked and absent from the map; trails,
+   water, public land and terrain shading are on.
+2. **Switching to Camping:** campsites appear and are listed first and in bold. Switching back
+   to Hiking hides them again.
+3. **Only Hiking and Camping appear.** No Backcountry Ski anywhere.
+4. **The hillshade looks like relief, not noise.** In the High Peaks (Adirondacks shortcut,
+   zoom ~11–12) ridges should be lit from the northwest. Basemap labels should sit above the
+   shading, and trails and water above both. Toggle Terrain shading off and on. This was the
+   one thing headless Chrome couldn't confirm: it rendered the UI chrome, but not the map
+   canvas, in virtual-time mode.
+5. **Shading strength against the public land tint:** if it's too strong, lower
+   `--map-hillshade-exaggeration` (0.45) or `--map-hillshade-shadow` alpha.
+6. **Zoom and compass at the bottom right:** compass rotates with right-drag and resets on
+   click. Attribution is still visible and includes the terrain credit.
+7. **The header on `/discover` is a slim strip;** on `/` it's the normal header.
+8. **Collapsing the Layers panel** with its header leaves the spinner visible while loading.
+9. **Saved panel (signed in) at the top right;** clicking a row flies to the site and × unsaves.
+10. **Zoom far out over the Adirondacks** so a layer truncates: the notice should be a small
+    pill at the bottom centre. If the "Sign in to save campsites" banner is also showing, the
+    two may sit close together at the bottom; check they don't overlap.
+11. **Popups and the Save button still work** on campsites, trails and water.
+12. **Landing page copy,** and the "Explore the map" button.
