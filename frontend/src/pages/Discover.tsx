@@ -39,6 +39,8 @@ import ModeSwitcher from "../modes/ModeSwitcher";
 import LayerPanel from "../components/LayerPanel";
 import SavedPanel from "../components/SavedPanel";
 import SaveButton from "../components/SaveButton";
+import TrailInsight from "../trails/TrailInsight";
+import { isRouteHit } from "../trails/mapLayers";
 import { DEFAULT_MODE_ID, modeById, type ModeId } from "../modes/modes";
 import {
   loadSaved,
@@ -75,6 +77,8 @@ export default function Discover() {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const styleReady = useRef(false);
+  // The map, once its base layers exist, for features that add their own (TrailInsight).
+  const [mapInstance, setMapInstance] = useState<maplibregl.Map | null>(null);
   const inFlight = useRef<AbortController | null>(null);
   const debounce = useRef<number | undefined>(undefined);
 
@@ -283,6 +287,7 @@ export default function Discover() {
       addMapLayers(instance);
 
       styleReady.current = true;
+      setMapInstance(instance);
       void refresh();
     });
 
@@ -315,6 +320,8 @@ export default function Discover() {
     };
 
     instance.on("click", (event: maplibregl.MapMouseEvent) => {
+      // A named route opens the trail panel (TrailInsight); no segment popup on top of it.
+      if (isRouteHit(instance, event.point)) return;
       const hit = topClickable(event.point);
       if (!hit) return;
       const { layer, feature } = hit;
@@ -353,6 +360,7 @@ export default function Discover() {
       window.clearTimeout(debounce.current);
       inFlight.current?.abort();
       styleReady.current = false;
+      setMapInstance(null);
       instance.remove();
       map.current = null;
     };
@@ -433,6 +441,8 @@ export default function Discover() {
           .
         </div>
       )}
+
+      <TrailInsight map={mapInstance} />
     </div>
   );
 }

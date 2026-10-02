@@ -226,6 +226,13 @@ class TestRouteProfile:
         # A year: terrain does not change.
         assert (row.expires_at - row.computed_at).days == 365
 
+    def test_long_routes_are_sampled_more_coarsely(self, monkeypatch):
+        monkeypatch.setattr(elevation, "MAX_SAMPLES", 40)
+        monkeypatch.setattr(elevation, "post_samples", fake_post(lambda p: 100.0))
+        value = RouteProfile().run(self.route()).value  # 2 km
+        assert len(value["distance_m"]) <= 41
+        assert value["params"]["spacing_m"] == pytest.approx(50)
+
     def test_a_3dep_failure_is_not_cached(self, monkeypatch):
         def down(points):
             raise AnalysisError("3DEP down")

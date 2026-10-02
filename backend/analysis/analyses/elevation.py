@@ -38,6 +38,11 @@ THREEDEP_URL = (
     "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/getSamples"
 )
 BATCH_SIZE = 400
+#: Long routes are sampled more coarsely so a profile stays a few 3DEP requests: the
+#: 137-mile Northville-Placid Trail at 25 m would be ~8,800 samples and 22 requests, with
+#: the trail panel waiting on all of them. At 2,000 samples it is 110 m spacing -- still
+#: finer than a 300 px chart can draw.
+MAX_SAMPLES = 2000
 TIMEOUT_SECONDS = 60
 #: Ends closer than this are treated as joined when stitching route members.
 JOIN_TOLERANCE_M = 50.0
@@ -292,6 +297,7 @@ class RouteProfile(Analysis):
     def compute(self, geom, window, params):
         settings = {**DEFAULTS, **params}
         line, path = stitch(geom)
+        settings["spacing_m"] = max(settings["spacing_m"], line.length / MAX_SAMPLES)
         if line.length < settings["spacing_m"]:
             raise AnalysisError("route is shorter than one sample spacing")
         distances, points = sample_points(line, settings["spacing_m"])

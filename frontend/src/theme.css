@@ -97,6 +97,25 @@
   --map-hillshade-accent: rgba(0, 0, 0, 0.3);
   --map-hillshade-exaggeration: 0.45;
 
+  /* Named routes (TM05-61). Routes are context until one is chosen, so the default line is
+   * thin and translucent beneath the trail linework; the selected route is the accent,
+   * wide, with a dark casing so it reads over the hillshade and the orange trails. */
+  --map-route: #e9d8a6;
+  --map-route-opacity: 0.35;
+  --map-route-width: 2.5;
+  --map-route-selected: #ffd166;
+  --map-route-selected-width: 4;
+  --map-route-casing: #15130f;
+  --map-route-casing-width: 7;
+
+  /* Elevation chart. The fill sits back so the line and the cursor carry the reading. */
+  --chart-line: var(--map-route-selected);
+  --chart-fill: rgba(255, 209, 102, 0.14);
+  --chart-grid: var(--border-subtle);
+  --chart-cursor: var(--text-primary);
+  --chart-marker: var(--map-campsites);
+  --chart-height: 132px;
+
   /* --- spacing --- */
   --space-xs: 4px;
   --space-sm: 8px;
