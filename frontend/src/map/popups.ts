@@ -29,8 +29,33 @@ const WATER_TYPES: Record<string, { label: string; noun: string }> = {
 
 const METRES_PER_MILE = 1609.344;
 
+export interface PopupContent {
+  /** The node to hand to Popup.setDOMContent(). */
+  element: HTMLDivElement;
+  /**
+   * An empty slot at the foot of a campsite popup, for the page to render its save
+   * button into with a React portal. Null for layers that have no actions.
+   */
+  actions: HTMLDivElement | null;
+}
+
+/**
+ * Popup content as a DOM node. The HTML is the same as popupFor(); campsites also get
+ * the actions slot, so the page never has to find or build nodes inside the popup.
+ */
+export function popupContent(layer: ClickableLayer, properties: Properties): PopupContent {
+  const element = document.createElement("div");
+  element.innerHTML = popupFor(layer, properties);
+  if (layer !== "campsites") return { element, actions: null };
+
+  const actions = document.createElement("div");
+  actions.className = "popup-actions";
+  element.querySelector(".popup")?.appendChild(actions);
+  return { element, actions };
+}
+
 /** Popup HTML for a feature from `layer`. */
-export function popupFor(layer: ClickableLayer, properties: Properties): string {
+function popupFor(layer: ClickableLayer, properties: Properties): string {
   switch (layer) {
     case "campsites":
       return campsitePopup(properties);

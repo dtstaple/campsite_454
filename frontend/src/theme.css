@@ -86,6 +86,17 @@
   --map-public-land-line-opacity: 0.55;
   --map-public-land-line-width: 0.8;
 
+  /* Terrain hillshade, drawn under every data layer and under the basemap's labels.
+   * The basemap is dark, so the shadow side does most of the work and the highlight is
+   * kept faint -- a bright highlight on dark reads as fog rather than as relief. The
+   * highlight is --text-primary at low alpha so the lit slopes share the chrome's warmth.
+   * Exaggeration is MapLibre's 0-1 intensity; past ~0.6 the shading starts to compete
+   * with the public land tint and the trail linework. */
+  --map-hillshade-shadow: rgba(0, 0, 0, 0.55);
+  --map-hillshade-highlight: rgba(237, 231, 217, 0.16);
+  --map-hillshade-accent: rgba(0, 0, 0, 0.3);
+  --map-hillshade-exaggeration: 0.45;
+
   /* --- spacing --- */
   --space-xs: 4px;
   --space-sm: 8px;
@@ -98,10 +109,19 @@
   --radius-sm: 4px;
   --radius-md: 6px;
   --radius-lg: 8px;
+  --radius-pill: 999px;
 
   /* --- shadows --- */
   --shadow-float: 0 2px 8px rgba(0, 0, 0, 0.35);
   --shadow-overlay: 0 4px 16px rgba(0, 0, 0, 0.45);
+  /* Floating map chrome: a tight contact shadow plus a soft lift, so a panel reads as
+   * hovering just above the terrain rather than as a card pasted on it. */
+  --shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.45), 0 6px 20px rgba(0, 0, 0, 0.32);
+
+  /* --- floating surfaces --- */
+  /* --bg-surface at 92% so the hillshade faintly shows through the chrome. */
+  --bg-floating: rgba(28, 25, 20, 0.92);
+  --blur-floating: 8px;
 
   /* --- type --- */
   --font-sans: "Public Sans", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
@@ -127,6 +147,10 @@
   /* v1 used uppercase 11px labels with generous tracking, and tightened its titles. */
   --tracking-label: 0.06em;
   --tracking-title: -0.01em;
+
+  /* --- emphasis --- */
+  /* For secondary readouts (layer counts, zoom hints) that should be present but quiet. */
+  --opacity-quiet: 0.75;
 
   /* --- motion --- */
   --transition: 120ms ease;
