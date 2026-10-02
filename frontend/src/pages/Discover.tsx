@@ -17,7 +17,6 @@ import {
   bboxCenter,
   DEFAULT_REGION,
   DEFAULT_ZOOM,
-  REGIONS,
   regionAt,
   regionCamera,
   type Region,
@@ -27,6 +26,8 @@ import { popupFor } from "../map/popups";
 import { Link } from "react-router-dom";
 import { useSession } from "../session";
 import ModeSwitcher from "../modes/ModeSwitcher";
+import LayerPanel from "../components/LayerPanel";
+import SavedPanel from "../components/SavedPanel";
 import { DEFAULT_MODE_ID, modeById, type ModeId } from "../modes/modes";
 import {
   loadSaved,
@@ -40,7 +41,6 @@ import {
   ApiError,
   fetchMapData,
   layerVisibleAtZoom,
-  MIN_ZOOM_FOR_LINEWORK,
   simplifyForZoom,
   type Bbox,
   type LayerName,
@@ -79,6 +79,10 @@ export default function Discover() {
   const switchMode = useCallback((id: ModeId) => {
     setModeId(id);
     setEnabled({ ...modeById(id).layers });
+  }, []);
+
+  const toggleLayer = useCallback((layer: LayerName, on: boolean) => {
+    setEnabled((previous) => ({ ...previous, [layer]: on }));
   }, []);
   // refresh() reads the toggles through a ref so it can stay a stable callback.
   // Synced in an effect rather than during render, and declared before the effect
@@ -361,102 +365,26 @@ export default function Discover() {
       <div ref={mapContainer} className="map" />
 
       <div className="overlay-left">
-      <ModeSwitcher active={mode.id} onChange={switchMode} />
-
-      <div className="panel">
-        {/* Data sits in a few regions hundreds of miles apart, so free panning mostly
-            finds empty map. These jump straight to the places that have something. */}
-        <div className="panel-title">Regions</div>
-        <div className="regions" role="group" aria-label="Jump to a region">
-          {REGIONS.map((region) => {
-            const isCurrent = region.id === currentRegion?.id;
-            return (
-              <button
-                key={region.id}
-                type="button"
-                className={`region-button${isCurrent ? " is-current" : ""}`}
-                aria-pressed={isCurrent}
-                onClick={() => flyToRegion(region)}
-              >
-                {region.label}
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="panel-title">Layers</div>
-        {LAYERS.map((layer) => {
-          const info = meta[layer.name];
-          const on = enabled[layer.name];
-          const zoomedOut = !layerVisibleAtZoom(layer.name, zoom);
-          return (
-            <label key={layer.name} className={`row${on && !zoomedOut ? "" : " off"}`}>
-              <input
-                type="checkbox"
-                checked={on}
-                onChange={(event) =>
-                  setEnabled((previous) => ({
-                    ...previous,
-                    [layer.name]: event.target.checked,
-                  }))
-                }
-              />
-              <span className="swatch" style={{ background: `var(--map-${layer.name})` }} />
-              {layer.label}
-              <span className="count">
-                {on && zoomedOut
-                  ? `z${MIN_ZOOM_FOR_LINEWORK}+`
-                  : on && info
-                    ? `${info.returned.toLocaleString()}${info.truncated ? ` / ${info.matched.toLocaleString()}` : ""}`
-                    : ""}
-              </span>
-            </label>
-          );
-        })}
-        {loading ? (
-          <div className="status">
-            <span className="spinner" />
-            Loading…
-          </div>
-        ) : (
-          fromCache && <div className="status cached">Cached · zoom {zoom.toFixed(1)}</div>
-        )}
-      </div>
+        <ModeSwitcher active={mode.id} onChange={switchMode} />
+        <LayerPanel
+          mode={mode}
+          enabled={enabled}
+          meta={meta}
+          zoom={zoom}
+          loading={loading}
+          fromCache={fromCache}
+          currentRegionId={currentRegion?.id}
+          onToggle={toggleLayer}
+          onRegion={flyToRegion}
+        />
       </div>
 
       {session && (
-        <div className="panel saved-panel">
-          <div className="panel-title">Saved</div>
-          {saved.length === 0 ? (
-            <div className="saved-empty">
-              Nothing saved yet. Open a campsite and choose Save.
-            </div>
-          ) : (
-            <ul className="saved-list">
-              {saved.map((campsite) => (
-                <li key={campsite.id}>
-                  <button
-                    type="button"
-                    className="saved-row"
-                    onClick={() => flyToSaved(campsite)}
-                    title="Show on the map"
-                  >
-                    {campsite.name}
-                  </button>
-                  <button
-                    type="button"
-                    className="saved-remove"
-                    onClick={() => void toggleSaved(campsite)}
-                    aria-label={`Unsave ${campsite.name}`}
-                    title="Unsave"
-                  >
-                    ×
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+        <SavedPanel
+          saved={saved}
+          onShow={flyToSaved}
+          onUnsave={(campsite) => void toggleSaved(campsite)}
+        />
       )}
 
       {signInPrompt && !session && (

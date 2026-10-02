@@ -128,6 +128,10 @@
   --tracking-label: 0.06em;
   --tracking-title: -0.01em;
 
+  /* --- emphasis --- */
+  /* For secondary readouts (layer counts, zoom hints) that should be present but quiet. */
+  --opacity-quiet: 0.75;
+
   /* --- motion --- */
   --transition: 120ms ease;
 }
