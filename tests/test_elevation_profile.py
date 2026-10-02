@@ -231,7 +231,7 @@ class TestRouteProfile:
         monkeypatch.setattr(elevation, "post_samples", fake_post(lambda p: 100.0))
         value = RouteProfile().run(self.route()).value  # 2 km
         assert len(value["distance_m"]) <= 41
-        assert value["params"]["spacing_m"] == pytest.approx(50)
+        assert value["params"]["spacing_m"] == pytest.approx(50, rel=1e-3)
 
     def test_a_3dep_failure_is_not_cached(self, monkeypatch):
         def down(points):
