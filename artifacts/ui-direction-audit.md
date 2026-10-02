@@ -217,7 +217,7 @@ run (see Q9).
 | 3d | Slim header on `/discover`; zoom and compass in a floating group at the bottom right; `--shadow-panel` and `--bg-floating` elevation on all chrome; the zoom-in notice is now a quiet pill; the tab title says CampSite | `… polish the map shell …` |
 | 3e | Landing copy reframed ("Backcountry exploration" / "Find where to spend the night." / "Explore the map"), same structure | `… reframe the landing copy …` |
 
-`Discover.tsx` went from 480 to about 400 lines.
+`Discover.tsx` went from 480 to 442 lines, despite gaining mode and terrain state.
 
 ### Hillshade source: verification record
 
