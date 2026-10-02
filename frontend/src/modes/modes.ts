@@ -66,6 +66,11 @@ export const MODES: readonly ActivityMode[] = [
   },
 ];
 
+/** The layer the mode is about, which the layer panel emphasises. */
+export function primaryLayer(mode: ActivityMode): LayerName | undefined {
+  return mode.emphasis[0];
+}
+
 /** The only modes the UI may show. */
 export const ENABLED_MODES: readonly ActivityMode[] = MODES.filter((mode) => mode.enabled);
 

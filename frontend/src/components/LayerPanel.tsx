@@ -13,8 +13,8 @@ import {
   type LayerName,
   type Metadata,
 } from "../api";
-import type { ActivityMode } from "../modes/modes";
-import { orderedLayers, primaryLayer } from "../modes/visibility";
+import { orderedLayers } from "../map/layers";
+import { primaryLayer, type ActivityMode } from "../modes/modes";
 import { REGIONS, type Region } from "../regions";
 
 interface Props {

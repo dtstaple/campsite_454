@@ -1,13 +1,10 @@
 /**
  * The MapLibre source and layer definitions, as data.
  *
- * Extracted from App.tsx so that component reads as composition rather than as ninety
- * lines of paint properties. Nothing here is stateful -- addMapLayers() is called once
- * on the map's `load` event and the sources are fed afterwards by App's refresh().
- * The only place layers are defined. Discover.tsx calls addMapSources() and
- * addMapLayers() once on the map's `load` event and feeds the sources afterwards from
- * its refresh(). Kept out of the component so it reads as composition rather than as a
- * hundred lines of paint properties.
+ * The only place layers are defined. Nothing here is stateful: Discover.tsx calls
+ * addMapSources() and addMapLayers() once on the map's `load` event and feeds the
+ * sources afterwards from its refresh(). Kept out of the component so it reads as
+ * composition rather than as a hundred lines of paint properties.
  *
  * Every colour, width and opacity comes from theme.css via theme.ts. MapLibre paint
  * properties cannot take a `var(--x)`, so they are read back out of the stylesheet
@@ -18,6 +15,7 @@ import type * as maplibregl from "maplibre-gl";
 import type { FeatureCollection as GeoJsonFeatureCollection } from "geojson";
 import { mapColors, mapPaint } from "../theme";
 import type { LayerName } from "../api";
+import type { ActivityMode } from "../modes/modes";
 
 export const LAYERS: readonly { name: LayerName; label: string }[] = [
   { name: "public-land", label: "Public land" },
@@ -25,6 +23,20 @@ export const LAYERS: readonly { name: LayerName; label: string }[] = [
   { name: "trails", label: "Trails" },
   { name: "campsites", label: "Campsites" },
 ];
+
+export type LayerEntry = (typeof LAYERS)[number];
+
+/**
+ * LAYERS in an activity mode's emphasis order, for the layer panel. Layers the mode
+ * does not mention go last. Ordering only -- draw order is fixed by addMapLayers().
+ */
+export function orderedLayers(mode: ActivityMode): LayerEntry[] {
+  const rank = (name: LayerName) => {
+    const index = mode.emphasis.indexOf(name);
+    return index === -1 ? mode.emphasis.length : index;
+  };
+  return [...LAYERS].sort((a, b) => rank(a.name) - rank(b.name));
+}
 
 export const EMPTY: GeoJsonFeatureCollection = { type: "FeatureCollection", features: [] };
 
