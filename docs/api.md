@@ -168,8 +168,16 @@ takes exactly this string -- see [auth.md](auth.md). Two consequences worth know
   is why a saved campsite is stored against `source_id` and not against a row number.
 
 `id` is the feature's stable source identifier — the OSM way ID for trails, NHD's
-`permanent_identifier` for water, and so on. It is stable across re-ingests, so it is safe
-to use with `map.setFeatureState()`.
+`permanent_identifier` for water, and so on. It is stable across re-ingests.
+
+**MapLibre does not keep it (TM05-63).** MapLibre GeoJSON sources only preserve *numeric*
+feature ids. Every id here is a non-numeric string, so a feature returned by
+`queryRenderedFeatures` or a click comes back with `id` 0. That is what broke saving
+campsites from the map: the popup sent `POST /api/saved-campsites/0/`. The frontend
+therefore copies each feature's `id` into `properties.source_id` before `setData()` and
+reads it back from there (`frontend/src/map/featureIds.ts`). Read `properties.source_id`
+from map features, never `feature.id`. For `setFeatureState()`, use the source's
+`promoteId: "source_id"` rather than the raw id.
 
 ---
 
