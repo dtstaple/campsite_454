@@ -143,13 +143,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .status.cached {
-  color: var(--text-tertiary);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-}
-
-.spinner {
+  .spinner {
     animation-duration: 2.4s;
   }
 }
