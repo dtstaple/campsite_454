@@ -180,17 +180,33 @@ running an ingest you are not sure completed.
 
 ## 4. Why partial runs are normal
 
-Three of the five sources routinely finish partial. In each case the framework validated
-something the source got wrong, skipped that record, and said so.
+Some sources finish partial. In each case the framework validated something the source got
+wrong, skipped that record, and said so.
 
-**PADUS skips about 149 of 1,723 Adirondack parcels** — roughly 9% — for invalid geometry:
-self-intersecting rings and nested shells. These are digitizing artifacts in the federal
-dataset, not something our code causes. It is worth knowing that those parcels are
-genuinely missing from the table; for a model that decides where camping is *legal*, a
-missing parcel is a wrong answer rather than a cosmetic gap. Repairing rather than
-skipping them is an open question, not a settled one.
+**Invalid geometry is repaired, not skipped (TM05-57).** PAD-US ships about 9% of its
+Adirondack parcels with self-intersecting rings or nested shells — digitizing artifacts in
+the federal dataset. They used to be skipped, which silently dropped the High Peaks
+Wilderness and the White Mountain National Forest; for a model that decides where camping
+is *legal*, a missing parcel is a wrong answer. `load()` now repairs any invalid geometry
+with PostGIS `ST_MakeValid`, then keeps only the parts the target column can hold
+(`ST_CollectionExtract`): a repair that returns a polygon plus a stray line keeps the
+polygon. Only geometry with nothing usable left after repair is skipped, as
+"not repairable". Every repair is listed in the run notes under "Repaired with
+ST_MakeValid". The repair runs in the database rather than local GEOS so it is judged by
+the same library that validates the stored row.
 
-**NHD waterbodies skip a handful** — 3 out of 16,821 — for the same reason.
+Measured on 2026-10-02, re-ingesting PAD-US:
+
+| | Before | After |
+|---|---|---|
+| Adirondacks run | `partial`, 1,574 written, 149 skipped | `success`, 1,723 written, 149 repaired, 0 skipped |
+| White Mountains run | `partial`, 727 written, 49 skipped | `success`, 776 written, 49 repaired, 0 skipped |
+| Parcels in the table | 2,299 | 2,488 (0 invalid) |
+| High Peaks Wilderness | absent | present: 1,114 km², open, GAP 1 |
+| Campsites inside any parcel | 199 of 1,320 | **1,174 of 1,320** |
+
+**NHD waterbodies** used to skip 3 of 16,821 for the same reason; the next run repairs
+them too.
 
 **RIDB skips 64 of 724 campsites** because they have no usable coordinates. Recreation.gov
 publishes some sites with blank or literal `0, 0` coordinates, and zero-zero is a point in
