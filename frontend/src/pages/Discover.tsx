@@ -21,9 +21,17 @@ import {
   regionCamera,
   type Region,
 } from "../regions";
-import { addMapLayers, addMapSources, CLICKABLE, CLICKABLE_IDS, EMPTY, LAYERS } from "../map/layers";
+import {
+  addMapLayers,
+  addMapSources,
+  addTerrainLayers,
+  CLICKABLE,
+  CLICKABLE_IDS,
+  EMPTY,
+  LAYERS,
+  setHillshadeVisible,
+} from "../map/layers";
 import { popupFor } from "../map/popups";
-import { addHillshade, setHillshadeVisible } from "../map/terrain";
 import { Link } from "react-router-dom";
 import { useSession } from "../session";
 import ModeSwitcher from "../modes/ModeSwitcher";
@@ -274,7 +282,7 @@ export default function Discover() {
 
     instance.on("load", () => {
       // First, so it lands under the basemap labels and under every data layer.
-      addHillshade(instance, terrainRef.current);
+      addTerrainLayers(instance, terrainRef.current);
       addMapSources(instance);
       addMapLayers(instance);
 
