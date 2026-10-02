@@ -1,0 +1,81 @@
+# Scoring model configuration (TM05-43). docs/scoring.md explains every value.
+#
+# Tuning a weight or a curve is an edit to this file, not to code. Any edit changes the
+# config_digest reported with every score, so cached scores from the old config are
+# recognisably stale. Bump model_version when the *meaning* of a factor changes.
+
+model_version: "1.0.0"
+
+# Relative weights. They need not sum to 1: the engine renormalises over the factors
+# that could be evaluated, so a factor that is not_available drops out cleanly.
+weights:
+  water: 0.35
+  legal: 0.30
+  trail: 0.20
+  slope: 0.10
+  land_cover: 0.05
+
+factors:
+  water:
+    # Leave No Trace: camp about 200 ft (61 m) from water. The curve peaks there.
+    ideal_m: 60
+    # Sub-score for a site right on the bank. Water is reachable, but this is exactly
+    # what LNT asks you not to do.
+    at_zero: 35
+    # Past the ideal, the sub-score halves every this many metres:
+    # 60 m -> 100, 460 m -> 50, 860 m -> 25.
+    half_distance_m: 400
+    # Beyond this nothing counts as nearby water.
+    max_search_m: 3000
+    # How many of the nearest features of each flow class to consider. A wetland at
+    # 40 m should not hide a perennial stream at 120 m, so a few candidates are scored
+    # and the best one wins.
+    candidates_per_class: 5
+    # Multipliers on the curve. Perennial water is there when you need it; intermittent
+    # water may be dry. Unknown flow sits between.
+    flow_multiplier:
+      perennial: 1.0
+      unknown: 0.8
+      intermittent: 0.55
+    feature_multiplier:
+      stream: 1.0
+      lake: 1.0
+      spring: 1.0
+      wetland: 0.5
+      other: 0.7
+
+  trail:
+    # Reachable but not on the trail: LNT asks for camps out of sight of it, and 60 m is
+    # the same 200 ft rule of thumb.
+    ideal_m: 60
+    at_zero: 50
+    half_distance_m: 800
+    max_search_m: 5000
+
+  legal:
+    # Sub-score by PAD-US public access. When several parcels overlap a point, the most
+    # restrictive access wins: it is a legal question, so assume the stricter rule.
+    access_score:
+      open: 100
+      restricted: 45
+      unknown: 40
+      closed: 0
+    # Outside every public parcel: most likely private land. Not zero, because PAD-US
+    # is incomplete, but low.
+    not_public_score: 15
+    # Multiplier by GAP status: what the land is managed for. 1-2 are managed for a
+    # natural state, where dispersed camping is plausible; 4 has no protection mandate.
+    gap_multiplier:
+      "1": 1.0
+      "2": 1.0
+      "3": 0.9
+      "4": 0.75
+      "": 0.85
+    # Land marked closed caps the overall score, whatever the other factors say.
+    closed_caps_total_at: 0
+
+  slope:
+    placeholder: "Slope is not measured yet (planned: USGS 3DEP, Sprint 5)."
+
+  land_cover:
+    placeholder: "Land cover is not measured yet (planned: Sentinel-2, Sprint 5)."

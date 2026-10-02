@@ -76,6 +76,16 @@ def nearest(queryset: QuerySet, lon: float, lat: float):
     )
 
 
+def nearest_k(queryset: QuerySet, lon: float, lat: float, k: int) -> list:
+    """The `k` features nearest (lon, lat), nearest first, each with `distance_m` set."""
+    value = metric_point(lon, lat)
+    return list(
+        queryset.annotate(distance_m=MetricDistance(F("geom_m"), value)).order_by(
+            KnnDistance(F("geom_m"), value)
+        )[:k]
+    )
+
+
 def nearest_distance_m(queryset: QuerySet, lon: float, lat: float) -> float | None:
     """Metres from (lon, lat) to the nearest feature in `queryset`, or None if empty."""
     feature = nearest(queryset, lon, lat)
