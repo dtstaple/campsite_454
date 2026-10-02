@@ -19,7 +19,7 @@ empty, it is `null` or `[]` instead, so a consumer never has to test for a missi
 {
   "contract": 1,
   "model_version": "1.0.0",
-  "config_digest": "3f9a1c2e",
+  "config_digest": "19acb433",
   "location": { "lon": -73.9512, "lat": 44.1847 },
   "score": 81,
   "factors": [
@@ -37,7 +37,9 @@ empty, it is `null` or `[]` instead, so a consumer never has to test for a missi
         "feature_type": "stream",
         "perennial": true,
         "name": "Johns Brook",
-        "source_id": "nhd:22300012"
+        "source": "nhd",
+        "source_id": "22300012",
+        "nearest_any_m": 71.4
       },
       "explanation": "Perennial stream 71 m away (ideal is about 60 m)."
     },
@@ -125,4 +127,150 @@ New factor keys may appear. Anything breaking bumps `contract`.
 
 ## 2. The model
 
-*Filled in with the implementation below.*
+Code: `backend/scoring/` — `config.yml` (every tunable number), `curves.py` (the distance
+curves), `factors.py` (one class per factor), `engine.py` (`score_location(lon, lat)`,
+`score_campsite(campsite)`). Distances come from `geodata.distance` (TM05-42), so they are
+metres and index-backed.
+
+### Combining factors
+
+```
+total = Σ weight_i × score_i / Σ weight_i      over factors whose status is not not_available
+score = round(min(total, every cap))
+```
+
+A weighted mean rather than a weighted sum, so weights are *relative*: they need not add
+to 1, and a factor that cannot be evaluated drops out without distorting the scale. Factors
+appear in the output in the order of `weights` in `config.yml`.
+
+### Weights (model 1.0.0)
+
+| Factor | Weight | Share today | Why |
+|---|---|---|---|
+| `water` | 0.35 | 41% | The thing a backcountry site most depends on. |
+| `legal` | 0.30 | 35% | Whether you may camp there at all. Also the only factor that can cap. |
+| `trail` | 0.20 | 24% | Reachability. Matters, but a short bushwhack is fine. |
+| `slope` | 0.10 | — | Placeholder; counts once 3DEP lands. |
+| `land_cover` | 0.05 | — | Placeholder; counts once Sentinel-2 lands. |
+
+"Share today" is the effective weight while slope and land cover are `not_available`
+(0.35 / 0.85 and so on). Change a weight by editing `config.yml`; no code changes, and the
+`config_digest` on every score changes with it.
+
+### The distance curves
+
+Closest is not best. Leave No Trace asks for camps about **200 ft (≈60 m) from water** and
+away from trails, so both curves peak at an ideal distance and fall off on both sides:
+
+```
+d ≤ ideal :  score = at_zero + (100 − at_zero) × d / ideal          (linear rise)
+d > ideal :  score = 100 × 0.5 ^ ((d − ideal) / half_distance)     (halves every half_distance)
+```
+
+| Distance | Water (ideal 60, bank 35, half 400 m) | Trail (ideal 60, on-trail 50, half 800 m) |
+|---|---|---|
+| 0 m | 35 | 50 |
+| 30 m | 68 | 75 |
+| 60 m | **100** | **100** |
+| 200 m | 78 | 89 |
+| 460 m | 50 | 71 |
+| 1 km | 20 | 44 |
+| 3 km | 0.6 | 8 |
+| beyond search | 0 (`no_data`, > 3 km) | 0 (`no_data`, > 5 km) |
+
+The trail curve is gentler on both sides: sitting on a trail is less of a problem than
+sitting on a stream bank, and walking a kilometre to a trail is ordinary.
+
+### Water
+
+The nearest water is not always the water that matters — a wetland 40 m away should not
+hide a perennial stream at 120 m. So the factor takes the **5 nearest features of each flow
+class** (perennial / unknown / intermittent), scores each with
+
+```
+curve(distance) × flow_multiplier × feature_multiplier
+```
+
+and keeps the best. Flow multipliers: perennial **1.0**, unknown **0.8**, intermittent
+**0.55** — intermittent water may be dry when you arrive. Feature multipliers: stream, lake,
+spring 1.0; wetland 0.5; other 0.7. When the winning feature is not the closest one,
+the explanation says so ("Nearer water (intermittent stream, 33 m) scored lower.") and
+`measurement.nearest_any_m` gives the closest distance.
+
+`measurement`: `distance_m`, `ideal_m`, `feature_type`, `perennial` (true / false / null),
+`name` (null if unnamed), `source`, `source_id`, `nearest_any_m`. With nothing in 3 km:
+`status: no_data`, score 0, `distance_m: null`, plus `max_search_m`.
+
+### Legal status
+
+From PAD-US: the parcels whose polygon contains the point.
+
+- **Access** (`public_access`): open **100**, restricted **45**, unknown **40**, closed **0**.
+  Where parcels overlap, the **most restrictive** access applies — this is a legal question,
+  so the stricter rule is assumed.
+- **GAP status** multiplies it: 1 and 2 (managed for a natural state) ×1.0, 3 ×0.9,
+  4 (no protection mandate) ×0.75, unknown ×0.85. Taken from the best-protected parcel among
+  those that set the access.
+- **Closed land caps the overall score at 0**, whatever water and trail say, with a `caps`
+  entry giving the reason.
+- **Outside every parcel**: `status: no_data`, score **15** — probably private land, but
+  PAD-US is incomplete, so not zero.
+
+`measurement`: `public_access`, `gap_status`, `manager`, `designation` (all null outside
+public land), `parcels` (how many contain the point).
+
+### Trail access
+
+Nearest trail segment (OSM ways, TM05-26 filtering), scored on the trail curve.
+`measurement`: `distance_m`, `ideal_m`, `name`, `trail_type`, `source`, `source_id`. Nothing
+within 5 km: `no_data`, score 0.
+
+### Placeholders: slope and land cover
+
+Both are real factor classes (`SlopeFactor`, `LandCoverFactor`) with weights in the config,
+returning `not_available` with an explanation. Sprint 5 replaces each class's `evaluate()`
+with a real measurement; the engine, the config shape and the output contract stay as they
+are.
+
+### What is deliberately *not* a factor
+
+**Capacity.** 571 of the 660 RIDB campsites report the same capacity, 8 — a default, not a
+measurement — so it would add noise that looks like signal. `score_campsite()` scores a
+campsite by its location only; a test asserts two sites at the same point with capacities 2
+and 40 score identically.
+
+### Performance (measured)
+
+`python manage.py bench_scoring`, 2026-10-02, local Docker PostGIS (emulated on Apple
+Silicon, so pessimistic):
+
+| Run | Time |
+|---|---|
+| 100 campsites (median of 3 warm runs) | **934 ms** — 9.3 ms per site |
+| All 1,320 campsites (one run) | 18.1 s — 13.7 ms per site |
+
+Per factor, 100 sites: water 675 ms (three KNN queries of 5), trail 190 ms, legal 142 ms,
+placeholders ~2 ms. Water is the obvious target if this ever matters: one query ordered by
+flow class would replace three.
+
+Score distribution over all 1,320 campsites: min 0, median 56, max 98.
+
+### Known limitation: PAD-US coverage
+
+Only **199 of 1,320** ingested campsites fall inside any PAD-US parcel, so most sites score
+the 15-point "not public" legal value — including places that are plainly public land, such
+as Marcy Dam in the High Peaks Wilderness. The cause is in ingestion, not scoring: the last
+PAD-US runs are `partial` and skipped 49 parcels as invalid geometry ("Ring
+Self-intersection", "Nested shells"), and the large wilderness and forest units are among
+them. They need repairing with `ST_MakeValid` rather than skipping; that is tracked as its
+own story. Until then, the legal factor is right about the parcels it has and pessimistic
+about the rest.
+
+### Adding a factor
+
+1. Write a `Factor` subclass in `factors.py` (or its own module) with `key`, `label` and
+   `evaluate(lon, lat) -> FactorResult`, and decorate it with `@register`.
+2. Add its weight under `weights:` and its settings under `factors:` in `config.yml`.
+3. Document its curve and `measurement` keys here.
+
+Nothing in `engine.py` changes. TM05-44 adds weather this way.
