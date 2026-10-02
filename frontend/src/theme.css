@@ -109,10 +109,19 @@
   --radius-sm: 4px;
   --radius-md: 6px;
   --radius-lg: 8px;
+  --radius-pill: 999px;
 
   /* --- shadows --- */
   --shadow-float: 0 2px 8px rgba(0, 0, 0, 0.35);
   --shadow-overlay: 0 4px 16px rgba(0, 0, 0, 0.45);
+  /* Floating map chrome: a tight contact shadow plus a soft lift, so a panel reads as
+   * hovering just above the terrain rather than as a card pasted on it. */
+  --shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.45), 0 6px 20px rgba(0, 0, 0, 0.32);
+
+  /* --- floating surfaces --- */
+  /* --bg-surface at 92% so the hillshade faintly shows through the chrome. */
+  --bg-floating: rgba(28, 25, 20, 0.92);
+  --blur-floating: 8px;
 
   /* --- type --- */
   --font-sans: "Public Sans", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;

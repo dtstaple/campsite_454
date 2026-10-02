@@ -265,7 +265,12 @@ export default function Discover() {
       zoom: DEFAULT_ZOOM,
     });
     map.current = instance;
-    instance.addControl(new maplibregl.NavigationControl(), "top-right");
+    // Zoom and compass, bottom right where a thumb or a mouse already rests. The compass
+    // also shows pitch, and clicking it resets north.
+    instance.addControl(
+      new maplibregl.NavigationControl({ showCompass: true, visualizePitch: true }),
+      "bottom-right",
+    );
 
     instance.on("load", () => {
       // First, so it lands under the basemap labels and under every data layer.
@@ -417,7 +422,7 @@ export default function Discover() {
       {error && <div className="banner error">{error}</div>}
 
       {truncated.length > 0 && !error && (
-        <div className="banner warn">
+        <div className="map-notice" role="status">
           Zoom in to see all features — showing{" "}
           {truncated.map((layer, index) => {
             const info = meta[layer.name]!;

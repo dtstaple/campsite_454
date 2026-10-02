@@ -5,12 +5,14 @@
  * the map -- which was the old behaviour, when the auth panel floated over it.
  */
 
-import { Link, NavLink, useNavigate } from "react-router-dom";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useSession } from "./session";
 
 export default function Header() {
   const { session, signOut } = useSession();
   const navigate = useNavigate();
+  // Over the map the header shrinks to a slim strip so the terrain gets the screen.
+  const onMap = useLocation().pathname.startsWith("/discover");
 
   function handleSignOut() {
     signOut();
@@ -20,7 +22,7 @@ export default function Header() {
   }
 
   return (
-    <header className="site-header">
+    <header className={`site-header${onMap ? " is-map" : ""}`}>
       <Link to="/" className="brand">
         CampSite
       </Link>

@@ -43,10 +43,11 @@
   display: flex;
   gap: 2px;
   padding: 2px;
-  background: var(--bg-surface);
+  background: var(--bg-floating);
+  backdrop-filter: blur(var(--blur-floating));
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-float);
+  box-shadow: var(--shadow-panel);
 }
 
 .mode-button {
@@ -99,10 +100,11 @@
   z-index: 1;
   min-width: 232px;
   padding: var(--space-md);
-  background: var(--bg-surface);
+  background: var(--bg-floating);
+  backdrop-filter: blur(var(--blur-floating));
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-float);
+  box-shadow: var(--shadow-panel);
 }
 
 /* v1's signature: 11px uppercase label with generous tracking. */
@@ -322,6 +324,36 @@
   font-weight: var(--weight-semibold);
 }
 
+/* The zoom-in notice: present, but a quiet pill rather than an alert. It is information
+ * about the sample, not a problem the user has to act on. */
+.map-notice {
+  position: absolute;
+  bottom: var(--space-lg);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1;
+  max-width: 60vw;
+  padding: var(--space-xs) var(--space-md);
+  background: var(--bg-floating);
+  backdrop-filter: blur(var(--blur-floating));
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-panel);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  line-height: var(--leading-snug);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+.map-notice b {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-weight: var(--weight-medium);
+}
+
 /* --- MapLibre popup --------------------------------------------------------- */
 
 /* v1 themed the Mapbox popup in index.html; the MapLibre class names differ but the
@@ -403,9 +435,16 @@
 /* --- MapLibre controls ------------------------------------------------------ */
 
 .maplibregl-ctrl-group {
-  background: var(--bg-surface) !important;
+  background: var(--bg-floating) !important;
+  backdrop-filter: blur(var(--blur-floating));
   border: 1px solid var(--border-subtle) !important;
-  box-shadow: var(--shadow-float) !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-panel) !important;
+  overflow: hidden;
+}
+
+.maplibregl-ctrl-group button:hover {
+  background-color: var(--bg-raised) !important;
 }
 
 .maplibregl-ctrl-group button + button {
@@ -459,8 +498,10 @@
  * controls rather than two competing cards.
  */
 .saved-panel {
-  top: auto;
-  bottom: var(--space-md);
+  left: auto;
+  right: var(--space-md);
+  min-width: 200px;
+  max-width: 260px;
   max-height: 40vh;
   overflow-y: auto;
 }
@@ -621,6 +662,27 @@
   font-weight: var(--weight-extrabold);
   letter-spacing: -0.01em;
   text-decoration: none;
+}
+
+/* On the map the header is a slim strip, not a website nav: less height, smaller type,
+ * and the active link marked by colour rather than an underline bar. */
+.site-header.is-map {
+  gap: var(--space-base);
+  padding: var(--space-xs) var(--space-md);
+  background: var(--bg-base);
+}
+
+.site-header.is-map .brand {
+  font-size: var(--text-md);
+}
+
+.site-header.is-map .nav-link {
+  font-size: var(--text-sm);
+  border-bottom: none;
+}
+
+.site-header.is-map .nav-link.active {
+  color: var(--accent);
 }
 
 .brand:hover {
