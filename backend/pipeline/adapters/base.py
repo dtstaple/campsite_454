@@ -123,9 +123,16 @@ class SourceAdapter(ABC):
 
         Everything except the identity of the row and when it was first seen: the upsert
         key must not change, and created_at should keep the original ingest time.
+
+        Generated columns are skipped too: the database computes them, and naming one in
+        an UPDATE is an error.
         """
         skip = {"id", "source", "source_id", "created_at"}
-        return [f.name for f in cls.model._meta.concrete_fields if f.name not in skip]
+        return [
+            f.name
+            for f in cls.model._meta.concrete_fields
+            if f.name not in skip and not getattr(f, "generated", False)
+        ]
 
     def run_parameters(self, aoi: AreaOfInterest) -> dict:
         """What gets recorded in IngestRun.parameters. Override to add source specifics."""
