@@ -103,14 +103,6 @@ export class ApiError extends Error {}
 const CACHE_LIMIT = 40;
 const cache = new Map<string, MapData>();
 
-export function cacheStats() {
-  return { size: cache.size, limit: CACHE_LIMIT };
-}
-
-export function clearCache() {
-  cache.clear();
-}
-
 function remember(key: string, value: MapData) {
   cache.delete(key);
   cache.set(key, value);
