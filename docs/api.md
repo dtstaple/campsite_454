@@ -18,6 +18,8 @@ the Vite dev server on port 5173.
 | `GET /api/water/` | Streams, rivers, lakes, ponds, wetlands — LineStrings and Polygons |
 | `GET /api/public-land/` | Public land parcels and legal access — MultiPolygons |
 | `GET /api/map-data/` | All four at once, for the initial load |
+| `GET /api/routes/` | Named hiking routes in a bbox — see [Named routes](#named-routes-tm05-60) |
+| `GET /api/routes/<osm_id>/` | One route: stats, elevation profile, campsites along it with scores |
 
 There is one endpoint per layer so you can fetch only what the user has toggled on, and a
 combined one so the first paint is a single round trip. They share the same code, so the
@@ -349,7 +351,126 @@ index.
 
 ---
 
+## Named routes (TM05-60)
+
+Named hiking routes (OSM `route=hiking` relations, TM05-58), their elevation profiles
+(TM05-59) and the campsites along them. Code: `backend/api/routes.py`.
+
+### `GET /api/routes/?bbox=west,south,east,north`
+
+Named routes whose geometry intersects the box, **longest first**, as a GeoJSON
+FeatureCollection. Unnamed relations are not listed.
+
+| Parameter | Default | Notes |
+|---|---|---|
+| `bbox` | required | Same format and validation as the layer endpoints |
+| `limit` | 200 | Max 1000. `metadata.truncated` says whether more matched |
+| `simplify` | none | Degrees, same as the layer endpoints. **Use `0.0001` for the map**: it cuts the High Peaks response from 384 KB to 141 KB |
+
+A route is returned **whole**, including the part outside the box: a route clipped to the
+viewport has the wrong length and profile.
+
+```json
+{
+  "type": "FeatureCollection",
+  "bbox": [-74.1, 44.05, -73.85, 44.25],
+  "features": [
+    {
+      "type": "Feature",
+      "id": 6619234,
+      "geometry": {"type": "MultiLineString", "coordinates": [[[-73.962732, 44.182899], ...]]},
+      "properties": {"osm_id": 6619234, "name": "Van Hoevenberg Trail", "ref": null,
+                     "network": "lwn", "operator": "NYSDEC", "length_m": 12328.4}
+    }
+  ],
+  "metadata": {"returned": 67, "truncated": false, "limit": 200, "simplify": null}
+}
+```
+
+`length_m` is the sum of the main-line members (side branches excluded). It can exceed
+the stitched line's length in the detail when a parallel branch is not part of the path —
+Van Hoevenberg's 12,328 m includes the 972 m Marcy Dam bypass, while its stitched line is
+11,373 m.
+
+### `GET /api/routes/<osm_id>/`
+
+| Parameter | Default | Notes |
+|---|---|---|
+| `campsites_within_m` | 500 | Campsites within this many metres of any route member. Capped at 5000; a non-integer is a 400 |
+
+Unknown `osm_id` → 404.
+
+```json
+{
+  "osm_id": 6619234,
+  "source_id": "relation/6619234",
+  "name": "Van Hoevenberg Trail",
+  "ref": null, "network": "lwn", "operator": "NYSDEC",
+  "length_m": 12328.4,
+  "geometry": {"type": "MultiLineString", "coordinates": [...]},
+  "line": {"type": "LineString", "coordinates": [[-73.962732, 44.182899], ...], "length_m": 11373.0},
+  "path": {"parts": 2, "parts_used": 1, "parts_left_out": 1, "left_out_m": 971.7, "largest_join_gap_m": 0.0},
+  "profile": {
+    "status": "ok",
+    "reason": null,
+    "stats": {"length_m": 11373.0, "gain_m": 1007.4, "loss_m": 46.9, "high_m": 1627.6,
+              "high_at_m": 11373.0, "low_m": 638.8, "low_at_m": 600.0, "start_m": 666.6,
+              "end_m": 1627.6, "max_grade_pct": 33.0, "max_grade_at_m": 11125.0,
+              "naive_gain_m": 1077.0, "naive_loss_m": 114.2},
+    "distance_m": [0.0, 25.0, 50.0, ...],
+    "elevation_m": [666.0, 665.1, ...],
+    "params": {"spacing_m": 25, "smoothing_window_m": 100, "threshold_m": 3, "grade_window_m": 100},
+    "source": {"name": "usgs-3dep", "datasets": ["NY_NH_Gaps_D24", ...], "resolution_m": [1],
+               "vertical_datum": ["North American Vertical Datum of 1988 (NAVD 88)"],
+               "computed_at": "2026-10-02T20:53:27.637233+00:00", "cached": true}
+  },
+  "campsites": {
+    "within_m": 500,
+    "count": 4,
+    "truncated": false,
+    "items": [
+      {"id": "way/1305981156", "source": "osm", "name": "Marcy Dam Backcountry Campsites",
+       "site_type": "primitive", "lon": -73.951989, "lat": 44.158017,
+       "distance_along_m": 3773.1, "distance_from_route_m": 83.6,
+       "score": 69, "score_breakdown": { "...": "a contract-1 score, docs/scoring.md" }}
+    ]
+  }
+}
+```
+
+- **`line`** is the route stitched into one ordered path (docs/elevation.md). Draw the route
+  from `geometry`. Use `line` for anything that moves *along* the route — the profile
+  cursor, the map marker, the 3D camera. Positions in `profile.distance_m` and
+  `distance_along_m` are measured along `line`.
+- **`profile`** comes from the analysis cache. The first request for a route computes it
+  from 3DEP (≈4–6 s); later requests read it (ms). If 3DEP is unavailable, `status` is
+  `"unavailable"`, `reason` says why, `stats` and the series are absent, and **the rest of
+  the response is still returned**.
+- **`campsites.items`** are ordered by `distance_along_m`, from
+  `ST_LineLocatePoint(line, site) × length(line)`. `distance_from_route_m` is the
+  perpendicular distance to the nearest route member. Both are metres in EPSG:5070
+  (TM05-42), and the search uses the campsite `geom_m` index. At most 100 are returned
+  (`truncated`).
+- **`score` / `score_breakdown`** are the scoring engine's contract-1 result. The weather
+  factor makes them change over time: do not cache longer than an hour.
+
+### Measured (2026-10-02, local Docker PostGIS, median of 5 warm runs)
+
+| Request | Time | Size |
+|---|---|---|
+| List, High Peaks box (67 routes) | 21 ms (first 247 ms) | 384 KB |
+| List, High Peaks box, `simplify=0.0001` | 33 ms | 141 KB |
+| List, whole Adirondack region, `simplify=0.0001` (200, truncated) | 234 ms | 752 KB |
+| Detail, Van Hoevenberg, profile not yet cached | 5.7 s | 36 KB |
+| Detail, Van Hoevenberg, cached (4 campsites) | 78 ms | 36 KB |
+| Detail, `campsites_within_m=2000` (13 campsites) | 183 ms | 57 KB |
+
+Most of a cached detail request is scoring the campsites, about 10 ms each.
+
+---
+
 ## Not included yet
 
-**Scoring.** These endpoints return raw ingested features, not scored campsites. The
-0–100 score is a later story.
+**Scored campsites in the map layers.** The layer endpoints above return raw ingested
+features; the scored-campsites endpoint is TM05-45. The route detail already carries
+scores for the campsites along a route.

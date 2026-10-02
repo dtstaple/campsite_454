@@ -120,6 +120,7 @@ Four tables hold the reference geography that gets fetched and kept:
 |---|---|---|
 | `Campsite` | Individual campsites | A single point |
 | `Trail` | Trail segments | One or more lines |
+| `TrailRoute` | Named hiking routes: ordered groups of trail segments (TM05-58) | One or more lines |
 | `WaterFeature` | Streams, rivers, lakes, wetlands | Lines *or* shapes |
 | `PublicLand` | Land ownership and camping legality | One or more shapes |
 
@@ -337,21 +338,126 @@ planned, none are built.
 
 In each case the pattern is the same: ask about one specific area, compute what we need,
 store the answer with a note about where and when it came from, discard the source data.
+That pattern is now built (TM05-44); see the next section for how to add one.
+
+## On-demand analysis and the answer cache (TM05-44)
+
+The ingestion pipeline handles data worth keeping whole. Everything else — elevation,
+imagery, weather — uses the second pattern this document describes: ask about one specific
+place, compute the answer, cache the *answer* with a note of how it was made, and throw
+the raw material away. `backend/analysis/` implements it.
+
+### The contract
+
+An analysis is a subclass of `analysis.base.Analysis`, the counterpart of `SourceAdapter`:
+
+| | SourceAdapter (ingestion) | Analysis (on demand) |
+|---|---|---|
+| Triggered by | `manage.py ingest`, for a configured region | a request, for one geometry |
+| Keeps | the data, in a reference table | the computed answer, in `AnalysisResult` |
+| You write | `fetch()`, `normalize()` | `compute(geom, window, params) -> Computed(value, provenance)` |
+| You declare | name, model, source SRID | `name`, `version`, `ttl`, `grid_degrees` |
+| Framework does | reprojection, validation, upsert, run record | cache key, hit/miss, expiry, provenance, purge |
+
+Callers use one method, `run(geom, params)`, which returns an `Outcome` (`value`,
+`provenance`, `cached`, `key`, `computed_at`, `expires_at`). If a fresh answer exists it is
+returned without calling `compute()`. Otherwise `compute()` runs, the answer is stored,
+and expired answers of that analysis are purged. A `compute()` that raises
+`AnalysisError` stores nothing, so a failure is never cached.
+
+### The cache key
+
+```
+sha256( canonical JSON of {analysis, version, geometry, window, params} )
+```
+
+- **analysis + version** — bumping `version` invalidates every cached answer of that
+  analysis without a migration.
+- **geometry** — EPSG:4326 WKT at 6 decimal places (~0.1 m), so float noise in a request
+  cannot split one answer into two. Analyses whose source has a coarse grid set
+  `grid_degrees`, and *points* are snapped to the centre of that grid cell first so nearby
+  requests share an answer. Lines and polygons are never snapped: snapping a route would
+  change what is being analysed.
+- **window** — the time span the answer covers, from the analysis's `window_for(now)`.
+  `None` for timeless answers such as slope.
+- **params** — sorted, so `{"a":1,"b":2}` and `{"b":2,"a":1}` are the same entry.
+
+The parts are also stored as columns (`analysis`, `version`, `geom`, `window_start`,
+`window_end`, `params`) so the cache can be inspected and queried, not just looked up.
+
+### Time-to-live, per source
+
+| Analysis | TTL | Grid | Why |
+|---|---|---|---|
+| `weather` (Open-Meteo) | **1 hour** | 0.05° (~5 km) | Open-Meteo refreshes hourly; its models answer per grid cell anyway (two points 2 km apart came back as the same cell). |
+| `route_profile` (3DEP, TM05-59) | 1 year | none (keyed by route geometry) | Terrain does not change; a changed route geometry is a new key. See docs/elevation.md. |
+| slope / aspect (3DEP, planned) | 1 year | none | Terrain does not change; a year bounds how long a bad answer could survive. |
+| land cover / NDVI (Sentinel-2, planned) | 30 days | none | Revisit is ~5 days, but vegetation changes on a seasonal scale. |
+| soil drainage (SSURGO, planned) | 1 year | none | Survey data is updated annually at most. |
+
+Expiry is a hard stop: an entry past `expires_at` is never served, and is deleted the next
+time that analysis stores an answer.
+
+### Provenance
+
+Every stored answer records what was used, when, and with what parameters: the analysis
+name and version, the request parameters, `computed_at`, and whatever the analysis adds —
+for weather, the endpoint, the exact request, the grid cell the API answered for, and its
+`generationtime_ms`. That makes "where did this number come from?" a lookup, the same way
+the ingest run record does for reference data.
+
+### Weather, the first analysis
+
+`analysis/analyses/weather.py`, verified live before use on 2026-10-02:
+
+```
+GET https://api.open-meteo.com/v1/forecast?latitude=…&longitude=…
+    &current=temperature_2m,precipitation,wind_speed_10m,wind_gusts_10m,weather_code
+    &daily=temperature_2m_min,temperature_2m_max,precipitation_sum,
+           precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max
+    &forecast_days=3&timezone=auto
+→ 200, ~0.7–0.8 s, no key. {latitude, longitude, elevation, timezone, current{…}, daily{time[], …[]}}
+```
+
+The full recorded response is `tests/fixtures/open_meteo_forecast.json`. The stored value
+keeps only the grid cell, the current conditions and one row per day; the payload is
+discarded. A response that does not have the verified shape raises `AnalysisError` instead
+of being cached half-understood. It is fetched with one quick retry and a 5 s timeout,
+because it sits on the scoring path, where failing fast and reporting the factor as
+`not_available` beats making someone wait.
+
+It feeds the scoring engine as a fourth factor (`WeatherFactor`, docs/scoring.md).
+Measured: a cache miss took 734 ms and a repeat request for the same cell 4.9 ms. Scoring
+100 campsites from a cold weather cache took 6.7 s — those 100 sites fall in just 5 grid
+cells, so 5 API calls — and 0.9–1.2 s warm.
+
+### Adding the next analysis (elevation, imagery)
+
+1. Subclass `Analysis` in `backend/analysis/analyses/`. Set `name`, `version`, `ttl`, and
+   `grid_degrees` (usually `None` for raster work keyed by exact geometry).
+2. Implement `compute()`: read the smallest window of source data that answers the
+   question (a windowed COG read, never a whole scene), reduce it to the answer, return
+   `Computed(value, provenance)`. Do not return pixels.
+3. Override `window_for()` only if the answer depends on time.
+4. Add its TTL to the table above, with the reason.
+5. If it feeds scoring, replace the matching placeholder factor's `evaluate()` to call
+   `run()`, and treat `AnalysisError` as `not_available`.
 
 ---
 
 ## Weather is a deliberate exception
 
-Weather does not go through any of this. It is fetched live from Open-Meteo when someone
-asks, held briefly, and never saved to the database.
+Weather does not go through the ingestion pipeline, and it is never kept as data. A
+stored forecast is a wrong forecast: every other kind of data here describes something
+that changes over years or not at all, while a forecast is obsolete within hours.
+Maintaining a table of forecasts would mean carefully keeping something guaranteed to be
+stale.
 
-The reason is simple: a stored forecast is a wrong forecast. Every other kind of data here
-describes something that changes over years or not at all — a lake does not move, a
-wilderness boundary rarely shifts. A forecast is obsolete within hours. Saving it would
-mean carefully maintaining a table whose entire contents are guaranteed to be stale.
-
-So weather takes a thin separate path that bypasses the ingestion framework completely.
-This is a decision, not an oversight. **Planned** — not yet built.
+It is fetched live from Open-Meteo when someone asks and **held for at most an hour** in
+the analysis cache (see "On-demand analysis and the answer cache"): one row per grid cell,
+deleted once it expires. That is a cache, not a history. Nothing reads an expired forecast,
+and nothing accumulates. TM05-44 made weather the first analysis precisely because it
+exercises that cache path end to end without any raster work depending on it.
 
 ---
 
@@ -391,6 +497,11 @@ backend/pipeline/
   adapters/base.py                the shared three-step contract
   adapters/registry.py            how sources announce themselves
   management/commands/ingest.py   the command-line tool
+
+backend/analysis/
+  base.py                         the Analysis contract: cache key, hit/miss, expiry
+  models.py                       AnalysisResult, the answer cache with provenance
+  analyses/weather.py             Open-Meteo forecast, the first analysis
 
 backend/geodata/
   models.py                       the four data tables and the run record

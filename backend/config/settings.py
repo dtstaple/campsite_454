@@ -36,6 +36,8 @@ INSTALLED_APPS = [
     "geodata",
     "pipeline",
     "devdata",
+    "scoring",
+    "analysis",
 ]
 
 MIDDLEWARE = [

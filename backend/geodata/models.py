@@ -150,6 +150,44 @@ class Trail(SourceRecord):
         indexes = [GistIndex(fields=["geom_m"], name="trail_geom_m_gist")]
 
 
+class TrailRoute(SourceRecord):
+    """
+    A named hiking route: an OSM `route=hiking` relation (TM05-58).
+
+    Where a Trail is one OSM way -- a segment between junctions, often unnamed -- a route
+    is what a hiker means by "the Van Hoevenberg Trail": an ordered list of those ways
+    under one name. `member_way_ids` keeps the relation's order; the ids join to Trail
+    rows as `way/<id>`. The geometry holds the route's main-line members only, in that
+    order; side branches tagged alternative / excursion / approach / connection are kept in
+    `member_way_ids` and `raw` but not in `geom` or `length_m`, so the length is the route,
+    not the route plus every spur.
+    """
+
+    osm_id = models.BigIntegerField(db_index=True, help_text="OSM relation id.")
+    ref = models.CharField(max_length=64, blank=True, help_text="Route reference, e.g. AT.")
+    network = models.CharField(max_length=32, blank=True, help_text="e.g. lwn, rwn, nwn.")
+    operator = models.CharField(max_length=128, blank=True)
+    member_way_ids = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="OSM way ids in relation order, every role included.",
+    )
+    geom = gis_models.MultiLineStringField(srid=4326, spatial_index=True)
+    geom_m = metric_geom(gis_models.MultiLineStringField)
+    length_m = models.FloatField(
+        null=True, blank=True, help_text="Geodesic length of the main-line members."
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["source", "source_id"], name="unique_route_source")
+        ]
+        indexes = [
+            GistIndex(fields=["geom_m"], name="route_geom_m_gist"),
+            models.Index(fields=["name"]),
+        ]
+
+
 class WaterFeature(SourceRecord):
     """
     Water. Generic GeometryField because NHD gives flowlines as lines (streams,

@@ -72,12 +72,13 @@ The command knows nothing about any particular source. It looks the name up in t
 registry and the region up in `pipeline/regions.yml`, so a newly written adapter appears
 automatically. An unknown name lists what is available instead of failing obscurely.
 
-### The five sources
+### The sources
 
 | Source | Writes to | What it returns |
 |---|---|---|
 | `padus` | `PublicLand` | Land ownership and legal camping access, from the USGS Protected Areas Database |
 | `osm-trails` | `Trail` | Hiking trails from OpenStreetMap, with ordered node IDs preserved |
+| `osm-routes` | `TrailRoute` | Named hiking routes (OSM `route=hiking` relations): ordered member ways, one geometry, total length |
 | `nhd-flowlines` | `WaterFeature` | Streams and rivers from USGS NHD |
 | `nhd-waterbodies` | `WaterFeature` | Lakes, ponds, reservoirs and wetlands from USGS NHD |
 | `ridb` | `Campsite` | Federal campsites from Recreation.gov |
@@ -371,6 +372,52 @@ coverage comes from OpenStreetMap instead. Use `white-mountains-nh` when you wan
 RIDB actually work — the White Mountain National Forest is USFS.
 
 ---
+
+### osm-routes (TM05-58)
+
+`TrailRoute` is what a hiker means by a trail. `osm-trails` stores OSM *ways* — segments
+between junctions, roughly 40% unnamed — while a `route=hiking` relation groups ways under
+one name: the Van Hoevenberg Trail, the Northville-Placid Trail. Each row keeps the
+relation id (`osm_id`, and `source_id` = `relation/<id>`), `name`, `ref`, `network`,
+`operator`, `member_way_ids` in relation order (joining to `Trail.source_id` as
+`way/<id>`), a MultiLineString with one line per main-line member, the metric `geom_m`
+column, and `length_m`.
+
+- **One query per region.** `relation["route"="hiking"](bbox); out geom;` returns every
+  member's coordinates inline. Tiling would transfer a long route once per tile, so the
+  adapter sets `max_tile_degrees = None`.
+- **Side branches** (roles `alternative`, `excursion`, `approach`, `connection`) stay in
+  `member_way_ids` but are left out of `geom` and `length_m`, so the length is the route
+  rather than the route plus its spurs. A way listed twice counts once.
+- **Nested relations are not expanded.** A super-relation (the Appalachian Trail is made of
+  per-state section relations) has no way members of its own; it is skipped with "missing
+  geom" in the run notes, and its sections are ingested in their own right. Expect the
+  Adirondack run to be `partial` with exactly this one skip (relation/20254765).
+- **The whole route is stored**, including any part outside the region box, because a
+  route's length and profile mean nothing clipped.
+
+Measured on 2026-10-02:
+
+| Region | Relations | Response | Time | Ingested |
+|---|---|---|---|---|
+| Adirondacks | 271 | 5.0 MB | 8 s (raw curl) / 4.4 s (ingest) | 270, 1 skipped (super-relation) |
+| White Mountains | 182 | 3.0 MB | 38 s with two Overpass 504 retries / 3.0 s on a later run | 182 |
+
+Re-running upserts by relation id: three Adirondack runs left the table at 452 rows.
+
+**Coverage**, from `python manage.py route_coverage`:
+
+| Region | Routes | Trail length on a named route | Ways on a named route |
+|---|---|---|---|
+| Adirondacks | 270 | 1,318 of 11,143 km (**11.8%**) | 940 of 18,067 (5.2%) |
+| White Mountains | 182 | 961 of 5,240 km (**18.3%**) | 583 of 7,596 (7.7%) |
+
+So named routes are the backbone, not the network: the main marked trails are covered, but
+most ingested way length — logging tracks, unmarked herd paths, connector paths — is on no
+route. Routes also add very few names to unnamed ways (0.7% of unnamed Adirondack ways are
+on a route), because unnamed ways are mostly not part of marked routes in the first place.
+Anything that needs "the trail this segment belongs to" for every segment will still need
+way-level fallbacks.
 
 ## 7. Integration tests against live services
 
