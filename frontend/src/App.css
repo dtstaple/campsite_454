@@ -307,8 +307,9 @@
   line-height: var(--leading-snug);
 }
 
+/* Above the zoom-in notice pill, so the two never stack on top of each other. */
 .banner.warn {
-  bottom: var(--space-xl);
+  bottom: calc(var(--space-xl) * 4);
   border: 1px solid var(--accent);
   color: var(--accent);
 }
@@ -328,10 +329,14 @@
  * about the sample, not a problem the user has to act on. */
 .map-notice {
   position: absolute;
-  bottom: var(--space-lg);
+  /* Clear of the attribution strip, which spans the bottom right on narrower screens. */
+  bottom: calc(var(--space-xl) * 2);
   left: 50%;
   transform: translateX(-50%);
   z-index: 1;
+  /* Shrink-to-fit is capped at the space right of `left: 50%`, which cut the text off
+   * early; size to the content instead and let max-width do the capping. */
+  width: max-content;
   max-width: 60vw;
   padding: var(--space-xs) var(--space-md);
   background: var(--bg-floating);
@@ -358,12 +363,14 @@
 
 /* v1 themed the Mapbox popup in index.html; the MapLibre class names differ but the
    chrome is the same: surface background, subtle border, float shadow. */
+/* Same floating surface as the panels, so a popup reads as part of the map chrome. */
 .maplibregl-popup-content {
-  background: var(--bg-surface) !important;
+  background: var(--bg-floating) !important;
+  backdrop-filter: blur(var(--blur-floating));
   border: 1px solid var(--border-subtle) !important;
-  border-radius: var(--radius-md) !important;
+  border-radius: var(--radius-lg) !important;
   padding: var(--space-md) var(--space-base) !important;
-  box-shadow: var(--shadow-float) !important;
+  box-shadow: var(--shadow-panel) !important;
   color: var(--text-primary) !important;
   font-family: var(--font-sans) !important;
   font-size: var(--text-base) !important;
