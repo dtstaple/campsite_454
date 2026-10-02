@@ -18,8 +18,8 @@ empty, it is `null` or `[]` instead, so a consumer never has to test for a missi
 ```json
 {
   "contract": 1,
-  "model_version": "1.0.0",
-  "config_digest": "19acb433",
+  "model_version": "1.1.0",
+  "config_digest": "0a9724fd",
   "location": { "lon": -73.9512, "lat": 44.1847 },
   "score": 81,
   "factors": [
@@ -75,7 +75,7 @@ empty, it is `null` or `[]` instead, so a consumer never has to test for a missi
 
 | Field | Type | Meaning |
 |---|---|---|
-| `key` | string | Stable identifier: `water`, `legal`, `trail`, `slope`, `land_cover`, and from TM05-44 `weather`. Use this, not `label`, in code. |
+| `key` | string | Stable identifier: `water`, `legal`, `trail`, `weather`, `slope`, `land_cover`. Use this, not `label`, in code. |
 | `label` | string | Human-readable name for display. |
 | `status` | string | One of `scored`, `no_data`, `not_available` — see below. |
 | `score` | float 0–100, or `null` | This factor's sub-score, one decimal. `null` **only** when `status` is `not_available`. |
@@ -114,8 +114,13 @@ marked **closed** to public access caps the score at 0.
 - A factor's `score` can be `null` (`not_available`); do not coerce it to 0.
 - `measurement` keys are factor-specific and some values inside can be `null` (an unnamed
   stream has `"name": null`; water with unknown flow has `"perennial": null`).
-- More factors will be added (weather in TM05-44). Iterate over `factors`; do not index by
-  position, and ignore keys you do not recognise.
+- More factors will be added. Iterate over `factors`; do not index by position, and ignore
+  keys you do not recognise.
+- **Scores change over time.** The `weather` factor uses a live forecast, so the same
+  campsite scores differently tomorrow. Do not cache a score longer than the weather cache
+  (1 hour), and show `factors[weather].measurement.date` so a user knows which day it is
+  for. If weather is `not_available` (Open-Meteo down) the score is still valid, it simply
+  excludes weather.
 - Scores from different `model_version` or `config_digest` values are not comparable.
 
 ### Stability promise
@@ -143,18 +148,20 @@ A weighted mean rather than a weighted sum, so weights are *relative*: they need
 to 1, and a factor that cannot be evaluated drops out without distorting the scale. Factors
 appear in the output in the order of `weights` in `config.yml`.
 
-### Weights (model 1.0.0)
+### Weights (model 1.1.0)
 
 | Factor | Weight | Share today | Why |
 |---|---|---|---|
-| `water` | 0.35 | 41% | The thing a backcountry site most depends on. |
-| `legal` | 0.30 | 35% | Whether you may camp there at all. Also the only factor that can cap. |
-| `trail` | 0.20 | 24% | Reachability. Matters, but a short bushwhack is fine. |
+| `water` | 0.35 | 35% | The thing a backcountry site most depends on. |
+| `legal` | 0.30 | 30% | Whether you may camp there at all. Also the only factor that can cap. |
+| `trail` | 0.20 | 20% | Reachability. Matters, but a short bushwhack is fine. |
+| `weather` | 0.15 | 15% | Tonight's conditions. Real, but it changes daily and does not make a place better or worse. |
 | `slope` | 0.10 | — | Placeholder; counts once 3DEP lands. |
 | `land_cover` | 0.05 | — | Placeholder; counts once Sentinel-2 lands. |
 
 "Share today" is the effective weight while slope and land cover are `not_available`
-(0.35 / 0.85 and so on). Change a weight by editing `config.yml`; no code changes, and the
+(0.35 / 1.00 and so on). Model 1.0.0 (TM05-43) had no weather; 1.1.0 (TM05-44) added
+it. Change a weight by editing `config.yml`; no code changes, and the
 `config_digest` on every score changes with it.
 
 ### The distance curves
@@ -225,6 +232,24 @@ Nearest trail segment (OSM ways, TM05-26 filtering), scored on the trail curve.
 `measurement`: `distance_m`, `ideal_m`, `name`, `trail_type`, `source`, `source_id`. Nothing
 within 5 km: `no_data`, score 0.
 
+### Weather
+
+From the live Open-Meteo forecast, through the analysis cache (TM05-44, see
+docs/architecture.md): snapped to a 0.05° grid, cached one hour. Scored on forecast day 0 —
+today, i.e. tonight's camp:
+
+```
+score = 100 − min(40, 4 × rain_mm) − min(30, max(0, wind_max_kmh − 25)) − min(30, 3 × max(0, −low_c))
+```
+
+Each penalty is capped so one bad element cannot zero the factor alone: 5 mm of rain costs
+20 points, a 40 km/h day 15, a −5 °C night 15. If Open-Meteo cannot be reached, the factor is
+`not_available` and drops out of the total.
+
+`measurement`: `date`, `precipitation_mm`, `precipitation_probability_pct`, `wind_max_kmh`,
+`temperature_min_c`, `temperature_max_c`, `penalties` (`precipitation`, `wind`,
+`freezing`), `grid` (the cell the forecast is for), `fetched_at`, `cached`.
+
 ### Placeholders: slope and land cover
 
 Both are real factor classes (`SlopeFactor`, `LandCoverFactor`) with weights in the config,
@@ -246,14 +271,16 @@ Silicon, so pessimistic):
 
 | Run | Time |
 |---|---|
-| 100 campsites (median of 3 warm runs) | **934 ms** — 9.3 ms per site |
-| All 1,320 campsites (one run) | 18.1 s — 13.7 ms per site |
+| 100 campsites, model 1.0.0 (median of 3 warm runs) | **934 ms** — 9.3 ms per site |
+| All 1,320 campsites, model 1.0.0 (one run) | 18.1 s — 13.7 ms per site |
+| 100 campsites, model 1.1.0 with weather, cold weather cache | 6.7 s — 5 Open-Meteo calls (5 grid cells) |
+| 100 campsites, model 1.1.0, warm (median of 3) | **1,180 ms** — 11.8 ms per site |
 
 Per factor, 100 sites: water 675 ms (three KNN queries of 5), trail 190 ms, legal 142 ms,
 placeholders ~2 ms. Water is the obvious target if this ever matters: one query ordered by
 flow class would replace three.
 
-Score distribution over all 1,320 campsites: min 0, median 56, max 98.
+Score distribution over all 1,320 campsites (model 1.0.0): min 0, median 56, max 98.
 
 ### Known limitation: PAD-US coverage
 
@@ -273,4 +300,4 @@ about the rest.
 2. Add its weight under `weights:` and its settings under `factors:` in `config.yml`.
 3. Document its curve and `measurement` keys here.
 
-Nothing in `engine.py` changes. TM05-44 adds weather this way.
+Nothing in `engine.py` changes. TM05-44 added weather exactly this way.

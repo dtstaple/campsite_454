@@ -4,7 +4,7 @@
 # config_digest reported with every score, so cached scores from the old config are
 # recognisably stale. Bump model_version when the *meaning* of a factor changes.
 
-model_version: "1.0.0"
+model_version: "1.1.0"
 
 # Relative weights. They need not sum to 1: the engine renormalises over the factors
 # that could be evaluated, so a factor that is not_available drops out cleanly.
@@ -12,6 +12,7 @@ weights:
   water: 0.35
   legal: 0.30
   trail: 0.20
+  weather: 0.15
   slope: 0.10
   land_cover: 0.05
 
@@ -73,6 +74,20 @@ factors:
       "": 0.85
     # Land marked closed caps the overall score, whatever the other factors say.
     closed_caps_total_at: 0
+
+  weather:
+    # Live forecast through the analysis cache (TM05-44): Open-Meteo, 0.05 deg grid,
+    # cached one hour. Scored on one forecast day; 0 is today, i.e. tonight's camp.
+    forecast_days: 3
+    day: 0
+    # 100 minus penalties, each capped so no single element zeroes the factor alone.
+    precipitation_penalty_per_mm: 4     # 5 mm of rain -> -20
+    precipitation_penalty_max: 40
+    wind_threshold_kmh: 25              # daily max sustained wind; below this is fine
+    wind_penalty_per_kmh: 1.0
+    wind_penalty_max: 30
+    freezing_penalty_per_degree: 3      # per degree the low drops below 0 C
+    freezing_penalty_max: 30
 
   slope:
     placeholder: "Slope is not measured yet (planned: USGS 3DEP, Sprint 5)."

@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     "pipeline",
     "devdata",
     "scoring",
+    "analysis",
 ]
 
 MIDDLEWARE = [

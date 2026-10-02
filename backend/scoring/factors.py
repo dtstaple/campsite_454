@@ -14,6 +14,8 @@ from dataclasses import dataclass, field
 
 from django.contrib.gis.geos import Point
 
+from analysis.analyses.weather import WeatherForecast
+from analysis.base import AnalysisError
 from geodata.distance import nearest, nearest_k
 from geodata.models import PublicLand, Trail, WaterFeature
 from scoring.curves import peak_curve
@@ -253,6 +255,72 @@ class LegalFactor(Factor):
             "parcels": len(parcels),
         }
         return self.result(SCORED, score, measurement, explanation, caps)
+
+
+# --- weather -------------------------------------------------------------------------
+
+
+@register
+class WeatherFactor(Factor):
+    """Tonight's conditions from the live forecast, via the analysis cache (TM05-44).
+
+    Starts at 100 and loses points for rain, wind above a threshold, and frost, each
+    capped so one bad element cannot zero the factor alone. The only factor that changes
+    from hour to hour -- see docs/scoring.md before caching scores.
+    """
+
+    key = "weather"
+    label = "Weather"
+    analysis = WeatherForecast()
+
+    def evaluate(self, lon, lat):
+        s = self.settings
+        try:
+            outcome = self.analysis.run(Point(lon, lat, srid=4326), {"days": s["forecast_days"]})
+        except AnalysisError:
+            return self.result(NOT_AVAILABLE, None, None, "Weather forecast unavailable right now.")
+        days = outcome.value["daily"]
+        if not days:
+            return self.result(NOT_AVAILABLE, None, None, "Weather forecast was empty.")
+        day = days[min(s["day"], len(days) - 1)]
+
+        rain = day["precipitation_mm"] or 0.0
+        wind = day["wind_max_kmh"] or 0.0
+        low = day["temperature_min_c"]
+        penalties = {
+            "precipitation": min(
+                s["precipitation_penalty_max"], rain * s["precipitation_penalty_per_mm"]
+            ),
+            "wind": min(
+                s["wind_penalty_max"],
+                max(0.0, wind - s["wind_threshold_kmh"]) * s["wind_penalty_per_kmh"],
+            ),
+            "freezing": 0.0
+            if low is None
+            else min(s["freezing_penalty_max"], max(0.0, -low) * s["freezing_penalty_per_degree"]),
+        }
+        score = 100.0 - sum(penalties.values())
+
+        measurement = {
+            "date": day["date"],
+            "precipitation_mm": rain,
+            "precipitation_probability_pct": day["precipitation_probability_pct"],
+            "wind_max_kmh": wind,
+            "temperature_min_c": low,
+            "temperature_max_c": day["temperature_max_c"],
+            "penalties": {key: round(value, 1) for key, value in penalties.items()},
+            "grid": outcome.value["grid"],
+            "fetched_at": outcome.computed_at.isoformat(),
+            "cached": outcome.cached,
+        }
+        parts = [f"{rain:g} mm of rain" if rain else "no rain"]
+        if day["precipitation_probability_pct"] is not None and rain:
+            parts[0] += f" ({day['precipitation_probability_pct']}% chance)"
+        parts.append(f"wind to {wind:.0f} km/h")
+        if low is not None:
+            parts.append(f"low {low:.0f} °C")
+        explanation = f"Forecast for {day['date']}: " + ", ".join(parts) + "."
+        return self.result(SCORED, score, measurement, explanation)
 
 
 # --- placeholders --------------------------------------------------------------------
