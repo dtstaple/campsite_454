@@ -46,6 +46,39 @@ def recorded_weather(monkeypatch):
     return calls
 
 
+class Terrain:
+    """Stands in for 3DEP: elevation rises `grade` metres per metre northwards, so the
+    slope at any site is atan(grade). Flat unless a test says otherwise."""
+
+    grade = 0.0
+    down = False
+
+    def post(self, points):
+        if self.down:
+            from analysis.base import AnalysisError
+
+            raise AnalysisError("3DEP down")
+        return {
+            "samples": [
+                {
+                    "locationId": i,
+                    "value": str(500 + self.grade * (p.y - LAT) * M_PER_DEG_LAT),
+                    "resolution": 1,
+                    "attributes": {"Name": "TEST"},
+                }
+                for i, p in enumerate(points)
+            ]
+        }
+
+
+@pytest.fixture(autouse=True)
+def terrain(monkeypatch):
+    """Slope is a live 3DEP factor (TM05-64); every test here answers it locally."""
+    stub = Terrain()
+    monkeypatch.setattr("analysis.analyses.elevation.post_samples", stub.post)
+    return stub
+
+
 def shipped():
     return load()
 
@@ -331,10 +364,10 @@ class TestEngine:
     def test_placeholders_are_excluded_and_weights_renormalised(self):
         water(60)
         result = score_location(LON, LAT)
-        slope = factor_by_key(result, "slope")
-        assert slope["status"] == "not_available"
-        assert slope["score"] is None
-        assert slope["effective_weight"] == 0
+        land_cover = factor_by_key(result, "land_cover")
+        assert land_cover["status"] == "not_available"
+        assert land_cover["score"] is None
+        assert land_cover["effective_weight"] == 0
         counted = [f for f in result["factors"] if f["status"] != "not_available"]
         assert sum(f["effective_weight"] for f in counted) == pytest.approx(1, abs=1e-3)
 
@@ -379,10 +412,11 @@ class TestEngine:
         assert factor_by_key(result, "legal")["status"] == "no_data"
         weights = shipped().weights
         weather = factor_by_key(result, "weather")["score"]
-        counted = ("water", "legal", "trail", "weather")
-        expected = (15 * weights["legal"] + weather * weights["weather"]) / sum(
-            weights[key] for key in counted
-        )
+        counted = ("water", "legal", "trail", "weather", "slope")
+        # The stub terrain is flat, so slope scores 100.
+        expected = (
+            15 * weights["legal"] + weather * weights["weather"] + 100 * weights["slope"]
+        ) / sum(weights[key] for key in counted)
         assert result["score"] == round(expected)
 
     def test_capacity_does_not_change_a_campsite_score(self):
@@ -460,3 +494,62 @@ class TestWeatherFactor:
         assert weather["status"] == "not_available"
         assert weather["score"] is None
         assert weather["effective_weight"] == 0
+
+
+class TestSlopeCurve:
+    curve = [[0, 100], [3, 100], [8, 50], [15, 10], [20, 0]]
+
+    def test_flat_ground_is_ideal(self):
+        from scoring.factors import piecewise
+
+        assert piecewise(0, self.curve) == 100
+        assert piecewise(3, self.curve) == 100
+
+    def test_interpolates_between_points_and_clamps(self):
+        from scoring.factors import piecewise
+
+        assert piecewise(5.5, self.curve) == pytest.approx(75)
+        assert piecewise(15, self.curve) == 10
+        assert piecewise(40, self.curve) == 0
+
+    def test_steeper_never_scores_higher(self):
+        from scoring.factors import piecewise
+
+        scores = [piecewise(d, self.curve) for d in range(0, 30)]
+        assert scores == sorted(scores, reverse=True)
+
+
+@pytest.mark.django_db
+@pytest.mark.integration
+class TestSlopeFactor:
+    def evaluate(self):
+        from scoring.factors import SlopeFactor
+
+        return SlopeFactor(shipped().factor("slope")).evaluate(LON, LAT)
+
+    def test_flat_ground_scores_full_with_its_measurement(self, terrain):
+        result = self.evaluate()
+        assert result.status == "scored"
+        assert result.score == 100
+        assert result.measurement["slope_deg"] == pytest.approx(0, abs=0.01)
+        assert result.measurement["elevation_m"] == pytest.approx(500, abs=0.5)
+        assert "flat" in result.explanation
+
+    def test_a_ten_percent_grade_scores_on_the_curve(self, terrain):
+        terrain.grade = 0.10  # 5.71 degrees
+        result = self.evaluate()
+        assert result.measurement["slope_pct"] == pytest.approx(10, abs=0.2)
+        assert result.measurement["slope_deg"] == pytest.approx(5.71, abs=0.05)
+        assert result.score == pytest.approx(100 - (5.71 - 3) / 5 * 50, abs=0.5)
+
+    def test_a_hillside_scores_zero(self, terrain):
+        terrain.grade = 0.5  # 26.6 degrees
+        assert self.evaluate().score == 0
+
+    def test_unreachable_3dep_is_not_available_and_excluded(self, terrain):
+        terrain.down = True
+        water(60)
+        result = score_location(LON, LAT)
+        slope = factor_by_key(result, "slope")
+        assert slope["status"] == "not_available"
+        assert slope["effective_weight"] == 0

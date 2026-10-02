@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 
 from django.contrib.gis.geos import Point
 
+from analysis.analyses.terrain import SiteTerrain
 from analysis.analyses.weather import WeatherForecast
 from analysis.base import AnalysisError
 from geodata.distance import nearest, nearest_k
@@ -343,10 +344,53 @@ class PlaceholderFactor(Factor):
         )
 
 
+def piecewise(x: float, points: list[list[float]]) -> float:
+    """Linear interpolation through (x, y) points sorted by x, clamped at both ends."""
+    if x <= points[0][0]:
+        return float(points[0][1])
+    for (x0, y0), (x1, y1) in zip(points, points[1:], strict=False):
+        if x <= x1:
+            return y0 + (y1 - y0) * (x - x0) / (x1 - x0) if x1 > x0 else float(y1)
+    return float(points[-1][1])
+
+
+SLOPE_WORDS = ((3, "flat"), (6, "gently sloping"), (10, "sloping"), (15, "steep"))
+
+
 @register
-class SlopeFactor(PlaceholderFactor):
+class SlopeFactor(Factor):
+    """Ground slope at the site from 3DEP (TM05-64): flatter is better.
+
+    Read through the site_terrain analysis, the same cache enrich_campsites fills, so a
+    campsite that has been enriched never waits on 3DEP here. If 3DEP is unreachable the
+    factor is not_available and drops out of the total, like weather.
+    """
+
     key = "slope"
     label = "Slope"
+    analysis = SiteTerrain()
+
+    def evaluate(self, lon, lat):
+        s = self.settings
+        try:
+            outcome = self.analysis.run(
+                Point(lon, lat, srid=4326), {"stencil_m": s.get("stencil_m", 10)}
+            )
+        except AnalysisError:
+            return self.result(NOT_AVAILABLE, None, None, "Slope unavailable right now.")
+        value = outcome.value
+        degrees = value["slope_deg"]
+        score = piecewise(degrees, s["curve"])
+        word = next((w for limit, w in SLOPE_WORDS if degrees < limit), "very steep")
+        measurement = {
+            "slope_deg": degrees,
+            "slope_pct": value["slope_pct"],
+            "elevation_m": value["elevation_m"],
+            "stencil_m": value["stencil_m"],
+            "cached": outcome.cached,
+        }
+        explanation = f"Ground is {word}: {degrees:.0f}° ({value['slope_pct']:.0f}%) across 20 m."
+        return self.result(SCORED, score, measurement, explanation)
 
 
 @register
