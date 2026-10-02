@@ -136,8 +136,13 @@ revisit them.
 
 | Run | Time |
 |---|---|
-| First computation for Van Hoevenberg (11.4 km, 456 samples, 2 batches) | 15.0 s |
+| First computation for Van Hoevenberg (11.4 km, 456 samples, 2 batches) | 3.8 s |
+| — before batching the sample reprojection | 15.0 s |
 | Cached read | 7.8 ms |
+
+Most of the original 15 s was not 3DEP. Each sample point was reprojected on its own, and
+building a GDAL transformation costs ~14 ms. Reprojecting all samples in one call cut the
+computation to 3.8 s with identical results.
 
 Profiles are therefore computed on first request and cached, rather than precomputed for all
 452 routes. Precomputing would mean several thousand 3DEP requests at once.

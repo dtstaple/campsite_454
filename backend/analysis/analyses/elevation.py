@@ -113,12 +113,13 @@ def sample_points(line: LineString, spacing_m: float) -> tuple[list[float], list
     distances = [i * spacing_m for i in range(int(length // spacing_m) + 1)]
     if length - distances[-1] > spacing_m / 4:
         distances.append(length)
-    points = []
-    for distance in distances:
-        point = line.interpolate(distance)
-        point.srid = METRIC_SRID
-        point.transform(4326)
-        points.append(point)
+    # Interpolate in metres, then reproject every sample in one call: building a GDAL
+    # transformation costs ~14 ms, which per point was most of a profile's run time.
+    coords = [line.interpolate(d).coords for d in distances]
+    # A LineString needs two points; pad a single sample, and only read back what we have.
+    projected = LineString(coords if len(coords) > 1 else coords * 2, srid=METRIC_SRID)
+    projected.transform(4326)
+    points = [Point(x, y, srid=4326) for x, y in projected.coords[: len(distances)]]
     return distances, points
 
 
