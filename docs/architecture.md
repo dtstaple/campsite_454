@@ -120,6 +120,7 @@ Four tables hold the reference geography that gets fetched and kept:
 |---|---|---|
 | `Campsite` | Individual campsites | A single point |
 | `Trail` | Trail segments | One or more lines |
+| `TrailRoute` | Named hiking routes: ordered groups of trail segments (TM05-58) | One or more lines |
 | `WaterFeature` | Streams, rivers, lakes, wetlands | Lines *or* shapes |
 | `PublicLand` | Land ownership and camping legality | One or more shapes |
 
