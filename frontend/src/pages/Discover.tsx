@@ -26,6 +26,8 @@ import { addMapLayers, addMapSources, CLICKABLE, CLICKABLE_IDS, EMPTY, LAYERS } 
 import { popupFor } from "../map/popups";
 import { Link } from "react-router-dom";
 import { useSession } from "../session";
+import ModeSwitcher from "../modes/ModeSwitcher";
+import { DEFAULT_MODE_ID, modeById, type ModeId } from "../modes/modes";
 import {
   loadSaved,
   save as saveCampsite,
@@ -65,12 +67,19 @@ export default function Discover() {
   const inFlight = useRef<AbortController | null>(null);
   const debounce = useRef<number | undefined>(undefined);
 
-  const [enabled, setEnabled] = useState<Record<LayerName, boolean>>({
-    "public-land": true,
-    water: true,
-    trails: true,
-    campsites: true,
-  });
+  // The activity mode decides which layers start on. Switching mode resets the toggles
+  // to that mode's defaults; toggling a layer afterwards is the user's call until the
+  // next switch.
+  const [modeId, setModeId] = useState<ModeId>(DEFAULT_MODE_ID);
+  const mode = modeById(modeId);
+  const [enabled, setEnabled] = useState<Record<LayerName, boolean>>(() => ({
+    ...modeById(DEFAULT_MODE_ID).layers,
+  }));
+
+  const switchMode = useCallback((id: ModeId) => {
+    setModeId(id);
+    setEnabled({ ...modeById(id).layers });
+  }, []);
   // refresh() reads the toggles through a ref so it can stay a stable callback.
   // Synced in an effect rather than during render, and declared before the effect
   // that calls refresh() so the ref is already current when that one runs.
@@ -351,6 +360,9 @@ export default function Discover() {
     <div className="app">
       <div ref={mapContainer} className="map" />
 
+      <div className="overlay-left">
+      <ModeSwitcher active={mode.id} onChange={switchMode} />
+
       <div className="panel">
         {/* Data sits in a few regions hundreds of miles apart, so free panning mostly
             finds empty map. These jump straight to the places that have something. */}
@@ -409,6 +421,7 @@ export default function Discover() {
         ) : (
           fromCache && <div className="status cached">Cached · zoom {zoom.toFixed(1)}</div>
         )}
+      </div>
       </div>
 
       {session && (

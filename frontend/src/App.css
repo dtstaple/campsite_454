@@ -26,7 +26,71 @@
   inset: 0;
 }
 
+/* --- floating chrome, top left: mode switcher above the layer panel --------- */
+
+.overlay-left {
+  position: absolute;
+  top: var(--space-md);
+  left: var(--space-md);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-sm);
+}
+
+.mode-switcher {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-float);
+}
+
+.mode-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-md);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+  transition:
+    color var(--transition),
+    background-color var(--transition);
+}
+
+.mode-button:hover {
+  color: var(--text-primary);
+}
+
+.mode-button:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.mode-button.is-active {
+  background: var(--bg-raised);
+  color: var(--accent);
+}
+
+.mode-icon {
+  flex: none;
+}
+
 /* --- layer panel ------------------------------------------------------------ */
+
+/* Inside the left column the panel flows under the switcher instead of floating. */
+.overlay-left .panel {
+  position: static;
+}
 
 .panel {
   position: absolute;
