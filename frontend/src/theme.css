@@ -108,6 +108,10 @@
   --map-route-casing: #15130f;
   --map-route-casing-width: 7;
 
+  /* 3D trail view (TM05-62): terrain exaggeration. Modest on purpose -- the Adirondacks
+   * and Whites are steep enough that much above 1.5 turns ridges into spikes. */
+  --map-terrain-exaggeration: 1.4;
+
   /* Elevation chart. The fill sits back so the line and the cursor carry the reading. */
   --chart-line: var(--map-route-selected);
   --chart-fill: rgba(255, 209, 102, 0.14);
