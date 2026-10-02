@@ -100,11 +100,11 @@ The basemap is Stadia Alidade Smooth Dark (keyless on localhost), overridable wi
 | Q3 | `cacheStats()` and `clearCache()` are exported but have no callers | `api.ts` | **safe to fix now** |
 | Q4 | `Discover.tsx` is 480 lines and renders four separate panels inline (regions, layers, saved, banners) | `pages/Discover.tsx` | **safe to fix now** (done as part of Phase 3b — the layers sidebar is being replaced anyway) |
 | Q5 | `<title>frontend</title>` — the browser tab says "frontend" | `index.html` | **safe to fix now** (visible change, so done in Phase 3d rather than as "cleanup") |
-| Q6 | Header docstring in `layers.ts` is two drafts pasted together: the first paragraph says "Extracted from App.tsx … fed by App's refresh()", the second says the same thing about Discover.tsx. The first is stale | `map/layers.ts` | touches a protected file |
-| Q7 | `isort.known-first-party` lists `api` and `config` twice; ruff warns "One or more modules are part of multiple import sections, including: `api`" on every run | `pyproject.toml` | touches a protected file (Bleron, TM05-35) |
+| Q6 | Header docstring in `layers.ts` is two drafts pasted together: the first paragraph says "Extracted from App.tsx … fed by App's refresh()", the second says the same thing about Discover.tsx. The first is stale | `map/layers.ts` | touches a protected file — **fixed in follow-up** |
+| Q7 | `isort.known-first-party` lists `api` and `config` twice; ruff warns "One or more modules are part of multiple import sections, including: `api`" on every run | `pyproject.toml` | touches a protected file (Bleron, TM05-35) — **fixed in follow-up** |
 | Q8 | `source?.setData(collection as unknown as GeoJsonFeatureCollection)` — a double cast because `api.ts` declares its own `FeatureCollection` that adds `metadata`. Making the API type `extends GeoJSON.FeatureCollection` would remove the cast | `pages/Discover.tsx`, `api.ts` | safe, but deferred: it is a type refactor across files a teammate is likely to touch in TM05-47/48; noted, not changed |
 | Q9 | Two oxlint `set-state-in-effect` warnings in `Discover.tsx` (`setSignInPrompt(false)` inside the session effect; `refresh()` on `enabled` change), plus `only-export-components` in `session.tsx` | frontend | safe in principle, but fixing either changes render timing, which the brief says cleanup must not do. Left alone and reported |
-| Q10 | The campsite save button is built with `document.createElement` inside the map effect, with refs mirroring React state so it doesn't go stale. It works, but it is the most fragile code in the frontend. A React portal into the popup would remove the refs | `pages/Discover.tsx` + `map/popups.ts` | touches a protected file (popups) |
+| Q10 | The campsite save button is built with `document.createElement` inside the map effect, with refs mirroring React state so it doesn't go stale. It works, but it is the most fragile code in the frontend. A React portal into the popup would remove the refs | `pages/Discover.tsx` + `map/popups.ts` | touches a protected file (popups) — **fixed in follow-up** |
 | Q11 | `api.ts` hardcodes `http://127.0.0.1:8000` as the fallback API base. That's fine for dev, but it should be documented next to `VITE_MAP_STYLE_URL` in `.env.example` | `api.ts` | note only |
 | Q12 | The `prefers-reduced-motion` block in `App.css` has a pasted copy of the `.status.cached` rule inside it, which is identical to the rule outside it and does nothing | `App.css` | **safe to fix now** |
 
@@ -212,8 +212,8 @@ run (see Q9).
 | 2 | Removed the unused `cacheStats`/`clearCache` exports (Q3) | `… remove the unused cacheStats …` |
 | 2 | Removed the duplicated rule in the reduced-motion block (Q12) | `… remove a duplicated rule …` |
 | 3a | `frontend/src/modes/`: `modes.ts` (typed config), `icons.tsx` (original SVGs), `ModeSwitcher.tsx`. Hiking is the default; Camping is enabled; Backcountry Ski is `enabled: false` and never rendered | `… add activity modes …` |
-| 3b | `components/LayerPanel.tsx` (floating, collapsible, mode-ordered, primary layer emphasised, quiet counts, regions inside), `components/SavedPanel.tsx` (extracted), `modes/visibility.ts` | `… replace the map sidebar …` |
-| 3c | `map/terrain.ts`: hillshade from a keyless raster-dem source, a Terrain shading toggle, `--map-hillshade-*` tokens | `… add terrain hillshade …` |
+| 3b | `components/LayerPanel.tsx` (floating, collapsible, mode-ordered, primary layer emphasised, quiet counts, regions inside), `components/SavedPanel.tsx` (extracted), `modes/visibility.ts` (later folded into `layers.ts`/`modes.ts`) | `… replace the map sidebar …` |
+| 3c | `map/terrain.ts` (later moved into `layers.ts` as `addTerrainLayers()`): hillshade from a keyless raster-dem source, a Terrain shading toggle, `--map-hillshade-*` tokens | `… add terrain hillshade …` |
 | 3d | Slim header on `/discover`; zoom and compass in a floating group at the bottom right; `--shadow-panel` and `--bg-floating` elevation on all chrome; the zoom-in notice is now a quiet pill; the tab title says CampSite | `… polish the map shell …` |
 | 3e | Landing copy reframed ("Backcountry exploration" / "Find where to spend the night." / "Explore the map"), same structure | `… reframe the landing copy …` |
 
@@ -223,7 +223,7 @@ run (see Q9).
 
 - **URL:** `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png` (AWS Terrain
   Tiles / Tilezen Joerd, AWS Open Data registry). No API key.
-- **Encoding:** `"terrarium"`, set explicitly in `map/terrain.ts`. `tileSize: 256`, `maxzoom: 15`.
+- **Encoding:** `"terrarium"`, set explicitly in `addTerrainLayers()` in `map/layers.ts`. `tileSize: 256`, `maxzoom: 15`.
 - **Verification (curl, 2026-10-01):** three tiles, all `200 image/png`, all 256×256 8-bit RGB
   PNGs, all with different MD5s, so none is a placeholder. I decoded them with the Terrarium
   formula `(R·256 + G + B/256) − 32768` to confirm the encoding:
@@ -244,7 +244,7 @@ run (see Q9).
   dependency the brief says to avoid unless clearly necessary. The `modes` config is checked by
   `tsc` in `npm run build`, but `orderedLayers`/`modeById` would be the first things to test if
   a runner is added.
-- **Q8, Q9 and Q10 were not fixed.** They're either type refactors across shared files or
+- **Q8 and Q9 were not fixed** (Q10 was, in the follow-up). They're either type refactors across shared files or
   render-timing changes, which a behaviour-neutral cleanup shouldn't make.
 - **No new dependencies.** None were added.
 
@@ -280,7 +280,7 @@ run (see Q9).
 9. **The landing lede now names the White Mountains alongside the Adirondacks,** because
    `regions.ts` lists both as ingested.
 
-### Proposed changes to protected files (not made)
+### Proposed changes to protected files (not made overnight; see the follow-up below)
 
 - **`frontend/src/map/layers.ts`** (Sahaj):
   - Delete the stale first paragraph of the header docstring (Q6).
@@ -326,3 +326,41 @@ run (see Q9).
     two may sit close together at the bottom; check they don't overlap.
 11. **Popups and the Save button still work** on campsites, trails and water.
 12. **Landing page copy,** and the "Explore the map" button.
+
+---
+
+## Follow-up: protected-file proposals implemented
+
+After the overnight run, Davis asked for the proposals above to be implemented. All were run
+through the same gate before each commit, and it passed every time.
+
+| Proposal | Done | Commit subject |
+|---|---|---|
+| `pyproject.toml`: deduplicate `known-first-party` (Q7) | Yes. The ruff "multiple import sections" warning is gone | `… deduplicate known-first-party …` |
+| `layers.ts`: drop the stale docstring paragraph (Q6) | Yes | `… move layer ordering into layers.ts …` |
+| `layers.ts`: move `orderedLayers()` beside `LAYERS` | Yes. `primaryLayer()` moved into `modes.ts`; `modes/visibility.ts` deleted | same |
+| `layers.ts`: register the hillshade there | Yes, as `addTerrainLayers()` / `setHillshadeVisible()`; `map/terrain.ts` deleted. Same URL, `terrarium` encoding and insertion point | `… register the terrain hillshade in layers.ts` |
+| `popups.ts`: save button as a React portal (Q10) | Yes. `popupContent()` returns the node plus a campsite actions slot; `components/SaveButton.tsx` is portalled into it; `sessionRef`/`savedRef` and the hand-built listener are gone; `popupFor()` is internal | `… render the popup save button through a React portal` |
+| Popups on the floating surface tokens | Yes | `… match popups to the floating chrome …` |
+| `layers.ts`: `setModeEmphasis()` for per-mode paint | **No.** The proposal said it would only be needed for per-mode paint, and nothing uses that yet; adding it would be dead code | — |
+| `backend/api/` trail endpoints | **No.** Those are Sprint 5 roadmap stories for Abdulrahman Shaalan, not cleanups | — |
+
+### Browser verification (headless Chrome over CDP, against the dev server and live backend)
+
+- `/discover` opens in Hiking: Campsites unchecked; Trails, Water, Public land and Terrain
+  shading checked.
+- Switching to Camping: Campsites becomes checked and is listed first; counts load (151
+  campsites, 2,043 trails, 2,500 / 9,668 water).
+- Only Hiking and Camping are rendered.
+- The hillshade renders as real relief, not noise: ridges are lit from the northwest and sit
+  under the basemap labels. The attribution shows the terrain credit.
+- Clicking Lake Durant Campground opens a popup with the portalled **Save** button. Clicking
+  it while signed out shows "Sign in to save campsites". Closing the popup removes the
+  button (0 left in the DOM).
+- The screenshot showed the zoom-in pill cut off with an ellipsis and touching the
+  attribution strip. Both are fixed: the pill now sizes to its content and sits higher, and
+  the sign-in banner sits above it.
+
+**Not verified:** the signed-in save/unsave round trip. It would have meant creating a test
+account in your database. Sign in and save one campsite from a popup and from the Saved panel
+to confirm it.
