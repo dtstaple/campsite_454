@@ -1,0 +1,43 @@
+/* Basemap toggle (TM05-65): bottom left, clear of the layer panel and the attribution. */
+
+.basemap-toggle {
+  position: absolute;
+  left: var(--space-md);
+  bottom: calc(var(--space-xl) * 1.5);
+  z-index: 1;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--bg-floating);
+  backdrop-filter: blur(var(--blur-floating));
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-panel);
+}
+
+.basemap-button {
+  padding: var(--space-xs) var(--space-md);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+  transition: color var(--transition);
+}
+
+.basemap-button:hover {
+  color: var(--text-primary);
+}
+
+.basemap-button:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.basemap-button.is-active {
+  background: var(--bg-raised);
+  color: var(--accent);
+}

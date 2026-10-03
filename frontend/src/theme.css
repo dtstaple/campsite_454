@@ -97,6 +97,14 @@
   --map-hillshade-accent: rgba(0, 0, 0, 0.3);
   --map-hillshade-exaggeration: 0.45;
 
+  /* Satellite basemap (TM05-65). Imagery is dimmed and slightly desaturated so the
+   * linework sits on it, and trails and streams get a dark casing only over imagery. */
+  --map-imagery-brightness-max: 0.85;
+  --map-imagery-saturation: -0.1;
+  --map-casing-imagery: #15130f;
+  --map-casing-imagery-opacity: 0.75;
+  --map-casing-imagery-extra-width: 2.4;
+
   /* Named routes (TM05-61). Routes are context until one is chosen, so the default line is
    * thin and translucent beneath the trail linework; the selected route is the accent,
    * wide, with a dark casing so it reads over the hillshade and the orange trails. */
