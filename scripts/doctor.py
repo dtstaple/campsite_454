@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import os
 import platform
+import re
 import shutil
 import socket
 import subprocess
@@ -197,10 +198,12 @@ def check_ports(env: dict[str, str]) -> None:
             continue
         if port == db_port and f":{port}" in mapped:
             report("PASS", f"port {port}", f"in use by {name}")
-        elif port == 8000 and "runserver" in owner:
-            report("PASS", f"port {port}", "in use by a Django runserver (ours)")
-        elif port == 5173 and "vite" in owner:
-            report("PASS", f"port {port}", "in use by Vite (ours)")
+        elif (
+            port in (8000, 5173)
+            and str(ROOT) in owner
+            and ("runserver" in owner or "vite" in owner)
+        ):
+            report("PASS", f"port {port}", f"in use by this checkout's {ours}")
         else:
             fix = (
                 "set POSTGRES_PORT to a free port (e.g. 5434) in .env, use it in DATABASE_URL, "
@@ -212,19 +215,35 @@ def check_ports(env: dict[str, str]) -> None:
 
 
 def port_owner(port: int) -> str | None:
-    """The command line holding a TCP port, '' if busy but unknown, None if free."""
+    """Who holds a TCP port, as 'command [in <cwd>]'; None if the port is free."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
         probe.settimeout(0.5)
         if probe.connect_ex(("127.0.0.1", port)) != 0:
             return None
     if shutil.which("lsof"):
         pids = run(["lsof", "-t", f"-iTCP:{port}", "-sTCP:LISTEN"]).stdout.split()
-        commands = [run(["ps", "-o", "command=", "-p", pid]).stdout.strip() for pid in pids]
-        return " | ".join(c for c in commands if c) or "unknown process (maybe Docker)"
-    if shutil.which("ss"):
-        line = run(["ss", "-ltnp", f"sport = :{port}"]).stdout.strip().splitlines()[-1:]
-        return line[0] if line else "unknown process"
-    return "unknown process"
+    elif shutil.which("ss"):
+        pids = re.findall(r"pid=(\d+)", run(["ss", "-ltnp", f"sport = :{port}"]).stdout)
+    else:
+        pids = []
+    owners = []
+    for pid in dict.fromkeys(pids):
+        command = run(["ps", "-o", "command=", "-p", pid]).stdout.strip()
+        if command:
+            owners.append(f"{command} [in {process_cwd(pid)}]")
+    # Docker Desktop's port proxy often runs as another user, invisible to lsof.
+    return " | ".join(owners) or "unknown process (maybe Docker)"
+
+
+def process_cwd(pid: str) -> str:
+    try:
+        return os.readlink(f"/proc/{pid}/cwd")  # Linux / WSL
+    except OSError:
+        pass
+    for line in run(["lsof", "-a", "-p", pid, "-d", "cwd", "-Fn"]).stdout.splitlines():
+        if line.startswith("n"):
+            return line[1:]
+    return "?"
 
 
 def check_django(env: dict[str, str], db_up: bool) -> None:
