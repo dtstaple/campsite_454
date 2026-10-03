@@ -69,7 +69,7 @@ gh pr checks 42 --watch && gh pr merge 42 --merge
 gh pr checks 43 --watch && gh pr merge 43 --merge
 gh pr checks 44 --watch && gh pr merge 44 --merge
 gh pr checks 45 --watch && gh pr merge 45 --merge
-gh pr checks <report PR> --watch && gh pr merge <report PR> --merge
+gh pr checks 46 --watch && gh pr merge 46 --merge
 ```
 
 ---
