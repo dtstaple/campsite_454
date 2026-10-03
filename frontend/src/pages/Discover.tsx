@@ -40,6 +40,7 @@ import ModeSwitcher from "../modes/ModeSwitcher";
 import LayerPanel from "../components/LayerPanel";
 import SavedPanel from "../components/SavedPanel";
 import SaveButton from "../components/SaveButton";
+import CampsiteDetail from "../campsite/CampsiteDetail";
 import TrailInsight from "../trails/TrailInsight";
 import BasemapToggle from "../basemap/BasemapToggle";
 import SatelliteLayers from "../basemap/SatelliteLayers";
@@ -142,6 +143,8 @@ export default function Discover() {
   // Starts empty and is filled by the effect below, because the list now comes from the
   // server rather than from this browser's storage.
   const [saved, setSaved] = useState<SavedCampsite[]>([]);
+  // The campsite whose detail panel is open (TM05-66), by source_id.
+  const [campsiteId, setCampsiteId] = useState<string | null>(null);
 
   // The campsite whose popup is open, and the slot in that popup the save button is
   // portalled into. The map's click handler only records this; the button itself is
@@ -335,6 +338,12 @@ export default function Discover() {
       if (!hit) return;
       const { layer, feature } = hit;
 
+      // A campsite opens its detail panel (TM05-66) instead of a popup.
+      if (layer === "campsites" && sourceIdOf(feature)) {
+        setCampsiteId(sourceIdOf(feature));
+        return;
+      }
+
       // setDOMContent rather than setHTML, so the campsite actions slot is a node we
       // already hold rather than one to re-find once the popup exists.
       const { element, actions } = popupContent(layer, feature.properties);
@@ -451,7 +460,27 @@ export default function Discover() {
         </div>
       )}
 
-      <TrailInsight map={mapInstance} />
+      <TrailInsight map={mapInstance} onOpenCampsite={setCampsiteId} />
+      <CampsiteDetail
+        map={mapInstance}
+        campsiteId={campsiteId}
+        onClose={() => setCampsiteId(null)}
+        renderSave={(detail) => {
+          const campsite = {
+            id: detail.id,
+            name: detail.display_name ?? "Campsite",
+            lon: detail.lon,
+            lat: detail.lat,
+          };
+          return (
+            <SaveButton
+              key={detail.id}
+              isSaved={saved.some((entry) => entry.id === detail.id)}
+              onToggle={() => toggleSaved(campsite)}
+            />
+          );
+        }}
+      />
       <SatelliteLayers map={mapInstance} basemap={basemap} terrain={terrain} />
       <BasemapToggle value={basemap} onChange={setBasemap} />
     </div>
