@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     "devdata",
     "scoring",
     "analysis",
+    "enrichment",
 ]
 
 MIDDLEWARE = [

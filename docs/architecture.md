@@ -359,8 +359,11 @@ An analysis is a subclass of `analysis.base.Analysis`, the counterpart of `Sourc
 | You declare | name, model, source SRID | `name`, `version`, `ttl`, `grid_degrees` |
 | Framework does | reprojection, validation, upsert, run record | cache key, hit/miss, expiry, provenance, purge |
 
-Callers use one method, `run(geom, params)`, which returns an `Outcome` (`value`,
-`provenance`, `cached`, `key`, `computed_at`, `expires_at`). If a fresh answer exists it is
+Callers use `run(geom, params)`, which returns an `Outcome` (`value`, `provenance`,
+`cached`, `key`, `computed_at`, `expires_at`). For many geometries, `run_many(geoms,
+params)` does one cache lookup and calls `compute_many()` for the misses; a source that
+can batch (3DEP) overrides it (TM05-64). `canonical_params()` fills in defaults so
+equivalent requests share one key. If a fresh answer exists it is
 returned without calling `compute()`. Otherwise `compute()` runs, the answer is stored,
 and expired answers of that analysis are purged. A `compute()` that raises
 `AnalysisError` stores nothing, so a failure is never cached.
@@ -390,6 +393,7 @@ The parts are also stored as columns (`analysis`, `version`, `geom`, `window_sta
 | Analysis | TTL | Grid | Why |
 |---|---|---|---|
 | `weather` (Open-Meteo) | **1 hour** | 0.05° (~5 km) | Open-Meteo refreshes hourly; its models answer per grid cell anyway (two points 2 km apart came back as the same cell). |
+| `site_terrain` (3DEP, TM05-64) | 1 year | none (exact point; params canonicalised) | Elevation and slope at a campsite; shared by enrichment and the slope factor. See docs/enrichment.md. |
 | `route_profile` (3DEP, TM05-59) | 1 year | none (keyed by route geometry) | Terrain does not change; a changed route geometry is a new key. See docs/elevation.md. |
 | slope / aspect (3DEP, planned) | 1 year | none | Terrain does not change; a year bounds how long a bad answer could survive. |
 | land cover / NDVI (Sentinel-2, planned) | 30 days | none | Revisit is ~5 days, but vegetation changes on a seasonal scale. |
