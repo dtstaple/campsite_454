@@ -18,7 +18,8 @@ copy-pasted into four adapters:
       duplicates
     - reprojection to EPSG:4326 from the adapter's declared source_srid, so NHD (4269)
       and PAD-US (5070) adapters declare a number instead of reimplementing transform
-    - geometry validation, single-to-multi promotion, and a clear error when a source
+    - geometry validation and repair (ST_MakeValid, TM05-57), single-to-multi promotion,
+      and a clear error when a source
       hands back a geometry the target column cannot hold
 
 An adapter therefore declares four attributes and writes two methods. Adding a source
@@ -30,7 +31,7 @@ from collections.abc import Iterable, Iterator
 from typing import Any
 
 from django.contrib.gis.geos import GEOSGeometry, MultiLineString, MultiPoint, MultiPolygon
-from django.db import transaction
+from django.db import connection, transaction
 from django.utils import timezone
 
 from geodata.models import IngestRun
@@ -41,6 +42,36 @@ MAX_LOGGED_SKIPS = 20
 
 # Rows per bulk_create. Keeps peak memory flat regardless of how much a source returns.
 DEFAULT_BATCH_SIZE = 1000
+
+# ST_CollectionExtract type codes, by target column type. After ST_MakeValid a polygon
+# can come back as a GeometryCollection holding the repaired polygons plus stray lines or
+# points where it collapsed; extracting the target's own dimension keeps what the column
+# can hold and drops the rest.
+_EXTRACT_TYPE = {
+    "POINT": 1,
+    "MULTIPOINT": 1,
+    "LINESTRING": 2,
+    "MULTILINESTRING": 2,
+    "POLYGON": 3,
+    "MULTIPOLYGON": 3,
+}
+
+# Repair in PostGIS rather than in local GEOS: the database's GEOS is what validates and
+# stores the geometry, so repairing with the same library means "valid after repair" is
+# judged by the same rules that will apply to the stored row. For a column of any type
+# (water), a collection keeps its highest dimension: ST_Dimension of a collection is the
+# largest of its parts, and ST_CollectionExtract's codes are dimension + 1.
+_REPAIR_SQL = """
+WITH fixed AS (SELECT ST_MakeValid(%s::geometry) AS g)
+SELECT ST_AsHEXEWKB(
+    CASE
+        WHEN %s > 0 THEN ST_CollectionExtract(g, %s)
+        WHEN GeometryType(g) = 'GEOMETRYCOLLECTION'
+            THEN ST_CollectionExtract(g, ST_Dimension(g) + 1)
+        ELSE g
+    END
+) FROM fixed
+"""
 
 # Sources are inconsistent about single vs multi geometry. A single geometry fits inside
 # a Multi container, so promote rather than reject; the reverse is a genuine error.
@@ -175,6 +206,24 @@ class SourceAdapter(ABC):
             "whose geometry column matches."
         )
 
+    def repair_geometry(self, geom: GEOSGeometry) -> GEOSGeometry | None:
+        """Repair an invalid geometry with ST_MakeValid, keeping the target type (TM05-57).
+
+        Returns None when nothing usable survives the repair (an empty result, e.g. a
+        polygon that collapses to a line). The result still goes through
+        prepare_geometry(), so a repaired single polygon is promoted like any other.
+        """
+        code = _EXTRACT_TYPE.get(self.target_geom_type(), 0)
+        with connection.cursor() as cursor:
+            cursor.execute(_REPAIR_SQL, [geom.hexewkb.decode(), code, code])
+            row = cursor.fetchone()
+        if not row or row[0] is None:
+            return None
+        repaired = GEOSGeometry(row[0])
+        if repaired.empty:
+            return None
+        return self.prepare_geometry(repaired)
+
     def iter_areas(self, aoi: AreaOfInterest) -> Iterator[AreaOfInterest]:
         """The areas fetch() will be called with: just `aoi`, or its tiles.
 
@@ -241,6 +290,8 @@ class SourceAdapter(ABC):
         """
         written = 0
         skipped: list[str] = []
+        # Read by run() for the provenance notes: what was repaired, and why.
+        self.repaired: list[str] = []
         batch: list = []
         batch_ids: set = set()
 
@@ -258,8 +309,16 @@ class SourceAdapter(ABC):
 
             prepared = self.prepare_geometry(geom)
             if not prepared.valid:
-                skipped.append(f"{source_id}: invalid geometry ({prepared.valid_reason})")
-                continue
+                reason = prepared.valid_reason
+                try:
+                    repaired = self.repair_geometry(prepared)
+                except GeometryTypeMismatch:
+                    repaired = None
+                if repaired is None or not repaired.valid:
+                    skipped.append(f"{source_id}: invalid geometry ({reason}), not repairable")
+                    continue
+                self.repaired.append(f"{source_id}: {reason}")
+                prepared = repaired
 
             # Postgres refuses two rows with the same conflict target inside one
             # INSERT ... ON CONFLICT ("cannot affect row a second time"), so a repeat
@@ -318,12 +377,17 @@ class SourceAdapter(ABC):
         run.record_count = written
         run.finished_at = timezone.now()
         run.status = IngestRun.Status.PARTIAL if skipped else IngestRun.Status.SUCCESS
-        if skipped:
-            shown = skipped[:MAX_LOGGED_SKIPS]
-            more = len(skipped) - len(shown)
-            run.notes = f"Skipped {len(skipped)} record(s):\n" + "\n".join(shown)
+        notes = []
+        repaired = getattr(self, "repaired", [])
+        for label, items in (("Skipped", skipped), ("Repaired with ST_MakeValid", repaired)):
+            if not items:
+                continue
+            shown = items[:MAX_LOGGED_SKIPS]
+            more = len(items) - len(shown)
+            notes.append(f"{label} {len(items)} record(s):\n" + "\n".join(shown))
             if more:
-                run.notes += f"\n... and {more} more"
+                notes[-1] += f"\n... and {more} more"
+        run.notes = "\n\n".join(notes)
         run.save(update_fields=["record_count", "finished_at", "status", "notes"])
         return run
 

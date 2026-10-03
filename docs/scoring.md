@@ -282,16 +282,22 @@ flow class would replace three.
 
 Score distribution over all 1,320 campsites (model 1.0.0): min 0, median 56, max 98.
 
-### Known limitation: PAD-US coverage
+### PAD-US coverage (fixed in TM05-57)
 
-Only **199 of 1,320** ingested campsites fall inside any PAD-US parcel, so most sites score
-the 15-point "not public" legal value — including places that are plainly public land, such
-as Marcy Dam in the High Peaks Wilderness. The cause is in ingestion, not scoring: the last
-PAD-US runs are `partial` and skipped 49 parcels as invalid geometry ("Ring
-Self-intersection", "Nested shells"), and the large wilderness and forest units are among
-them. They need repairing with `ST_MakeValid` rather than skipping; that is tracked as its
-own story. Until then, the legal factor is right about the parcels it has and pessimistic
-about the rest.
+Model 1.0.0 shipped with only **199 of 1,320** campsites inside any PAD-US parcel, so most
+sites scored the 15-point "not public" legal value — including Marcy Dam in the High Peaks
+Wilderness. The cause was ingestion: invalid parcels were skipped. TM05-57 repairs them
+with `ST_MakeValid` (docs/pipeline.md), and **1,174 of 1,320** campsites now fall inside a
+parcel. Measured over all 1,320 campsites, same model (1.1.0) and weights:
+
+| | Median | Mean | Stdev | Min / max |
+|---|---|---|---|---|
+| Before TM05-57, weather excluded | 56 | 56.3 | 12.55 | 0 / 98 |
+| After TM05-57, weather excluded | 79 | 76.7 | 13.19 | 0 / 99 |
+| Before TM05-57, with live weather | 61 | 61.7 | 11.06 | 0 / 98 |
+| After TM05-57, with live weather | 81 | 79.0 | 11.57 | 0 / 98 |
+
+The weather-excluded rows are the fair comparison; the forecast changes hourly.
 
 ### Adding a factor
 

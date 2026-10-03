@@ -41,11 +41,8 @@ VALID_RING = Polygon(
     ((-75.0, 43.0), (-74.0, 43.0), (-74.0, 44.0), (-75.0, 44.0), (-75.0, 43.0)),
     srid=4326,
 )
-# Self-intersecting ring: right geometry type, invalid geometry.
-BOWTIE = Polygon(
-    ((-75.0, 43.0), (-74.0, 44.0), (-74.0, 43.0), (-75.0, 44.0), (-75.0, 43.0)),
-    srid=4326,
-)
+# Collinear ring: invalid, and nothing polygonal survives ST_MakeValid.
+COLLAPSED = Polygon(((-75.0, 43.0), (-74.0, 43.0), (-73.0, 43.0), (-75.0, 43.0)), srid=4326)
 
 
 class FakeCampsiteAdapter(SourceAdapter):
@@ -251,7 +248,11 @@ def test_wrong_geometry_type_fails_loudly_and_names_both_types(clean_registry):
     assert PublicLand.objects.count() == 0
 
 
-def test_invalid_geometry_is_skipped_and_the_run_is_marked_partial(clean_registry):
+def test_unrepairable_geometry_is_skipped_and_the_run_is_marked_partial(clean_registry):
+    """Since TM05-57 invalid geometry is repaired first (tests/test_geometry_repair.py).
+    What is still skipped is geometry with nothing left after repair: this ring is
+    collinear, so ST_MakeValid turns it into lines and no polygon survives."""
+
     class MixedQualityAdapter(SourceAdapter):
         name = "mixed"
         source = PublicLand.Source.PADUS
@@ -263,7 +264,7 @@ def test_invalid_geometry_is_skipped_and_the_run_is_marked_partial(clean_registr
         def normalize(self, raw):
             return [
                 {"source_id": "good", "geom": VALID_RING.clone()},
-                {"source_id": "self-intersecting", "geom": BOWTIE.clone()},
+                {"source_id": "collapsed", "geom": COLLAPSED.clone()},
                 {"source_id": "", "geom": VALID_RING.clone()},
                 {"source_id": "no-geometry"},
             ]
@@ -276,7 +277,8 @@ def test_invalid_geometry_is_skipped_and_the_run_is_marked_partial(clean_registr
     assert PublicLand.objects.count() == 1
     assert PublicLand.objects.get().source_id == "good"
 
-    assert "self-intersecting" in run.notes
+    assert "collapsed: invalid geometry (Self-intersection" in run.notes
+    assert "not repairable" in run.notes
     assert "missing source_id" in run.notes
     assert "no-geometry: missing geom" in run.notes
 
