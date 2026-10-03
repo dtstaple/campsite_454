@@ -41,6 +41,9 @@ import LayerPanel from "../components/LayerPanel";
 import SavedPanel from "../components/SavedPanel";
 import SaveButton from "../components/SaveButton";
 import TrailInsight from "../trails/TrailInsight";
+import BasemapToggle from "../basemap/BasemapToggle";
+import SatelliteLayers from "../basemap/SatelliteLayers";
+import { useBasemap } from "../basemap/useBasemap";
 import { isRouteHit } from "../trails/mapLayers";
 import { DEFAULT_MODE_ID, modeById, type ModeId } from "../modes/modes";
 import {
@@ -95,11 +98,16 @@ export default function Discover() {
   // Hillshade is a raster the map fetches itself, so it is shown and hidden in place
   // rather than going through refresh(). The ref lets the once-only load handler read it.
   const [terrain, setTerrain] = useState(() => modeById(DEFAULT_MODE_ID).terrain);
+  // Standard or satellite basemap, remembered across reloads (TM05-65).
+  const [basemap, setBasemap] = useBasemap();
   const terrainRef = useRef(terrain);
   useEffect(() => {
     terrainRef.current = terrain;
-    if (map.current && styleReady.current) setHillshadeVisible(map.current, terrain);
-  }, [terrain]);
+    if (map.current && styleReady.current) {
+      // No hillshade over satellite imagery (TM05-65); SatelliteLayers restores it.
+      setHillshadeVisible(map.current, terrain && basemap !== "satellite");
+    }
+  }, [terrain, basemap]);
 
   const switchMode = useCallback((id: ModeId) => {
     const next = modeById(id);
@@ -444,6 +452,8 @@ export default function Discover() {
       )}
 
       <TrailInsight map={mapInstance} />
+      <SatelliteLayers map={mapInstance} basemap={basemap} terrain={terrain} />
+      <BasemapToggle value={basemap} onChange={setBasemap} />
     </div>
   );
 }
