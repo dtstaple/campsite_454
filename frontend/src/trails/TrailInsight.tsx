@@ -45,9 +45,11 @@ const REDUCED_STEP_MS = 1500;
 
 interface Props {
   map: maplibregl.Map | null;
+  /** Open a campsite's detail panel (TM05-66). Without it, a click just flies there. */
+  onOpenCampsite?: (sourceId: string) => void;
 }
 
-export default function TrailInsight({ map }: Props) {
+export default function TrailInsight({ map, onOpenCampsite }: Props) {
   const [selected, setSelected] = useState<{ osmId: number; name: string } | null>(null);
   const [state, setState] = useState<DetailState | null>(null);
   const [cursorM, setCursorM] = useState<number | null>(null);
@@ -318,9 +320,10 @@ export default function TrailInsight({ map }: Props) {
   const showCampsite = useCallback(
     (site: CampsiteAlong) => {
       setCursorM(site.distance_along_m);
-      map?.flyTo({ center: [site.lon, site.lat], zoom: Math.max(map.getZoom(), 14) });
+      if (onOpenCampsite) onOpenCampsite(site.id);
+      else map?.flyTo({ center: [site.lon, site.lat], zoom: Math.max(map.getZoom(), 14) });
     },
-    [map],
+    [map, onOpenCampsite],
   );
 
   if (!state) return null;

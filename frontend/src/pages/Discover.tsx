@@ -33,13 +33,18 @@ import {
   setHillshadeVisible,
 } from "../map/layers";
 import { popupContent } from "../map/popups";
+import { sourceIdOf, withSourceIds } from "../map/featureIds";
 import { Link } from "react-router-dom";
 import { useSession } from "../session";
 import ModeSwitcher from "../modes/ModeSwitcher";
 import LayerPanel from "../components/LayerPanel";
 import SavedPanel from "../components/SavedPanel";
 import SaveButton from "../components/SaveButton";
+import CampsiteDetail from "../campsite/CampsiteDetail";
 import TrailInsight from "../trails/TrailInsight";
+import BasemapToggle from "../basemap/BasemapToggle";
+import SatelliteLayers from "../basemap/SatelliteLayers";
+import { useBasemap } from "../basemap/useBasemap";
 import { isRouteHit } from "../trails/mapLayers";
 import { DEFAULT_MODE_ID, modeById, type ModeId } from "../modes/modes";
 import {
@@ -94,11 +99,16 @@ export default function Discover() {
   // Hillshade is a raster the map fetches itself, so it is shown and hidden in place
   // rather than going through refresh(). The ref lets the once-only load handler read it.
   const [terrain, setTerrain] = useState(() => modeById(DEFAULT_MODE_ID).terrain);
+  // Standard or satellite basemap, remembered across reloads (TM05-65).
+  const [basemap, setBasemap] = useBasemap();
   const terrainRef = useRef(terrain);
   useEffect(() => {
     terrainRef.current = terrain;
-    if (map.current && styleReady.current) setHillshadeVisible(map.current, terrain);
-  }, [terrain]);
+    if (map.current && styleReady.current) {
+      // No hillshade over satellite imagery (TM05-65); SatelliteLayers restores it.
+      setHillshadeVisible(map.current, terrain && basemap !== "satellite");
+    }
+  }, [terrain, basemap]);
 
   const switchMode = useCallback((id: ModeId) => {
     const next = modeById(id);
@@ -133,6 +143,8 @@ export default function Discover() {
   // Starts empty and is filled by the effect below, because the list now comes from the
   // server rather than from this browser's storage.
   const [saved, setSaved] = useState<SavedCampsite[]>([]);
+  // The campsite whose detail panel is open (TM05-66), by source_id.
+  const [campsiteId, setCampsiteId] = useState<string | null>(null);
 
   // The campsite whose popup is open, and the slot in that popup the save button is
   // portalled into. The map's click handler only records this; the button itself is
@@ -211,7 +223,7 @@ export default function Discover() {
         const source = current.getSource(layer.name) as maplibregl.GeoJSONSource | undefined;
         const collection = data.layers[layer.name];
         if (shown(layer.name) && collection) {
-          source?.setData(collection as unknown as GeoJsonFeatureCollection);
+          source?.setData(withSourceIds(collection as unknown as GeoJsonFeatureCollection));
           setMeta((previous) => ({ ...previous, [layer.name]: collection.metadata }));
         } else {
           source?.setData(EMPTY);
@@ -326,6 +338,12 @@ export default function Discover() {
       if (!hit) return;
       const { layer, feature } = hit;
 
+      // A campsite opens its detail panel (TM05-66) instead of a popup.
+      if (layer === "campsites" && sourceIdOf(feature)) {
+        setCampsiteId(sourceIdOf(feature));
+        return;
+      }
+
       // setDOMContent rather than setHTML, so the campsite actions slot is a node we
       // already hold rather than one to re-find once the popup exists.
       const { element, actions } = popupContent(layer, feature.properties);
@@ -337,7 +355,7 @@ export default function Discover() {
       const campsite: SavedCampsite = {
         // The Feature id is the campsite's source_id, which is what the save endpoint
         // accepts -- see docs/api.md. Sent back unchanged, never parsed.
-        id: String(feature.id ?? ""),
+        id: sourceIdOf(feature),
         name: String(feature.properties?.name || "") || "Unnamed campsite",
         lon: event.lngLat.lng,
         lat: event.lngLat.lat,
@@ -442,7 +460,29 @@ export default function Discover() {
         </div>
       )}
 
-      <TrailInsight map={mapInstance} />
+      <TrailInsight map={mapInstance} onOpenCampsite={setCampsiteId} />
+      <CampsiteDetail
+        map={mapInstance}
+        campsiteId={campsiteId}
+        onClose={() => setCampsiteId(null)}
+        renderSave={(detail) => {
+          const campsite = {
+            id: detail.id,
+            name: detail.display_name ?? "Campsite",
+            lon: detail.lon,
+            lat: detail.lat,
+          };
+          return (
+            <SaveButton
+              key={detail.id}
+              isSaved={saved.some((entry) => entry.id === detail.id)}
+              onToggle={() => toggleSaved(campsite)}
+            />
+          );
+        }}
+      />
+      <SatelliteLayers map={mapInstance} basemap={basemap} terrain={terrain} />
+      <BasemapToggle value={basemap} onChange={setBasemap} />
     </div>
   );
 }

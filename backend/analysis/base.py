@@ -125,6 +125,12 @@ class Analysis(ABC):
     def compute(self, geom: GEOSGeometry, window: Window | None, params: dict) -> Computed:
         """Produce the answer for this geometry and window. Raise AnalysisError on failure."""
 
+    def canonical_params(self, params: dict) -> dict:
+        """The parameters as they are keyed. Override to fill in defaults and normalise
+        types, so {} and {"stencil_m": 10} and {"stencil_m": 10.0} -- the same request --
+        share one cache entry instead of three."""
+        return params
+
     def window_for(self, now: datetime, params: dict) -> Window | None:
         """The time window a request at `now` covers. None for timeless analyses."""
         return None
@@ -132,19 +138,26 @@ class Analysis(ABC):
     def key_for(self, geom: GEOSGeometry, window: Window | None, params: dict) -> str:
         return cache_key(self.name, self.version, geom, window, params)
 
-    def run(self, geom: GEOSGeometry, params: dict | None = None, now: datetime | None = None):
-        """Return the cached answer if fresh, otherwise compute, cache and return it."""
-        params = dict(sorted((params or {}).items()))
-        now = now or timezone.now()
+    def compute_many(
+        self, geoms: list[GEOSGeometry], window: Window | None, params: dict
+    ) -> list[Computed | AnalysisError]:
+        """Compute several answers at once. Override when the source can batch (3DEP
+        takes hundreds of points per request); the default computes one at a time. Return
+        one entry per geometry, in order: a Computed, or the AnalysisError for that one."""
+        results: list[Computed | AnalysisError] = []
+        for geom in geoms:
+            try:
+                results.append(self.compute(geom, window, params))
+            except AnalysisError as error:
+                results.append(error)
+        return results
+
+    def _prepare(self, geom: GEOSGeometry, params: dict, now: datetime):
         geom = canonical_geom(quantize(geom, self.grid_degrees))
         window = self.window_for(now, params)
-        key = self.key_for(geom, window, params)
+        return geom, window, self.key_for(geom, window, params)
 
-        hit = AnalysisResult.objects.filter(key=key, expires_at__gt=now).first()
-        if hit is not None:
-            return Outcome(hit.value, hit.provenance, True, key, hit.computed_at, hit.expires_at)
-
-        computed = self.compute(geom, window, params)
+    def _store(self, geom, window, key, params, computed: Computed, now: datetime) -> Outcome:
         expires = now + self.ttl
         provenance = {
             **computed.provenance,
@@ -168,8 +181,63 @@ class Analysis(ABC):
                 "expires_at": expires,
             },
         )
-        self.purge_expired(now)
         return Outcome(computed.value, provenance, False, key, now, expires)
+
+    @staticmethod
+    def _hit(row: AnalysisResult) -> Outcome:
+        return Outcome(row.value, row.provenance, True, row.key, row.computed_at, row.expires_at)
+
+    def run(self, geom: GEOSGeometry, params: dict | None = None, now: datetime | None = None):
+        """Return the cached answer if fresh, otherwise compute, cache and return it."""
+        params = dict(sorted(self.canonical_params(dict(params or {})).items()))
+        now = now or timezone.now()
+        geom, window, key = self._prepare(geom, params, now)
+
+        hit = AnalysisResult.objects.filter(key=key, expires_at__gt=now).first()
+        if hit is not None:
+            return self._hit(hit)
+
+        computed = self.compute(geom, window, params)
+        outcome = self._store(geom, window, key, params, computed, now)
+        self.purge_expired(now)
+        return outcome
+
+    def run_many(
+        self, geoms: list[GEOSGeometry], params: dict | None = None, now: datetime | None = None
+    ) -> list[Outcome | AnalysisError]:
+        """run() for many geometries: one cache lookup, then compute_many() for the misses.
+
+        Results are in input order; a geometry that could not be computed gets its
+        AnalysisError instead of an Outcome, and nothing is cached for it. Geometries that
+        key the same (e.g. two points in one grid cell) are computed once.
+        """
+        params = dict(sorted(self.canonical_params(dict(params or {})).items()))
+        now = now or timezone.now()
+        prepared = [self._prepare(geom, params, now) for geom in geoms]
+        keys = {key for _, _, key in prepared}
+        hits = {
+            row.key: self._hit(row)
+            for row in AnalysisResult.objects.filter(key__in=keys, expires_at__gt=now)
+        }
+
+        misses: dict[str, tuple] = {}
+        for geom, window, key in prepared:
+            if key not in hits and key not in misses:
+                misses[key] = (geom, window)
+        if misses:
+            # Windows can only differ by geometry for timeless analyses; batch per window.
+            by_window: dict = {}
+            for key, (geom, window) in misses.items():
+                by_window.setdefault(window, []).append((key, geom))
+            for window, items in by_window.items():
+                computed = self.compute_many([geom for _, geom in items], window, params)
+                for (key, geom), result in zip(items, computed, strict=True):
+                    if isinstance(result, AnalysisError):
+                        hits[key] = result
+                    else:
+                        hits[key] = self._store(geom, window, key, params, result, now)
+            self.purge_expired(now)
+        return [hits[key] for _, _, key in prepared]
 
     def purge_expired(self, now: datetime) -> int:
         """Delete this analysis's expired answers. An expired answer is never served, so

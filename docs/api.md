@@ -18,6 +18,7 @@ the Vite dev server on port 5173.
 | `GET /api/water/` | Streams, rivers, lakes, ponds, wetlands — LineStrings and Polygons |
 | `GET /api/public-land/` | Public land parcels and legal access — MultiPolygons |
 | `GET /api/map-data/` | All four at once, for the initial load |
+| `GET /api/campsites/<id>/detail/` | One campsite with its derived facts — see [Campsite detail](#campsite-detail-tm05-64) |
 | `GET /api/routes/` | Named hiking routes in a bbox — see [Named routes](#named-routes-tm05-60) |
 | `GET /api/routes/<osm_id>/` | One route: stats, elevation profile, campsites along it with scores |
 
@@ -168,8 +169,16 @@ takes exactly this string -- see [auth.md](auth.md). Two consequences worth know
   is why a saved campsite is stored against `source_id` and not against a row number.
 
 `id` is the feature's stable source identifier — the OSM way ID for trails, NHD's
-`permanent_identifier` for water, and so on. It is stable across re-ingests, so it is safe
-to use with `map.setFeatureState()`.
+`permanent_identifier` for water, and so on. It is stable across re-ingests.
+
+**MapLibre does not keep it (TM05-63).** MapLibre GeoJSON sources only preserve *numeric*
+feature ids. Every id here is a non-numeric string, so a feature returned by
+`queryRenderedFeatures` or a click comes back with `id` 0. That is what broke saving
+campsites from the map: the popup sent `POST /api/saved-campsites/0/`. The frontend
+therefore copies each feature's `id` into `properties.source_id` before `setData()` and
+reads it back from there (`frontend/src/map/featureIds.ts`). Read `properties.source_id`
+from map features, never `feature.id`. For `setFeatureState()`, use the source's
+`promoteId: "source_id"` rather than the raw id.
 
 ---
 
@@ -350,6 +359,59 @@ Spatial filtering uses the `&&` operator against the GiST index on every geometr
 index.
 
 ---
+
+## Campsite detail (TM05-64)
+
+### `GET /api/campsites/<id>/detail/`
+
+`<id>` is the campsite's `source_id`, the same string the map API puts in each Feature's
+`id` (and, on the map, in `properties.source_id`). It contains a slash
+(`/api/campsites/node/5759412256/detail/`), and the trailing `/detail/` anchors it.
+An unknown id returns 404.
+
+The endpoint is additive: the map layers and TM05-45's scored endpoint are unaffected. It
+serves the facts derived by `enrich_campsites` (docs/enrichment.md).
+- **Unknown facts are `null`,** never placeholder text, so the UI can hide them.
+- **`facts` is `null`** for a campsite that hasn't been enriched yet; today that's
+  everything outside the Adirondacks.
+
+```json
+{
+  "id": "node/5759412256",
+  "source": "osm",
+  "name": null,
+  "display_name": "Campsite near Mud Pond",
+  "display_name_derived": true,
+  "site_type": "primitive",
+  "reservable": null,
+  "lon": -74.232066,
+  "lat": 43.846018,
+  "facts": {
+    "public_land": {"name": "Pine Lake Primitive Area", "manager": "State Department of Conservation",
+                    "designation": "State Conservation Area", "access": "open", "gap_status": "1"},
+    "water": {"name": "Mud Pond", "distance_m": 95.4, "feature_type": "lake", "perennial": true},
+    "trail": {"name": "Gooley Club Road", "distance_m": 273.7, "kind": "way"},
+    "terrain": {"elevation_m": 495.6, "slope_deg": 5.63, "slope_pct": 9.9},
+    "amenities": {"shelter_kind": "tent site", "osm_tags": {"operator": "NY DEC", "tents": "yes"}},
+    "method_version": "1",
+    "computed_at": "2026-10-02T23:56:32.187176+00:00"
+  }
+}
+```
+
+**Field notes:**
+- **`name`** is the source's own name; `null` when the source had none.
+- **`display_name`** is what to show. When `display_name_derived` is `true`, style it as
+  derived (e.g. italic) and don't present it as the site's real name.
+- **`public_land`, `water`, `trail`, `terrain`** are each `null` when unknown: outside every
+  parcel, nothing named within 5 km, or 3DEP unavailable.
+- **`trail.kind`** is `route` for a named hiking route (TM05-58) or `way` for a named OSM
+  trail segment.
+- **`amenities.osm_tags`** is an object of OSM tag → value (empty for non-OSM sites), and
+  `shelter_kind` is `lean-to`, `tent site`, or `null`.
+
+**Measured:** median **1.3 ms**, p95 1.5 ms over 50 enriched campsites (local, warm), with
+~700-byte responses.
 
 ## Named routes (TM05-60)
 
