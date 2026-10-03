@@ -22,8 +22,9 @@ https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/til
 
 - **Tile order is `{z}/{y}/{x}`**: row before column, unlike most XYZ services.
 - **Real JPEG tiles through zoom 19** at every point sampled: Marcy, Lake Placid, a remote
-  interior point, and 20 random points across the Adirondack box. That's 63 tiles from
-  zooms 13–19, all `200 image/jpeg` with distinct content.
+  interior point (zooms 13–19, 21 tiles, all different), and 20 random points across the
+  Adirondack box (zooms 18 and 19, 40 tiles, none of them the placeholder). That's 61
+  real `200 image/jpeg` tiles.
 - **From zoom 20 up, a placeholder.** Esri answers `200 image/jpeg` with the same
   2,521-byte grey tile reading "Map data not yet available" (MD5 `f27d9de7…`) at all three
   fixed points. The status alone can't detect it, so the source sets **`maxzoom: 19`** and
