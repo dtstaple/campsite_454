@@ -1,0 +1,158 @@
+/*
+ * Campsite panel (TM05-66). Shares the trail panel's frame (.trail-panel in
+ * trails/trails.css) and adds what a campsite needs. Every value comes from theme tokens.
+ */
+
+/* One detail panel at a time: an open campsite covers the trail it was picked from. */
+.app:has(.campsite-panel) .trail-panel:not(.campsite-panel) {
+  display: none;
+}
+
+.trail-name.is-derived {
+  font-style: italic;
+  font-weight: var(--weight-semibold);
+  color: var(--text-secondary);
+}
+
+.campsite-derived {
+  margin-top: var(--space-xs);
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+}
+
+/* --- satellite inset --- */
+
+.campsite-inset {
+  margin: 0;
+}
+
+.campsite-inset-frame {
+  position: relative;
+  max-width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-raised);
+  pointer-events: none;
+  user-select: none;
+}
+
+.campsite-inset-frame img {
+  position: absolute;
+  max-width: none;
+}
+
+.campsite-inset-pin {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  background: var(--map-campsites);
+  border: 2px solid var(--text-primary);
+  border-radius: 50%;
+  box-shadow: var(--shadow-panel);
+}
+
+.campsite-inset figcaption {
+  margin-top: var(--space-xs);
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+}
+
+/* --- save, and the empty slot reserved for TM05-47 --- */
+
+.campsite-actions .popup-save {
+  margin-top: 0;
+}
+
+/* Empty on purpose; TM05-47 renders the score breakdown here. */
+.campsite-score-slot:empty {
+  display: none;
+}
+
+/* --- facts --- */
+
+.campsite-facts {
+  display: grid;
+  gap: var(--space-sm);
+  margin: 0;
+}
+
+.campsite-row {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: var(--space-sm);
+  align-items: baseline;
+}
+
+.campsite-row dt {
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.campsite-row dd {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--text-base);
+}
+
+.campsite-row a {
+  color: var(--accent);
+}
+
+.campsite-sub {
+  display: block;
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+}
+
+.campsite-coords {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.campsite-coords code {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  user-select: all;
+}
+
+.campsite-copy {
+  padding: 2px var(--space-sm);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.campsite-copy:hover {
+  color: var(--text-primary);
+}
+
+.campsite-description {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+/* --- the selected site on the map --- */
+
+.campsite-selected-marker {
+  width: 18px;
+  height: 18px;
+  background: var(--map-campsites);
+  border: 3px solid var(--text-primary);
+  border-radius: 50%;
+  box-shadow: var(--shadow-panel);
+  pointer-events: none;
+}
