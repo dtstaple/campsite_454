@@ -87,6 +87,8 @@ dump:
 	@ls -lh $(OUT)
 	@echo "Dump written (accounts, tokens, sessions and saved campsites left out)."
 
+# The dump's own `public` schema entry is skipped: PostGIS lives in that schema, so
+# --clean could never drop it, and the schema already exists in every database here.
 restore:
 	@if [ -z "$(DUMP)" ]; then \
 		echo "Usage: make restore DUMP=<path-or-url>"; \
@@ -98,8 +100,12 @@ restore:
 		echo "==> Downloading $(DUMP)"; curl -fL --progress-bar -o "$$file" "$(DUMP)" || exit 1;; \
 	esac; \
 	echo "==> Restoring $$file into $(DB_CONTAINER_NAME) (replaces existing data and local accounts)"; \
-	docker exec -i $(DB_CONTAINER_NAME) pg_restore -U $(POSTGRES_USER) -d $(POSTGRES_DB) \
-		--clean --if-exists --no-owner --exit-on-error < "$$file"
+	docker cp "$$file" $(DB_CONTAINER_NAME):/tmp/restore.dump || exit 1; \
+	docker exec $(DB_CONTAINER_NAME) sh -c '\
+		pg_restore -l /tmp/restore.dump | grep -v -e " SCHEMA - public " -e " COMMENT - SCHEMA public " > /tmp/restore.list && \
+		pg_restore -U $(POSTGRES_USER) -d $(POSTGRES_DB) --clean --if-exists --no-owner \
+			--exit-on-error -L /tmp/restore.list /tmp/restore.dump; \
+		status=$$?; rm -f /tmp/restore.dump /tmp/restore.list; exit $$status'
 	$(VPY) backend/manage.py migrate --no-input
 	@echo "Restored. Accounts are not in dumps: make an admin with"
 	@echo "  $(VPY) backend/manage.py createsuperuser"
