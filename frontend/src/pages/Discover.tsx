@@ -33,6 +33,7 @@ import {
   setHillshadeVisible,
 } from "../map/layers";
 import { popupContent } from "../map/popups";
+import { sourceIdOf, withSourceIds } from "../map/featureIds";
 import { Link } from "react-router-dom";
 import { useSession } from "../session";
 import ModeSwitcher from "../modes/ModeSwitcher";
@@ -219,7 +220,7 @@ export default function Discover() {
         const source = current.getSource(layer.name) as maplibregl.GeoJSONSource | undefined;
         const collection = data.layers[layer.name];
         if (shown(layer.name) && collection) {
-          source?.setData(collection as unknown as GeoJsonFeatureCollection);
+          source?.setData(withSourceIds(collection as unknown as GeoJsonFeatureCollection));
           setMeta((previous) => ({ ...previous, [layer.name]: collection.metadata }));
         } else {
           source?.setData(EMPTY);
@@ -345,7 +346,7 @@ export default function Discover() {
       const campsite: SavedCampsite = {
         // The Feature id is the campsite's source_id, which is what the save endpoint
         // accepts -- see docs/api.md. Sent back unchanged, never parsed.
-        id: String(feature.id ?? ""),
+        id: sourceIdOf(feature),
         name: String(feature.properties?.name || "") || "Unnamed campsite",
         lon: event.lngLat.lng,
         lat: event.lngLat.lat,
