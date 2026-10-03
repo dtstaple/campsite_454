@@ -4,7 +4,7 @@
 # config_digest reported with every score, so cached scores from the old config are
 # recognisably stale. Bump model_version when the *meaning* of a factor changes.
 
-model_version: "1.1.0"
+model_version: "1.2.0"
 
 # Relative weights. They need not sum to 1: the engine renormalises over the factors
 # that could be evaluated, so a factor that is not_available drops out cleanly.
@@ -90,7 +90,17 @@ factors:
     freezing_penalty_max: 30
 
   slope:
-    placeholder: "Slope is not measured yet (planned: USGS 3DEP, Sprint 5)."
+    # Ground slope from 3DEP (TM05-64), a 3x3 stencil 10 m apart around the site.
+    stencil_m: 10
+    # Score by slope in degrees, interpolated linearly between these points. Flat to 3
+    # degrees is ideal (any tent pad); 8 degrees is where a sleeping pad starts sliding;
+    # 15 is a hillside nobody sleeps on; past 20 there is nothing to pitch on.
+    curve:
+      - [0, 100]
+      - [3, 100]
+      - [8, 50]
+      - [15, 10]
+      - [20, 0]
 
   land_cover:
     placeholder: "Land cover is not measured yet (planned: Sentinel-2, Sprint 5)."

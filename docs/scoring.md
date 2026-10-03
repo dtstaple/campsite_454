@@ -18,8 +18,8 @@ empty, it is `null` or `[]` instead, so a consumer never has to test for a missi
 ```json
 {
   "contract": 1,
-  "model_version": "1.1.0",
-  "config_digest": "0a9724fd",
+  "model_version": "1.2.0",
+  "config_digest": "a33b94ce",
   "location": { "lon": -73.9512, "lat": 44.1847 },
   "score": 81,
   "factors": [
@@ -44,15 +44,15 @@ empty, it is `null` or `[]` instead, so a consumer never has to test for a missi
       "explanation": "Perennial stream 71 m away (ideal is about 60 m)."
     },
     {
-      "key": "slope",
-      "label": "Slope",
+      "key": "land_cover",
+      "label": "Land cover",
       "status": "not_available",
       "score": null,
-      "weight": 0.1,
+      "weight": 0.05,
       "effective_weight": 0.0,
       "contribution": 0.0,
       "measurement": null,
-      "explanation": "Slope is not measured yet (planned: USGS 3DEP)."
+      "explanation": "Land cover is not measured yet (planned: Sentinel-2, Sprint 5)."
     }
   ],
   "caps": []
@@ -92,7 +92,7 @@ empty, it is `null` or `[]` instead, so a consumer never has to test for a missi
   within 5 km, not inside any public land parcel). This is real information and it
   *counts*: the factor scores low and keeps its weight.
 - **`not_available`** — the factor could not be evaluated at all: it is a placeholder not
-  built yet (slope, land cover), or its source was unreachable. It is **excluded** from the
+  built yet (land cover), or its source was unreachable (weather, slope). It is **excluded** from the
   total and the remaining weights are renormalised, so a missing source neither drags the
   score to zero nor silently inflates it. Display it as "not available", never as 0.
 
@@ -148,20 +148,21 @@ A weighted mean rather than a weighted sum, so weights are *relative*: they need
 to 1, and a factor that cannot be evaluated drops out without distorting the scale. Factors
 appear in the output in the order of `weights` in `config.yml`.
 
-### Weights (model 1.1.0)
+### Weights (model 1.2.0)
 
 | Factor | Weight | Share today | Why |
 |---|---|---|---|
-| `water` | 0.35 | 35% | The thing a backcountry site most depends on. |
-| `legal` | 0.30 | 30% | Whether you may camp there at all. Also the only factor that can cap. |
-| `trail` | 0.20 | 20% | Reachability. Matters, but a short bushwhack is fine. |
-| `weather` | 0.15 | 15% | Tonight's conditions. Real, but it changes daily and does not make a place better or worse. |
-| `slope` | 0.10 | — | Placeholder; counts once 3DEP lands. |
+| `water` | 0.35 | 32% | The thing a backcountry site most depends on. |
+| `legal` | 0.30 | 27% | Whether you may camp there at all. Also the only factor that can cap. |
+| `trail` | 0.20 | 18% | Reachability. Matters, but a short bushwhack is fine. |
+| `weather` | 0.15 | 14% | Tonight's conditions. Real, but it changes daily and does not make a place better or worse. |
+| `slope` | 0.10 | 9% | Whether there is flat ground to sleep on (TM05-64). |
 | `land_cover` | 0.05 | — | Placeholder; counts once Sentinel-2 lands. |
 
-"Share today" is the effective weight while slope and land cover are `not_available`
-(0.35 / 1.00 and so on). Model 1.0.0 (TM05-43) had no weather; 1.1.0 (TM05-44) added
-it. Change a weight by editing `config.yml`; no code changes, and the
+"Share today" is the effective weight while land cover is `not_available` (0.35 / 1.10
+and so on). Model 1.0.0 (TM05-43) had no weather; 1.1.0 (TM05-44) added it; 1.2.0
+(TM05-64) replaced the slope placeholder with a real factor. Change a weight by editing
+`config.yml`; no code changes, and the
 `config_digest` on every score changes with it.
 
 ### The distance curves
@@ -250,12 +251,32 @@ Each penalty is capped so one bad element cannot zero the factor alone: 5 mm of 
 `temperature_min_c`, `temperature_max_c`, `penalties` (`precipitation`, `wind`,
 `freezing`), `grid` (the cell the forecast is for), `fetched_at`, `cached`.
 
-### Placeholders: slope and land cover
+### Slope (TM05-64)
 
-Both are real factor classes (`SlopeFactor`, `LandCoverFactor`) with weights in the config,
-returning `not_available` with an explanation. Sprint 5 replaces each class's `evaluate()`
-with a real measurement; the engine, the config shape and the output contract stay as they
-are.
+Ground slope at the site from USGS 3DEP, through the `site_terrain` analysis — the same
+cache `enrich_campsites` fills, so an enriched campsite never waits on 3DEP here. Slope is
+Horn's method over a 3x3 stencil of elevations 10 m apart (20 m across: a tent pad and the
+ground around it); see docs/enrichment.md. Flatter is better, interpolated linearly
+through the `curve` points in `config.yml`:
+
+| Slope | 0–3° | 5.5° | 8° | 11.5° | 15° | ≥ 20° |
+|---|---|---|---|---|---|---|
+| Sub-score | **100** | 75 | 50 | 30 | 10 | 0 |
+
+3° is any tent pad; around 8° a sleeping pad starts to slide; 15° is a hillside nobody
+sleeps on. If 3DEP is unreachable the factor is `not_available` and drops out, like weather.
+
+`measurement`: `slope_deg`, `slope_pct`, `elevation_m`, `stencil_m`, `cached`.
+Explanation, e.g. "Ground is gently sloping: 6° (10%) across 20 m."
+
+**Caveat:** 3DEP is hydro-flattened. A site whose mapped point falls on a pond or lake
+(Marcy Dam's does) reads exactly 0° — water, not ground.
+
+### Placeholder: land cover
+
+`LandCoverFactor` is a real factor class with a weight in the config, returning
+`not_available` with an explanation. Sprint 5 replaces its `evaluate()` with a real
+measurement; the engine, the config shape and the output contract stay as they are.
 
 ### What is deliberately *not* a factor
 
