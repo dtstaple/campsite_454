@@ -14,3 +14,11 @@ Start every commit with the issue key so Jira links it automatically:
 3. Open a PR back to `main` when ready
 4. Move your Jira story To Do -> In Progress -> Done (never skip In Progress)
 5. Log time in Jira with a real description plus a link to your commit or PR
+
+## Before you push
+Run the gate (also in `CLAUDE.md`; CI runs the same):
+
+    ruff check . && ruff format --check . && pytest
+    cd frontend && npm run lint && npm run build
+
+Local setup is in `docs/setup.md`.
