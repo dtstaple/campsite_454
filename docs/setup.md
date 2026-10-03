@@ -106,8 +106,8 @@ A fresh database is empty. Choose one of three ways to fill it:
 
 | Path | Command | Time | What you get |
 |---|---|---|---|
-| **Restore a dump** (recommended) | `make restore DUMP=<url-or-path>` | about a minute | Everything a teammate has: every region ingested so far, routes, profiles, enrichment |
-| Full rebuild | `make data` | 30–60 min (estimate) | The Adirondacks rebuilt from the live sources |
+| **Restore a dump** (recommended) | `make restore DUMP=<url-or-path>` | ~15 s + downloading ~110 MB | Everything a teammate has: every region ingested so far, routes, profiles, enrichment |
+| Full rebuild | `make data` | ~30 min to 3+ h (estimate; see below) | The Adirondacks rebuilt from the live sources |
 | Sample | `.venv/bin/python backend/manage.py seed` | seconds | One 7 × 7 km patch, the Essex Chain Lakes; enough for UI work |
 
 ### Restore a dump
@@ -160,6 +160,25 @@ prints at the end.
 - **Another region:** `make data REGION=white-mountains-nh`. The regions are listed in
   `backend/pipeline/regions.yml`.
 - **Re-running is safe:** ingests upsert, and profiles and enrichment are cached.
+
+**How long it takes (estimate, 2026-10-03).** The ingests take about 7 minutes in total:
+
+| Step | Measured |
+|---|---|
+| padus | 19 s |
+| nhd-flowlines | 4 min |
+| nhd-waterbodies | 1 min |
+| osm-trails | 1.5 min |
+| osm-campsites | 15 s |
+| osm-routes | 5–20 s |
+
+Enrichment takes about 2.5 minutes cold.
+
+The route profiles dominate. They cover 270 named routes and 3,450 km of trail, and 3DEP's
+speed varies a lot: from ~0.33 s/km on a good day (about 20 min) to 3.2 s/km on
+2026-10-03, when it was returning 502s (about 3 h). Profiles are also computed on first
+view in the app, so you can stop after `enrich` and lose nothing but a wait in the trail
+panel. A step that fails part-way is safe to re-run, because finished work is cached.
 
 The upstream services (Overpass, NHD, PAD-US, 3DEP) are public and occasionally slow or
 down. When a step fails, the run stops and prints the command that re-runs just that step.
@@ -367,7 +386,14 @@ nvm use 22
 
 ### Running a second copy side by side
 
-Give the second checkout its own Compose project, container and port in its `.env`:
+Create the second checkout's `.env` **before** `make setup`, so it never touches the first
+database:
+
+```
+python3 scripts/ensure_env.py
+```
+
+Then give it its own Compose project, container and port in that `.env`:
 
 ```
 COMPOSE_PROJECT_NAME=campsite_b
@@ -375,7 +401,8 @@ DB_CONTAINER_NAME=campsite_db_b
 POSTGRES_PORT=5442
 ```
 
-Use the same port in `DATABASE_URL`. The two databases never touch.
+Use the same port in `DATABASE_URL`, then run `make setup`. The two databases and their
+volumes never touch.
 
 ### Pointing at a different database
 
