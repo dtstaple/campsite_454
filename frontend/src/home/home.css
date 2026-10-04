@@ -1,0 +1,320 @@
+/*
+ * The homepage (TM05-68). Every value is a theme.css token.
+ *
+ * Deliberately still: no scroll-triggered motion, no fades, no parallax. The only thing
+ * that moves is a recording, and it can be paused (or never autoplays, with reduced
+ * motion). Desktop pairs text with media side by side, alternating; below 860px every
+ * section stacks, text first. (The breakpoint is the one literal: custom properties do not
+ * work inside a media query.)
+ */
+
+.page-home {
+  display: block;
+}
+
+.home {
+  width: 100%;
+  max-width: calc(var(--content-max) + 2 * var(--space-xl));
+  margin: 0 auto;
+  padding: var(--space-5xl) var(--space-xl) 0;
+}
+
+/* --- shared type --- */
+
+.eyebrow {
+  margin: 0 0 var(--space-md);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.page-home a:focus-visible,
+.page-home button:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+/* --- hero --- */
+
+.home-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 4fr) minmax(0, 7fr);
+  align-items: center;
+  gap: var(--space-4xl);
+  padding-bottom: var(--space-6xl);
+}
+
+.home-title {
+  margin: 0 0 var(--space-xl);
+  font-size: var(--text-display);
+  font-weight: var(--weight-extrabold);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-title);
+}
+
+.home-lede {
+  margin: 0 0 var(--space-2xl);
+  max-width: 52ch;
+  color: var(--text-secondary);
+  font-size: var(--text-lg);
+  line-height: var(--leading-normal);
+}
+
+.home-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-base);
+}
+
+.home-secondary {
+  color: var(--text-secondary);
+  font-size: var(--text-md);
+}
+
+/* --- features --- */
+
+.home-feature {
+  display: grid;
+  grid-template-columns: minmax(0, 4fr) minmax(0, 6fr);
+  align-items: center;
+  gap: var(--space-4xl);
+  padding: var(--space-6xl) 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* Media on the left. `order` rather than DOM order, so the text still comes first when
+ * the sections stack and for anyone reading with a screen reader. */
+.home-feature.is-flipped {
+  grid-template-columns: minmax(0, 6fr) minmax(0, 4fr);
+}
+
+.home-feature.is-flipped .feature-media {
+  order: -1;
+}
+
+.home-feature-title {
+  margin: 0 0 var(--space-base);
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-title);
+}
+
+.home-feature-body {
+  margin: 0;
+  max-width: 46ch;
+  color: var(--text-secondary);
+  font-size: var(--text-lg);
+  line-height: var(--leading-normal);
+}
+
+/* --- coverage and closing --- */
+
+.home-coverage {
+  padding: var(--space-3xl) 0;
+  border-top: 1px solid var(--border-subtle);
+  text-align: center;
+}
+
+.home-coverage p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-md);
+}
+
+.home-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xl);
+  padding: var(--space-5xl) 0 var(--space-6xl);
+  text-align: center;
+}
+
+.home-cta-title {
+  margin: 0;
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-title);
+}
+
+/* --- footer --- */
+
+.home-footer {
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.home-footer-inner {
+  max-width: calc(var(--content-max) + 2 * var(--space-xl));
+  margin: 0 auto;
+  padding: var(--space-3xl) var(--space-xl);
+}
+
+.home-footer-title {
+  margin: 0 0 var(--space-lg);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.home-sources {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-lg) var(--space-2xl);
+  margin: 0 0 var(--space-xl);
+}
+
+.home-source dt {
+  margin-bottom: var(--space-xs);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.home-source dd {
+  margin: 0;
+  font-size: var(--text-md);
+}
+
+.home-source a {
+  color: var(--text-primary);
+  text-decoration: underline;
+  text-decoration-color: var(--border-strong);
+  text-underline-offset: var(--focus-offset);
+}
+
+.home-source a:hover {
+  text-decoration-color: var(--accent);
+}
+
+.home-footer-note {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+/* --- media frame (FeatureMedia) --- */
+
+.feature-media {
+  position: relative;
+  width: 100%;
+  aspect-ratio: var(--media-aspect);
+  overflow: hidden;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-float);
+}
+
+.feature-media-video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.feature-media-placeholder {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  height: 100%;
+  padding: var(--space-xl);
+  text-align: center;
+}
+
+.feature-media-label {
+  margin: 0;
+  max-width: 44ch;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+}
+
+.feature-media-file {
+  margin: 0;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+/* Play/pause, bottom left. Always present over a video: loops over five seconds need a way
+ * to stop them, and with reduced motion it is how the video starts at all. */
+.feature-media-toggle {
+  position: absolute;
+  left: var(--space-md);
+  bottom: var(--space-md);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-md);
+  background: var(--media-control-bg);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.feature-media-toggle:hover {
+  border-color: var(--accent);
+}
+
+.feature-media-icon {
+  width: var(--space-md);
+  height: var(--space-md);
+  fill: currentColor;
+}
+
+/* A paused, still poster makes the button the obvious thing to press. */
+.feature-media-toggle.is-paused {
+  padding: var(--space-sm) var(--space-base);
+  font-size: var(--text-sm);
+}
+
+/* --- small screens: stack, text first --- */
+
+@media (max-width: 860px) {
+  .home {
+    padding: var(--space-3xl) var(--space-base) 0;
+  }
+
+  .home-hero,
+  .home-feature,
+  .home-feature.is-flipped {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2xl);
+  }
+
+  .home-hero {
+    padding-bottom: var(--space-4xl);
+  }
+
+  .home-feature {
+    padding: var(--space-4xl) 0;
+  }
+
+  .home-feature.is-flipped .feature-media {
+    order: 0;
+  }
+
+  .home-footer-inner {
+    padding: var(--space-2xl) var(--space-base);
+  }
+
+  .home-sources {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
