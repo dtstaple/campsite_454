@@ -135,6 +135,17 @@
   --space-base: 16px;
   --space-lg: 20px;
   --space-xl: 24px;
+  /* Page-scale spacing for the homepage (TM05-68): section rhythm, not panel padding. */
+  --space-2xl: 32px;
+  --space-3xl: 48px;
+  --space-4xl: 72px;
+  --space-5xl: 112px;
+  --space-6xl: 160px;
+
+  /* --- page layout --- */
+  --content-max: 1100px;
+  /* Feature recordings are 16:10, the shape of a laptop browser window. */
+  --media-aspect: 16 / 10;
 
   /* --- radii --- */
   --radius-sm: 4px;
@@ -164,6 +175,9 @@
   --text-md: 14px;
   --text-lg: 16px;
   --text-xl: 20px;
+  --text-2xl: 24px;
+  /* The homepage title: scales with the window between a phone and a wide desktop. */
+  --text-display: clamp(32px, 4vw, 48px);
 
   --weight-regular: 400;
   --weight-medium: 500;
@@ -182,6 +196,15 @@
   /* --- emphasis --- */
   /* For secondary readouts (layer counts, zoom hints) that should be present but quiet. */
   --opacity-quiet: 0.75;
+
+  /* --- focus --- */
+  --focus-ring: 2px solid var(--accent);
+  --focus-offset: 3px;
+
+  /* --- media --- */
+  /* The play button over a still poster (reduced motion): dark enough to read on any
+   * frame of a recording. */
+  --media-control-bg: rgba(21, 19, 15, 0.82);
 
   /* --- motion --- */
   --transition: 120ms ease;
