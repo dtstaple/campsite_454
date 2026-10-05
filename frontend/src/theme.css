@@ -211,14 +211,37 @@
 }
 
 /*
- * Score gradient and letter grades from v1, recorded for when scoring lands.
- * Nothing consumes these yet -- this prototype renders raw ingested features, not
- * scored campsites -- but they are the two systems v1 used and are worth keeping
- * together rather than rediscovering later.
+ * Score colours (TM05-48): v1's letter grades. v1 also had a clay-to-moss gradient
+ * (#8a6a4a -> #6f9660); it was measured against these and removed.
  *
- *   gradient : #8a6a4a (clay, score 0)  ->  #6f9660 (moss, score 100)
- *   grades   : A #2d9e5f  B #f4a261  C #e9c46a  D #e76f51  F #c0392b
+ * WCAG contrast against the dark basemap's terrain (#333333) and against Esri imagery as
+ * the map draws it (dimmed and desaturated, median of 40,960 pixels sampled over five
+ * campsite areas):
  *
- * Note they disagree with each other: v1's map used the letter grades while its
- * scoreScale.ts computed the gradient, and neither referenced the other.
+ *   gradient   clay 2.55 / 2.45, moss 3.73 / 3.58 -- the low end fails 3:1, and the two
+ *              ends are only 1.46:1 apart, so a 30 and a 70 look alike on the map
+ *   grades     A 3.71 / 3.56   B 6.13 / 5.87   C 7.56 / 7.25   D 4.09 / 3.92
+ *              F 3.17 / 3.04 (v1's #c0392b was 2.32 / 2.23)
+ *
+ * The grades won: four of v1's five already pass 3:1 on both basemaps, adjacent grades
+ * differ in hue as well as lightness, and five labelled swatches make a readable legend
+ * where a continuous ramp would not. F is the one retune: v1's dark red failed, and was
+ * moved to a lighter crimson rather than lightened in place, because a lighter #c0392b
+ * drifts into D's orange-red (CIE76 dE 12 at 3.4:1; crimson keeps dE 26 from D).
+ *
+ * B matches --map-trails. A marker is a filled circle with a light ring and a trail is a
+ * line, so they do not read as the same thing; the legend labels both.
+ *
+ * Bands (A 90+, B 80+, C 70+, D 60+, F below) live in src/score/grade.ts with the code
+ * that uses them, not here: they are not a look.
  */
+:root {
+  --score-a: #2d9e5f;
+  --score-b: #f4a261;
+  --score-c: #e9c46a;
+  --score-d: #e76f51;
+  --score-f: #df4962;
+  /* No score yet. Achromatic, so it never reads as any grade: 3.43:1 on terrain,
+   * 3.29:1 on imagery, and CIE76 dE 61 from F, the grade it must not be mistaken for. */
+  --score-none: #8a8578;
+}
