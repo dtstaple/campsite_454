@@ -9,7 +9,7 @@ The short version, once the prerequisites are installed:
 git clone https://github.com/dtstaple/campsite_454.git
 cd campsite_454
 make setup
-make restore DUMP=<dump URL from the team channel>
+make restore DUMP=https://github.com/dtstaple/campsite_454/releases/download/dev-data-2026-10-05/campsite-2026-10-05.dump
 make doctor
 make dev
 ```
@@ -113,8 +113,10 @@ A fresh database is empty. Choose one of three ways to fill it:
 ### Restore a dump
 
 ```
-make restore DUMP=https://github.com/dtstaple/campsite_454/releases/download/<tag>/<file>.dump
+make restore DUMP=https://github.com/dtstaple/campsite_454/releases/download/dev-data-2026-10-05/campsite-2026-10-05.dump
 ```
+
+That is the current snapshot, [dev-data-2026-10-05](https://github.com/dtstaple/campsite_454/releases/tag/dev-data-2026-10-05) (103 MB): the Adirondacks and the White Mountains, with routes, profiles and enrichment. `make restore` with no `DUMP` prints the latest URL too.
 
 `DUMP` can be a URL or a local path. Restoring **replaces** the data in your local
 database.
@@ -132,9 +134,12 @@ This writes `dumps/campsite-<date>.dump`; `dumps/` is gitignored. Then upload it
 GitHub Release asset:
 
 ```
-gh release create data-<date> dumps/campsite-<date>.dump \
-    --title "Data snapshot <date>" --notes "make restore DUMP=<asset URL>"
+gh release create dev-data-<date> dumps/campsite-<date>.dump \
+    --title "Dev database snapshot <date>" \
+    --notes "Public geodata only, no user accounts. Restore with: make restore DUMP=<asset URL>"
 ```
+
+Then point `SNAPSHOT_URL` in the `Makefile` and the URLs in this file at the new asset.
 
 ### Full rebuild
 
