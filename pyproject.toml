@@ -16,6 +16,9 @@ branch = true
 omit = ["*/tests/*", "*/.venv/*", "*/migrations/*"]
 
 [tool.coverage.report]
+# CI measured 94.6% (line + branch) on 2026-10-05; the floor sits 1 point below. Raise it
+# as coverage grows, never lower it to get green (TM05-50).
+fail_under = 93
 show_missing = true
 skip_empty = true
 
