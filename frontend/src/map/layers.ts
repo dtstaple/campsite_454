@@ -13,7 +13,8 @@
 
 import type * as maplibregl from "maplibre-gl";
 import type { FeatureCollection as GeoJsonFeatureCollection } from "geojson";
-import { mapColors, mapHillshade, mapPaint } from "../theme";
+import { mapColors, mapHillshade, mapPaint, scoreColors } from "../theme";
+import { scoreColorExpression } from "../score/grade";
 import type { LayerName } from "../api";
 import type { ActivityMode } from "../modes/modes";
 
@@ -152,7 +153,7 @@ export function addMapLayers(map: maplibregl.Map): void {
     source: "campsites",
     paint: {
       "circle-radius": paint.campsitesRadius,
-      "circle-color": colour.campsites,
+      "circle-color": scoreColorExpression(scoreColors()) as maplibregl.ExpressionSpecification,
       "circle-opacity": paint.campsitesOpacity,
       "circle-stroke-width": paint.campsitesStrokeWidth,
       "circle-stroke-color": colour.campsiteStroke,
