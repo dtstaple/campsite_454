@@ -24,7 +24,7 @@ The gate to run before pushing (the same checks CI runs):
 
 ```
 ruff check . && ruff format --check . && pytest
-cd frontend && npm run lint && npm run build
+cd frontend && npm run lint && npm run build && npm test
 ```
 
 `npm run build` runs `tsc -b` before Vite, so it is the type check as well as the build.
