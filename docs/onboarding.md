@@ -1,113 +1,53 @@
 # Onboarding — CampSite (Team 5)
 
-Everything you need to get running and find your work.
+Welcome. This page is orientation only. **Installing and running the project is in
+[setup.md](setup.md)**, and that is the only place setup steps live.
 
----
+## 1. Get running
 
-## 1. Install these (once per laptop)
+Follow [setup.md](setup.md) for your OS. On a fresh clone that is:
 
-| Tool | Link | Needed for |
-|---|---|---|
-| Git | https://git-scm.com/downloads | everyone |
-| VS Code | https://code.visualstudio.com/ | everyone |
-| Python 3.12 | https://python.org/ | backend, pipeline |
-| Node.js 18+ | https://nodejs.org/ | frontend |
-| Docker Desktop | https://www.docker.com/products/docker-desktop/ | database |
+    make setup
+    make restore DUMP=<dump URL from the team channel>
+    make doctor
+    make dev
 
-Verify:
+If `make doctor` shows a FAIL, apply its FIX line. If that doesn't make it obvious, paste
+the output into Claude Code.
 
-    git --version
-    python3 --version
-    node -v
-    docker --version
+## 2. Tools
 
-**VS Code extensions:** Python (Microsoft), ESLint, Prettier, Docker
+- **VS Code** with the Python, Ruff, oxc (we lint with oxlint, not ESLint), Docker and,
+  on Windows, WSL extensions.
+- **Claude Code** reads the committed [`CLAUDE.md`](../CLAUDE.md) automatically: the team's
+  Jira, Git and code rules. Put personal notes in `CLAUDE.local.md`, which is gitignored.
 
----
+## 3. Who owns what
 
-## 2. Clone the repo
+| Name | Owns |
+|---|---|
+| Davis Stapleton | Data pipeline, architecture, PostGIS schema, spatial API |
+| Bleron Balidemaj | Docker, database infrastructure, deployment config |
+| Abdulrahman Shaalan | Django backend, auth, API endpoints |
+| Sahaj Soni | React frontend, MapLibre map |
 
-    git clone https://github.com/dtstaple/campsite_454.git
-    cd campsite_454
+Your current story is on the Jira board, space `TM05`. Read its Acceptance Criteria first;
+that is the definition of done.
 
----
+## 4. Working on a story
 
-## 3. Python setup (backend + pipeline people)
+    git checkout main && git pull
+    git checkout -b TM05-<n>-short-description
+    # work, and commit with the key first:
+    git commit -m "TM05-<n> what changed"
+    git push -u origin TM05-<n>-short-description
 
-    python3 -m venv .venv
-    source .venv/bin/activate       # Windows: .venv\Scripts\activate
-    pip install -r requirements.txt
+Open a PR to `main` and let CI go green. The full rules (the gate, Jira habits, worklogs,
+the sprint report) are in [`CLAUDE.md`](../CLAUDE.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
 
----
+## 5. Where to read next
 
-## 4. Your story and where your work goes
-
-| Person | Jira story | Work in this folder |
-|---|---|---|
-| Davis Stapleton | **TM05-8** — Set up repo, CI, and testing framework | `/tests`, root config |
-| Bleron Balidemaj | **TM05-9** — Set up local database with Docker (PostgreSQL + PostGIS) | repo root (`docker-compose.yml`) |
-| Abdulrahman Shaalan | **TM05-10** — Set up backend server with a working test endpoint | `/backend` |
-| Sahaj Soni | **TM05-11** — Set up frontend app with a working map on screen | `/frontend` |
-
-Open your story in Jira and read its Acceptance Criteria — that's the definition of done.
-
----
-
-## 5. How to work on your story
-
-    # 1. Start from an up-to-date main
-    git checkout main
-    git pull
-
-    # 2. Make your branch (use YOUR story number)
-    git checkout -b TM05-9-docker-postgis
-
-    # 3. Work, committing as you go — always start the message with your key
-    git add .
-    git commit -m "TM05-9 add docker-compose with PostGIS"
-
-    # 4. Push and open a PR
-    git push -u origin TM05-9-docker-postgis
-
-Then open the pull request on GitHub, or from the Development panel inside your Jira story.
-
-**Every branch name and commit message must start with your `TM05-<n>` key** — that's how Jira
-links your work automatically, and it's part of how the class grades contributions.
-
----
-
-## 6. Running tests
-
-We have pytest + coverage + ruff set up. Before you push:
-
-    source .venv/bin/activate
-    ruff check .
-    pytest
-
-CI runs the same checks on every push and pull request. If CI is red, your story isn't done.
-
-After an ingest or a new sample, also run `pytest -m data`. It checks that the rows in your
-database make sense together, not just that the code works. See `docs/setup.md`.
-
----
-
-## 7. Jira habits (these are graded)
-
-- Move your story **To Do → In Progress** when you start, **Done** only when it's actually finished
-- Don't skip In Progress, and don't flip straight to Done
-- **Log time** on your own story as you work, with a real description of what you did plus a link
-  to your commit or PR
-- Show up in both SCRUM tables with specific updates (not "worked on stuff")
-- Aim for ~4 hours logged for the sprint
-
----
-
-## 8. Add your run steps here when you're done
-
-Once your piece works, add a short section below so the next person doesn't have to guess.
-
-**Database (Bleron):** _add your steps_
-
-**Backend (Abdulrahman):** _add your steps_
-
-**Frontend (Sahaj):** _add your steps_
+- [architecture.md](architecture.md): how the pieces fit together
+- [pipeline.md](pipeline.md): the ingest sources
+- [scoring.md](scoring.md): the score
+- [api.md](api.md): the endpoints

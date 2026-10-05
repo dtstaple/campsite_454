@@ -18,7 +18,7 @@ secrets.yaml
 .pgpass
 
 # ---------- Agent / local tooling config ----------
-CLAUDE.md
+# CLAUDE.md is the committed team rules file; personal notes go in CLAUDE.local.md.
 CLAUDE.local.md
 .claude/
 .mcp.json
@@ -93,3 +93,5 @@ Thumbs.db
 *.swp
 *.log
 EOF
+# ---------- Database dumps (make dump / make restore) ----------
+dumps/

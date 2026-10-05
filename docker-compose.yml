@@ -1,7 +1,8 @@
 services:
   db:
     image: postgis/postgis:16-3.4
-    container_name: campsite_db
+    # Overridable so a second checkout or a clean-clone test can run beside the main one.
+    container_name: ${DB_CONTAINER_NAME:-campsite_db}
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
