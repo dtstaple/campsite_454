@@ -338,7 +338,8 @@ def check_data() -> None:
             "FAIL",
             "data",
             f"database is empty ({summary})",
-            "make restore DUMP=<url-or-path>  (fast)  or  make data  (full rebuild)",
+            "make restore DUMP=<url>  (fast; `make restore` prints the latest snapshot URL)  "
+            "or  make data  (full rebuild)",
         )
     elif any(counts[model] == 0 for model in core):
         empty = [model for model in core if counts[model] == 0]

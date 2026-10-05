@@ -21,14 +21,17 @@ POSTGRES_DB ?= campsite
 REGION ?= adirondacks
 STEPS ?=
 DUMP ?=
+# The current team snapshot (GitHub Release). Update it when a new snapshot is published.
+SNAPSHOT_URL := https://github.com/dtstaple/campsite_454/releases/download/dev-data-2026-10-05/campsite-2026-10-05.dump
 OUT ?= dumps/campsite-$(shell date +%Y-%m-%d).dump
 
 # Python 3.12 exactly: CI runs 3.12, and 3.13/3.14 have no wheels for some pinned deps.
 PYTHON312 := $(shell command -v python3.12 2>/dev/null)
 
 # Data that belongs to a person, not the project: dumped as empty tables.
+# 'accounts_*' is a pattern, so a new per-user table in accounts/ is left out automatically.
 PERSONAL_TABLES := auth_user auth_user_groups auth_user_user_permissions authtoken_token \
-	accounts_savedcampsite django_session django_admin_log
+	'accounts_*' django_session django_admin_log
 
 .PHONY: help setup doctor dev backend frontend data restore dump
 
@@ -56,7 +59,8 @@ setup:
 	@echo "==> Migrations"
 	$(VPY) backend/manage.py migrate --no-input
 	@echo
-	@echo "Setup done. Next: get data (make restore DUMP=... or make data), then make doctor and make dev."
+	@echo "Setup done. Next: get data, then make doctor and make dev. Fastest:"
+	@echo "  make restore DUMP=$(SNAPSHOT_URL)"
 
 doctor:
 	@if [ -x $(VPY) ]; then $(VPY) scripts/doctor.py; else python3 scripts/doctor.py; fi
@@ -92,7 +96,7 @@ dump:
 restore:
 	@if [ -z "$(DUMP)" ]; then \
 		echo "Usage: make restore DUMP=<path-or-url>"; \
-		echo "  e.g. make restore DUMP=https://github.com/dtstaple/campsite_454/releases/download/<tag>/<file>.dump"; \
+		echo "  latest team snapshot: make restore DUMP=$(SNAPSHOT_URL)"; \
 		exit 1; fi
 	@file="$(DUMP)"; \
 	case "$$file" in http://*|https://*) \

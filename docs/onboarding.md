@@ -8,7 +8,7 @@ Welcome. This page is orientation only. **Installing and running the project is 
 Follow [setup.md](setup.md) for your OS. On a fresh clone that is:
 
     make setup
-    make restore DUMP=<dump URL from the team channel>
+    make restore DUMP=https://github.com/dtstaple/campsite_454/releases/download/dev-data-2026-10-05/campsite-2026-10-05.dump
     make doctor
     make dev
 

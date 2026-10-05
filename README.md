@@ -11,11 +11,12 @@ MapLibre.
 
 ```
 make setup
-make restore DUMP=<dump URL>   # or: make data (full rebuild), or the sample
+make restore DUMP=https://github.com/dtstaple/campsite_454/releases/download/dev-data-2026-10-05/campsite-2026-10-05.dump
 make doctor
 make dev                        # http://localhost:5173
 ```
 
+`make data` rebuilds from the sources instead, and a small sample is one command away.
 Prerequisites per OS, the data options, and troubleshooting are in
 **[docs/setup.md](docs/setup.md)**, the one setup guide.
 
