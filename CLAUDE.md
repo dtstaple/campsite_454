@@ -40,7 +40,7 @@ Use these exact full names anywhere in Jira. The grader string-matches them.
 - **Backend.** Python 3.12 (`.python-version`; 3.13/3.14 break some wheels), Django,
   DRF, `django.contrib.gis`.
 - **Database.** PostgreSQL 16 + PostGIS 3.4 in Docker, container `campsite_db`.
-- **Frontend.** React + TypeScript + Vite, with MapLibre GL (not Mapbox). Node 20
+- **Frontend.** React + TypeScript + Vite, with MapLibre GL (not Mapbox). Node 22
   (`.nvmrc`), the same as CI.
 - **Tooling.** ruff for lint and format; pytest with coverage; oxlint for the frontend.
   GitHub Actions runs all of them on every push and PR.
@@ -79,7 +79,7 @@ Makefile            setup / doctor / dev / data / restore / dump
 
 ```
 ruff check . && ruff format --check . && pytest
-cd frontend && npm run lint && npm run build
+cd frontend && npm run lint && npm run build && npm test
 ```
 
 If any of it fails, don't commit. If CI is red, the story is not done.

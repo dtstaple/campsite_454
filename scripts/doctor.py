@@ -87,7 +87,7 @@ def check_python() -> None:
 
 
 def check_node() -> None:
-    wanted = (ROOT / ".nvmrc").read_text().strip() if (ROOT / ".nvmrc").exists() else "20"
+    wanted = (ROOT / ".nvmrc").read_text().strip() if (ROOT / ".nvmrc").exists() else "22"
     result = run(["node", "--version"])
     if result.returncode != 0:
         report("FAIL", "node", "node not found", f"install Node {wanted} (nvm install {wanted})")

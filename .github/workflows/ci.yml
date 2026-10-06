@@ -79,7 +79,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
@@ -93,4 +93,9 @@ jobs:
 
       - name: Build
         run: npm run build
+        working-directory: frontend
+
+      # Node 22 strips TypeScript types itself, so the .ts tests run with no extra tooling.
+      - name: Test
+        run: npm test
         working-directory: frontend

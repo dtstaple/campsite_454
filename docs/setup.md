@@ -18,7 +18,7 @@ Then open http://localhost:5173.
 
 ## 1. Prerequisites
 
-The versions match CI: Python **3.12** (`.python-version`) and Node **20 or newer**
+The versions match CI: Python **3.12** (`.python-version`) and Node **22** (22.18 or newer)
 (`.nvmrc`).
 
 ### macOS
@@ -26,11 +26,11 @@ The versions match CI: Python **3.12** (`.python-version`) and Node **20 or newe
 1. Install [Homebrew](https://brew.sh), then the tools:
 
    ```
-   brew install python@3.12 node@20 gdal geos
+   brew install python@3.12 node@22 gdal geos
    ```
 
    If you already manage Node with nvm, run `nvm install && nvm use` instead of
-   `node@20`.
+   `node@22`.
 
 2. Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) and start it.
 
@@ -63,13 +63,13 @@ sudo apt install -y git make curl python3.12 python3.12-venv \
     gdal-bin libgdal-dev libgeos-dev
 ```
 
-Install Node 20 with nvm:
+Install Node 22 with nvm:
 
 ```
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
 ```
 
-Reopen the terminal, then run `nvm install 20`.
+Reopen the terminal, then run `nvm install 22`.
 
 Docker on native Linux: install Docker Engine and the compose plugin from
 [docs.docker.com/engine/install/ubuntu](https://docs.docker.com/engine/install/ubuntu/), then
@@ -274,7 +274,7 @@ The thresholds and the reasoning behind them are at the top of
 ```
 source .venv/bin/activate
 ruff check . && ruff format --check . && pytest
-cd frontend && npm run lint && npm run build
+cd frontend && npm run lint && npm run build && npm test
 ```
 
 CI runs the same checks. Branch, commit and Jira rules are in `CLAUDE.md` and
@@ -381,8 +381,8 @@ make setup
 
 ### `npm test` fails with `ERR_UNKNOWN_FILE_EXTENSION ".ts"`
 
-The frontend unit tests use Node's built-in TypeScript type stripping, which needs Node
-**22.6+**. CI pins Node 20 for lint and build. To run `npm test` locally:
+The frontend unit tests use Node's built-in TypeScript type stripping, which is on by
+default from Node **22.18**. CI runs Node 22 (`.nvmrc`). On an older Node:
 
 ```
 nvm install 22
