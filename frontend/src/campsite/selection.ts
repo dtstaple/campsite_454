@@ -19,6 +19,12 @@ export interface CampsiteSelection {
   name: string | null;
   /** Contract-1 score (0-100), or null when the source of the selection had none. */
   score: number | null;
+  /**
+   * The full contract-1 score (docs/scoring.md) for the panel's breakdown (TM05-47), when the
+   * source has it: a trail-list row does today; map features will once TM05-45 adds it.
+   * Unvalidated -- score/breakdown.ts checks it before anything is shown.
+   */
+  breakdown?: unknown;
 }
 
 /** The selection for a map feature, or null if it has no usable id or point. */
@@ -35,6 +41,7 @@ export function selectionFromFeature(feature: {
     lat,
     name: typeof props.name === "string" && props.name ? props.name : null,
     score: isScore(props.score) ? props.score : null,
+    ...(props.score_breakdown != null && { breakdown: props.score_breakdown }),
   };
 }
 

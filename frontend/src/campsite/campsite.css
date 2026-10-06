@@ -61,15 +61,117 @@
   font-size: var(--text-xs);
 }
 
-/* --- save, and the empty slot reserved for TM05-47 --- */
+/* --- save --- */
 
 .campsite-actions .popup-save {
   margin-top: 0;
 }
 
-/* Empty on purpose; TM05-47 renders the score breakdown here. */
-.campsite-score-slot:empty {
-  display: none;
+/* --- score (TM05-47) ---
+ * The total leads, in its grade colour (TM05-48's --score-* tokens, set per element as
+ * --score-color). The factors below are the explanation, so they are quieter. */
+
+.campsite-score {
+  display: grid;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.campsite-score-total {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-xs);
+}
+
+.campsite-score-number {
+  color: var(--score-color);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+  font-variant-numeric: tabular-nums;
+}
+
+.campsite-score-of {
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+/* The grade letter as a chip in its own colour; dark text reads on every grade. */
+.campsite-score-grade {
+  margin-left: auto;
+  padding: 0 var(--space-sm);
+  background: var(--score-color);
+  border-radius: var(--radius-sm);
+  color: var(--bg-base);
+  font-size: var(--text-md);
+  font-weight: var(--weight-extrabold);
+}
+
+/* A cap overrides the total (closed land caps at 0), so it says why, in danger colour. */
+.campsite-score-cap {
+  color: var(--danger);
+  font-size: var(--text-sm);
+}
+
+.campsite-score-note {
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+  line-height: var(--leading-snug);
+}
+
+.campsite-factors {
+  display: grid;
+  gap: var(--space-sm);
+  margin: 0;
+  padding: var(--space-sm) 0 0;
+  border-top: 1px solid var(--border-subtle);
+  list-style: none;
+}
+
+.campsite-factor {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0 var(--space-sm);
+  align-items: baseline;
+}
+
+.campsite-factor-label {
+  color: var(--text-primary);
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+}
+
+.campsite-factor-value {
+  color: var(--score-color);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.campsite-factor-detail {
+  grid-column: 1 / -1;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  line-height: var(--leading-snug);
+}
+
+/* Not available: words, not a number, in the quiet text colour -- it is a gap in what we
+ * know, not a bad result, so it must not take a grade colour. */
+.campsite-factor.is-missing .campsite-factor-label,
+.campsite-factor.is-missing .campsite-factor-value {
+  color: var(--text-tertiary);
+}
+
+.campsite-factor.is-missing .campsite-factor-value {
+  font-family: var(--font-sans);
+  font-weight: var(--weight-regular);
+  font-style: italic;
 }
 
 /* --- facts --- */

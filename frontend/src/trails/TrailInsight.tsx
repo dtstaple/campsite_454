@@ -325,7 +325,14 @@ export default function TrailInsight({ map, onOpenCampsite, onHoverCampsite }: P
     (site: CampsiteAlong) => {
       setCursorM(site.distance_along_m);
       if (onOpenCampsite) {
-        onOpenCampsite({ id: site.id, lon: site.lon, lat: site.lat, name: site.name, score: site.score });
+        onOpenCampsite({
+          id: site.id,
+          lon: site.lon,
+          lat: site.lat,
+          name: site.name,
+          score: site.score,
+          breakdown: site.score_breakdown,
+        });
       }
       else map?.flyTo({ center: [site.lon, site.lat], zoom: Math.max(map.getZoom(), 14) });
     },
