@@ -1,5 +1,5 @@
 """
-Registration, login, and saved-campsite endpoints.
+Registration, login, account deletion, and saved-campsite endpoints.
 
 Registration deliberately returns the same 201 response whether the email is fresh or
 already belongs to another account, and simply skips creating a second row in the
@@ -14,6 +14,12 @@ Logout deletes the token row rather than marking it inactive. DRF tokens carry n
 and no refresh flow, so the row's existence *is* the session -- deleting it is the only
 thing that actually revokes access. A client that keeps using the old token gets 401 from
 then on, which is what "signed out" has to mean on the server and not just in localStorage.
+
+Account deletion relies on CASCADE alone. Every foreign key to the user cascades: the auth
+token (DRF's Token.user), saved campsites (SavedCampsite.user) and Django's own admin log;
+group and permission memberships are many-to-many rows Django removes with the user. A
+test walks the user model's relations, so a future non-cascading key fails CI rather than
+leaving orphans behind.
 """
 
 from django.contrib.auth import authenticate, get_user_model
@@ -84,16 +90,25 @@ def logout_view(request):
     return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-@api_view(["GET"])
+@api_view(["GET", "DELETE"])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
 def current_user_view(request):
-    """Who does this token belong to.
+    """GET: who does this token belong to. DELETE: delete that account.
 
-    Same shape as the registration response (username, email) so a client has one idea of
-    what an account looks like. The user's primary key is deliberately not included: no
-    other endpoint exposes an internal row id, and nothing the frontend does needs one.
+    GET has the same shape as the registration response (username, email) so a client has
+    one idea of what an account looks like. The user's primary key is deliberately not
+    included: no other endpoint exposes an internal row id, and nothing the frontend does
+    needs one.
+
+    DELETE removes the user, and with it, by CASCADE, their token and saved campsites
+    (see the module docstring). It acts only on request.user -- there is no id in the URL
+    -- so no request can reach another account. 204 with no body; the token is gone, so
+    every later request with it is a 401.
     """
+    if request.method == "DELETE":
+        request.user.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
     return Response({"username": request.user.username, "email": request.user.email})
 
 

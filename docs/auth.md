@@ -29,6 +29,7 @@ Authorization: Token <token>
 | `/api/auth/login/` | `POST` | No | `200` with a token |
 | `/api/auth/logout/` | `POST` | Yes | `204`, token revoked |
 | `/api/auth/me/` | `GET` | Yes | `200` with the token's owner |
+| `/api/auth/me/` | `DELETE` | Yes | `204`, account deleted |
 | `/api/saved-campsites/` | `GET` | Yes | `200` with this user's saved campsites |
 | `/api/saved-campsites/<source_id>/` | `POST` | Yes | `201` (or `200` if already saved) |
 | `/api/saved-campsites/<source_id>/` | `DELETE` | Yes | `204` |
@@ -147,6 +148,39 @@ like. The user's database id is deliberately not included — no endpoint here e
 internal row id.
 
 - `401` — missing or invalid token.
+
+---
+
+## Delete account (TM05-70)
+
+Deletes the account the token belongs to.
+
+```
+DELETE /api/auth/me/
+Authorization: Token 9a4f2c1e8b3d4a6f9c0e1b2d3a4f5c6d7e8f9a0b
+```
+
+`204`, no body. In one transaction, the server deletes:
+- **the user**,
+- **their auth token**, so every later request with it gets `401`, including a second delete,
+- **their saved campsites**.
+
+The campsites themselves are shared reference data and stay.
+
+- `204` — account deleted.
+- `401` — missing or invalid token. Nothing is deleted.
+
+The endpoint acts only on the token's owner and takes no id, so no request can delete or
+change another account, token or saved campsite. There is no confirmation step or grace
+period, and deletion cannot be undone. The client should ask "are you sure?" before
+calling it, then drop its stored token.
+
+**How the related rows go.** Every foreign key to the user is `on_delete=CASCADE`:
+`authtoken.Token.user`, `accounts.SavedCampsite.user` and Django's admin log. Group and
+permission memberships are many-to-many rows Django removes along with the user. So
+`user.delete()` removes it all, with no explicit deletes. `test_every_foreign_key_to_the_user_cascades`
+walks the user model's relations and fails if a future model points at the user without
+`CASCADE`. The delete endpoint then has to handle that model explicitly.
 
 ---
 
