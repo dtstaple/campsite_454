@@ -360,7 +360,7 @@ index.
 
 ---
 
-## Campsite detail (TM05-64)
+## Campsite detail (TM05-64, scored in TM05-45)
 
 ### `GET /api/campsites/<id>/detail/`
 
@@ -369,11 +369,16 @@ index.
 (`/api/campsites/node/5759412256/detail/`), and the trailing `/detail/` anchors it.
 An unknown id returns 404.
 
-The endpoint is additive: the map layers and TM05-45's scored endpoint are unaffected. It
-serves the facts derived by `enrich_campsites` (docs/enrichment.md).
+The endpoint serves the facts derived by `enrich_campsites` (docs/enrichment.md) and the
+campsite's score (TM05-45). The map layers are unaffected.
 - **Unknown facts are `null`,** never placeholder text, so the UI can hide them.
 - **`facts` is `null`** for a campsite that hasn't been enriched yet; today that's
   everything outside the Adirondacks.
+- **The score uses stored values only.** This request never calls 3DEP or Open-Meteo.
+  Water, trail and legal status come from the ingested vector tables. Slope and weather
+  come from the analysis cache that `enrich_campsites` and other requests fill. An input
+  that is not stored is reported as `not_available`; it is not fetched, and it is never
+  scored as 0.
 
 ```json
 {
@@ -395,9 +400,49 @@ serves the facts derived by `enrich_campsites` (docs/enrichment.md).
     "amenities": {"shelter_kind": "tent site", "osm_tags": {"operator": "NY DEC", "tents": "yes"}},
     "method_version": "1",
     "computed_at": "2026-10-02T23:56:32.187176+00:00"
+  },
+  "score": 84,
+  "score_status": "scored",
+  "score_breakdown": {
+    "contract": 1, "model_version": "1.2.0", "config_digest": "a33b94ce",
+    "location": {"lon": -74.232066, "lat": 43.846018},
+    "score": 84,
+    "factors": [
+      {"key": "water", "label": "Water", "status": "scored", "score": 91.2, "weight": 0.35,
+       "effective_weight": 0.3684, "contribution": 33.6, "measurement": {"distance_m": 95.4, "...": "..."},
+       "explanation": "Lake or pond 95 m away (ideal is about 60 m)."},
+      {"key": "weather", "label": "Weather", "status": "not_available", "score": null, "weight": 0.15,
+       "effective_weight": 0.0, "contribution": 0.0, "measurement": null,
+       "explanation": "No recent forecast stored for here."}
+    ],
+    "caps": []
   }
 }
 ```
+
+**Score fields (TM05-45):**
+
+| Field | Type | Meaning |
+|---|---|---|
+| `score` | int 0–100, or `null` | The overall score, the same as `score_breakdown.score`. `null` unless `score_status` is `scored`. |
+| `score_status` | string | `scored`: computed from stored values. `pending`: the campsite has not been enriched yet, so there is nothing stored to score it from. `not_available`: enriched, but no weighted factor could be evaluated from stored values. |
+| `score_breakdown` | object or `null` | The scoring engine's contract-1 result, with `contract`, `model_version`, `config_digest`, `location`, `score`, `factors` (each with `key`, `label`, `status`, `score`, `weight`, `effective_weight`, `contribution`, `measurement`, `explanation`) and `caps`. docs/scoring.md defines every field. `null` when `score` is `null`. |
+
+`score`/`score_breakdown` are the same fields the route detail returns for each campsite.
+The difference is that the route detail fetches missing slope and weather live, and this
+endpoint does not. The rest of the response is returned whatever the `score_status`; a
+score that cannot be computed never makes the request fail. A nonexistent id is a 404.
+
+- **Unenriched sites are not scored.** Most of them lie outside the ingested regions,
+  with no water, trail or PAD-US data nearby. Scoring them would report that missing
+  data as `no_data`, which means "measured, found nothing", and the result would be a
+  misleadingly low score.
+- **Weather is often `not_available` here.** The forecast cache lasts one hour (docs/scoring.md), so
+  weather is scored only when a recent request (for example a route detail) has already
+  fetched the forecast for that grid cell. When it is `not_available`, the weights are
+  renormalised and the score is still valid.
+- **Slope** is read from the `site_terrain` cache that `enrich_campsites` fills (kept a
+  year), so an enriched site normally has it.
 
 **Field notes:**
 - **`name`** is the source's own name; `null` when the source had none.
@@ -534,5 +579,5 @@ Most of a cached detail request is scoring the campsites, about 10 ms each.
 ## Not included yet
 
 **Scored campsites in the map layers.** The layer endpoints above return raw ingested
-features; the scored-campsites endpoint is TM05-45. The route detail already carries
-scores for the campsites along a route.
+features. Scores are served per campsite by the campsite detail (TM05-45), and the route
+detail carries scores for the campsites along a route.

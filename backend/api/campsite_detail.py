@@ -1,10 +1,17 @@
 """
-GET /api/campsites/<source_id>/detail/ -- one campsite with its derived facts (TM05-64).
+GET /api/campsites/<source_id>/detail/ -- one campsite with its derived facts (TM05-64)
+and its score (TM05-45).
 
-Additive: the map layers and TM05-45's scored endpoint are untouched. The id is the
-campsite's source_id, the same string the map API uses as each Feature's id (it contains
-a slash: "node/5759412256"). Unknown facts are null rather than placeholder text, so a
-client can hide them; `facts` is null for a campsite that has not been enriched yet.
+The id is the campsite's source_id, the same string the map API uses as each Feature's id
+(it contains a slash: "node/5759412256"). Unknown facts are null rather than placeholder
+text, so a client can hide them; `facts` is null for a campsite that has not been enriched
+yet.
+
+The score is scored from stored values only: no 3DEP or Open-Meteo call is made on this
+request, so a slope or forecast not already in the analysis cache is not_available rather
+than fetched. A campsite that has not been enriched has no stored inputs and is not scored
+at all (`score_status: "pending"`): its region usually has no vector data either, and
+scoring it would report absent water and land as measured zeros.
 Contract: docs/api.md, "Campsite detail".
 """
 
@@ -14,6 +21,11 @@ from rest_framework.response import Response
 
 from enrichment.models import CampsiteFacts
 from geodata.models import Campsite
+from scoring.engine import ScoringError, score_campsite
+
+SCORED = "scored"
+PENDING = "pending"
+NOT_AVAILABLE = "not_available"
 
 
 def _or_none(value):
@@ -59,6 +71,16 @@ def _facts_payload(facts: CampsiteFacts) -> dict:
     }
 
 
+def _score(site: Campsite, facts: CampsiteFacts | None) -> tuple[str, dict | None]:
+    """(score_status, contract-1 result or None)."""
+    if facts is None:
+        return PENDING, None
+    try:
+        return SCORED, score_campsite(site, stored_only=True)
+    except ScoringError:
+        return NOT_AVAILABLE, None
+
+
 @api_view(["GET"])
 def campsite_detail_view(request, source_id: str):
     site = (
@@ -72,6 +94,7 @@ def campsite_detail_view(request, source_id: str):
         facts = None
 
     source_name = (site.name or "").strip()
+    score_status, result = _score(site, facts)
     return Response(
         {
             "id": site.source_id,
@@ -84,5 +107,8 @@ def campsite_detail_view(request, source_id: str):
             "lon": round(site.geom.x, 6),
             "lat": round(site.geom.y, 6),
             "facts": _facts_payload(facts) if facts else None,
+            "score": result["score"] if result else None,
+            "score_status": score_status,
+            "score_breakdown": result,
         }
     )

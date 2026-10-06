@@ -27,26 +27,34 @@ class ScoringError(Exception):
     """A location could not be scored."""
 
 
-def build_factors(config: ScoringConfig):
+def build_factors(config: ScoringConfig, stored_only: bool = False):
     unknown = [key for key in config.weights if key not in FACTORS]
     if unknown:
         raise ScoringConfigError(f"weights name unknown factors: {', '.join(unknown)}")
-    return [FACTORS[key](config.factor(key)) for key in config.weights]
+    return [FACTORS[key](config.factor(key), stored_only) for key in config.weights]
 
 
-def score_location(lon: float, lat: float, config: ScoringConfig | None = None) -> dict:
-    """Score the point (lon, lat), WGS84 degrees, from its coordinates alone."""
+def score_location(
+    lon: float, lat: float, config: ScoringConfig | None = None, stored_only: bool = False
+) -> dict:
+    """Score the point (lon, lat), WGS84 degrees, from its coordinates alone.
+
+    `stored_only` answers from stored values and makes no live call: a factor whose
+    analysis (3DEP slope, Open-Meteo weather) is not already cached is not_available
+    rather than fetched."""
     if not (-180 <= lon <= 180 and -90 <= lat <= 90):
         raise ScoringError(f"not a valid longitude/latitude: ({lon}, {lat})")
     config = config or load()
-    results = [factor.evaluate(lon, lat) for factor in build_factors(config)]
+    results = [factor.evaluate(lon, lat) for factor in build_factors(config, stored_only)]
     return combine(results, config, lon, lat)
 
 
-def score_campsite(campsite, config: ScoringConfig | None = None) -> dict:
+def score_campsite(
+    campsite, config: ScoringConfig | None = None, stored_only: bool = False
+) -> dict:
     """Score a Campsite by its location. Nothing about the record itself is a factor --
     capacity in particular is not (571 of 660 RIDB sites report the same 8)."""
-    return score_location(campsite.geom.x, campsite.geom.y, config)
+    return score_location(campsite.geom.x, campsite.geom.y, config, stored_only)
 
 
 def combine(results: list[FactorResult], config: ScoringConfig, lon: float, lat: float) -> dict:
