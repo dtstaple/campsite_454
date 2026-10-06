@@ -6,7 +6,7 @@
  * they are diagnostics rather than the thing the user came to read.
  */
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import {
   layerVisibleAtZoom,
   MIN_ZOOM_FOR_LINEWORK,
@@ -16,6 +16,7 @@ import {
 import { orderedLayers } from "../map/layers";
 import { primaryLayer, type ActivityMode } from "../modes/modes";
 import { REGIONS, type Region } from "../regions";
+import { bandLabel, GRADES, gradeToken } from "../score/grade";
 
 interface Props {
   mode: ActivityMode;
@@ -29,6 +30,24 @@ interface Props {
   terrain: boolean;
   onTerrain: (on: boolean) => void;
   onRegion: (region: Region) => void;
+}
+
+/** What the campsite marker colours mean (TM05-48). Shown while the layer is on. */
+function ScoreLegend() {
+  return (
+    <ul className="score-legend" aria-label="Campsite score colours">
+      {GRADES.map((grade) => (
+        <li key={grade.letter}>
+          <span className="swatch" style={{ background: `var(${gradeToken(grade.letter)})` }} />
+          {bandLabel(grade.letter)}
+        </li>
+      ))}
+      <li>
+        <span className="swatch" style={{ background: `var(${gradeToken(null)})` }} />
+        No score yet
+      </li>
+    </ul>
+  );
 }
 
 /** "1,204" or "500 / 1,204" when the API capped the response. */
@@ -82,22 +101,30 @@ export default function LayerPanel({
               .filter(Boolean)
               .join(" ");
             return (
-              <label key={layer.name} className={classes}>
-                <input
-                  type="checkbox"
-                  checked={on}
-                  onChange={(event) => onToggle(layer.name, event.target.checked)}
-                />
-                <span className="swatch" style={{ background: `var(--map-${layer.name})` }} />
-                {layer.label}
-                <span className="count">
-                  {on && zoomedOut
-                    ? `zoom ${MIN_ZOOM_FOR_LINEWORK}+`
-                    : on
-                      ? countLabel(meta[layer.name])
-                      : ""}
-                </span>
-              </label>
+              <Fragment key={layer.name}>
+                <label className={classes}>
+                  <input
+                    type="checkbox"
+                    checked={on}
+                    onChange={(event) => onToggle(layer.name, event.target.checked)}
+                  />
+                  {/* Campsites are drawn in grade colours, so their swatch is the grades. */}
+                  {layer.name === "campsites" ? (
+                    <span className="swatch swatch-score" />
+                  ) : (
+                    <span className="swatch" style={{ background: `var(--map-${layer.name})` }} />
+                  )}
+                  {layer.label}
+                  <span className="count">
+                    {on && zoomedOut
+                      ? `zoom ${MIN_ZOOM_FOR_LINEWORK}+`
+                      : on
+                        ? countLabel(meta[layer.name])
+                        : ""}
+                  </span>
+                </label>
+                {layer.name === "campsites" && on && <ScoreLegend />}
+              </Fragment>
             );
           })}
 

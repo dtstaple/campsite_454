@@ -7,6 +7,8 @@
  * Change a colour there and both the chrome and the map follow.
  */
 
+import type { ScoreColors } from "./score/grade";
+
 /** One custom property's computed value, trimmed. */
 export function token(name: string): string {
   const value = getComputedStyle(document.documentElement).getPropertyValue(name);
@@ -30,6 +32,21 @@ export function mapColors() {
      * 1.47:1 and the marker's edge dissolves into the basemap. */
     campsiteStroke: token("--text-primary") || "#ede7d9",
     publicLand: token("--map-public-land") || "#2d6a4f",
+  };
+}
+
+/**
+ * The score grade colours (TM05-48), for the campsite markers' paint. Same fallback rule
+ * as mapColors(): the literal theme.css values, never an empty string.
+ */
+export function scoreColors(): ScoreColors {
+  return {
+    A: token("--score-a") || "#2d9e5f",
+    B: token("--score-b") || "#f4a261",
+    C: token("--score-c") || "#e9c46a",
+    D: token("--score-d") || "#e76f51",
+    F: token("--score-f") || "#df4962",
+    none: token("--score-none") || "#8a8578",
   };
 }
 
