@@ -187,15 +187,30 @@ class Analysis(ABC):
     def _hit(row: AnalysisResult) -> Outcome:
         return Outcome(row.value, row.provenance, True, row.key, row.computed_at, row.expires_at)
 
+    @staticmethod
+    def _fresh(key: str, now: datetime) -> Outcome | None:
+        hit = AnalysisResult.objects.filter(key=key, expires_at__gt=now).first()
+        return None if hit is None else Analysis._hit(hit)
+
+    def lookup(
+        self, geom: GEOSGeometry, params: dict | None = None, now: datetime | None = None
+    ) -> Outcome | None:
+        """The cached answer if one is fresh, otherwise None. Never computes, so it never
+        calls the source: for requests that must answer from stored values only (TM05-45)."""
+        params = dict(sorted(self.canonical_params(dict(params or {})).items()))
+        now = now or timezone.now()
+        _, _, key = self._prepare(geom, params, now)
+        return self._fresh(key, now)
+
     def run(self, geom: GEOSGeometry, params: dict | None = None, now: datetime | None = None):
         """Return the cached answer if fresh, otherwise compute, cache and return it."""
         params = dict(sorted(self.canonical_params(dict(params or {})).items()))
         now = now or timezone.now()
         geom, window, key = self._prepare(geom, params, now)
 
-        hit = AnalysisResult.objects.filter(key=key, expires_at__gt=now).first()
+        hit = self._fresh(key, now)
         if hit is not None:
-            return self._hit(hit)
+            return hit
 
         computed = self.compute(geom, window, params)
         outcome = self._store(geom, window, key, params, computed, now)

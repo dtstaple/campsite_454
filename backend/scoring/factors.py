@@ -43,11 +43,19 @@ class Factor:
     key: str = ""
     label: str = ""
 
-    def __init__(self, settings: dict):
+    def __init__(self, settings: dict, stored_only: bool = False):
         self.settings = settings
+        self.stored_only = stored_only
 
     def evaluate(self, lon: float, lat: float) -> FactorResult:
         raise NotImplementedError
+
+    def outcome(self, geom, params: dict):
+        """This factor's analysis answer. Stored-only, it is read from the analysis cache
+        and None on a miss: the source (3DEP, Open-Meteo) is never called."""
+        if self.stored_only:
+            return self.analysis.lookup(geom, params)
+        return self.analysis.run(geom, params)
 
     def result(self, status, score, measurement, explanation, caps=None) -> FactorResult:
         return FactorResult(
@@ -277,9 +285,11 @@ class WeatherFactor(Factor):
     def evaluate(self, lon, lat):
         s = self.settings
         try:
-            outcome = self.analysis.run(Point(lon, lat, srid=4326), {"days": s["forecast_days"]})
+            outcome = self.outcome(Point(lon, lat, srid=4326), {"days": s["forecast_days"]})
         except AnalysisError:
             return self.result(NOT_AVAILABLE, None, None, "Weather forecast unavailable right now.")
+        if outcome is None:
+            return self.result(NOT_AVAILABLE, None, None, "No recent forecast stored for here.")
         days = outcome.value["daily"]
         if not days:
             return self.result(NOT_AVAILABLE, None, None, "Weather forecast was empty.")
@@ -373,11 +383,13 @@ class SlopeFactor(Factor):
     def evaluate(self, lon, lat):
         s = self.settings
         try:
-            outcome = self.analysis.run(
+            outcome = self.outcome(
                 Point(lon, lat, srid=4326), {"stencil_m": s.get("stencil_m", 10)}
             )
         except AnalysisError:
             return self.result(NOT_AVAILABLE, None, None, "Slope unavailable right now.")
+        if outcome is None:
+            return self.result(NOT_AVAILABLE, None, None, "No slope stored for this site yet.")
         value = outcome.value
         degrees = value["slope_deg"]
         score = piecewise(degrees, s["curve"])

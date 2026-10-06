@@ -320,6 +320,13 @@ parcel. Measured over all 1,320 campsites, same model (1.1.0) and weights:
 
 The weather-excluded rows are the fair comparison; the forecast changes hourly.
 
+### Stored values only (TM05-45)
+
+`score_location(..., stored_only=True)` and `score_campsite(..., stored_only=True)` score
+without any live call. Factors read from analyses (slope, weather) use
+`Analysis.lookup()`, which returns a fresh cached answer or nothing and never computes;
+on a miss the factor is `not_available`. The campsite detail endpoint scores this way.
+
 ### Adding a factor
 
 1. Write a `Factor` subclass in `factors.py` (or its own module) with `key`, `label` and
