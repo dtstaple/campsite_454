@@ -46,6 +46,8 @@ import BasemapToggle from "../basemap/BasemapToggle";
 import SatelliteLayers from "../basemap/SatelliteLayers";
 import { useBasemap } from "../basemap/useBasemap";
 import { isRouteHit } from "../trails/mapLayers";
+import { selectionFromFeature, type CampsiteSelection } from "../campsite/selection";
+import { useCampsiteHover } from "../campsite/useCampsiteHover";
 import { DEFAULT_MODE_ID, modeById, type ModeId } from "../modes/modes";
 import {
   loadSaved,
@@ -143,8 +145,12 @@ export default function Discover() {
   // Starts empty and is filled by the effect below, because the list now comes from the
   // server rather than from this browser's storage.
   const [saved, setSaved] = useState<SavedCampsite[]>([]);
-  // The campsite whose detail panel is open (TM05-66), by source_id.
-  const [campsiteId, setCampsiteId] = useState<string | null>(null);
+  // The selected campsite (TM05-66, TM05-69): its detail panel is open and it is raised
+  // on the map. Set from a map click or the trail panel's list; one at a time.
+  const [selection, setSelection] = useState<CampsiteSelection | null>(null);
+  // The campsite row hovered in the trail panel's list, lit up on the map (TM05-69).
+  const [hoveredCampsite, setHoveredCampsite] = useState<string | null>(null);
+  useCampsiteHover(mapInstance, hoveredCampsite);
 
   // The campsite whose popup is open, and the slot in that popup the save button is
   // portalled into. The map's click handler only records this; the button itself is
@@ -335,12 +341,16 @@ export default function Discover() {
       // A named route opens the trail panel (TrailInsight); no segment popup on top of it.
       if (isRouteHit(instance, event.point)) return;
       const hit = topClickable(event.point);
-      if (!hit) return;
+      // Empty map clears the selected campsite (TM05-69).
+      if (!hit) {
+        setSelection(null);
+        return;
+      }
       const { layer, feature } = hit;
 
       // A campsite opens its detail panel (TM05-66) instead of a popup.
       if (layer === "campsites" && sourceIdOf(feature)) {
-        setCampsiteId(sourceIdOf(feature));
+        setSelection(selectionFromFeature(feature, sourceIdOf(feature)));
         return;
       }
 
@@ -460,11 +470,15 @@ export default function Discover() {
         </div>
       )}
 
-      <TrailInsight map={mapInstance} onOpenCampsite={setCampsiteId} />
+      <TrailInsight
+        map={mapInstance}
+        onOpenCampsite={setSelection}
+        onHoverCampsite={setHoveredCampsite}
+      />
       <CampsiteDetail
         map={mapInstance}
-        campsiteId={campsiteId}
-        onClose={() => setCampsiteId(null)}
+        selection={selection}
+        onClose={() => setSelection(null)}
         renderSave={(detail) => {
           const campsite = {
             id: detail.id,

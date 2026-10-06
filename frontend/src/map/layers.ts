@@ -15,6 +15,8 @@ import type * as maplibregl from "maplibre-gl";
 import type { FeatureCollection as GeoJsonFeatureCollection } from "geojson";
 import { mapColors, mapHillshade, mapPaint, scoreColors } from "../theme";
 import { scoreColorExpression } from "../score/grade";
+import { campsiteHighlightPaint } from "../campsite/highlight";
+import { SOURCE_ID_PROPERTY } from "./featureIds";
 import type { LayerName } from "../api";
 import type { ActivityMode } from "../modes/modes";
 
@@ -67,7 +69,12 @@ export const CLICKABLE_IDS: string[] = CLICKABLE.map((entry) => entry.id);
 /** One GeoJSON source per layer. The API output goes in unmodified. */
 export function addMapSources(map: maplibregl.Map): void {
   for (const layer of LAYERS) {
-    map.addSource(layer.name, { type: "geojson", data: EMPTY });
+    map.addSource(layer.name, {
+      type: "geojson",
+      data: EMPTY,
+      // TM05-69: campsites are keyed by source_id so feature-state can mark the selected one.
+      ...(layer.name === "campsites" ? { promoteId: SOURCE_ID_PROPERTY } : {}),
+    });
   }
 }
 
@@ -147,16 +154,23 @@ export function addMapLayers(map: maplibregl.Map): void {
     paint: { "line-color": colour.trails, "line-width": paint.hitWidth, "line-opacity": 0 },
   });
 
+  // TM05-69 wraps these values: unchanged until a campsite is selected or hovered.
+  const highlight = campsiteHighlightPaint({
+    radius: paint.campsitesRadius,
+    opacity: paint.campsitesOpacity,
+    strokeWidth: paint.campsitesStrokeWidth,
+    strokeColor: colour.campsiteStroke,
+  });
   map.addLayer({
     id: "campsites-point",
     type: "circle",
     source: "campsites",
     paint: {
-      "circle-radius": paint.campsitesRadius,
+      "circle-radius": highlight.radius,
       "circle-color": scoreColorExpression(scoreColors()) as maplibregl.ExpressionSpecification,
-      "circle-opacity": paint.campsitesOpacity,
-      "circle-stroke-width": paint.campsitesStrokeWidth,
-      "circle-stroke-color": colour.campsiteStroke,
+      "circle-opacity": highlight.opacity,
+      "circle-stroke-width": highlight.strokeWidth,
+      "circle-stroke-color": highlight.strokeColor,
     },
   });
 }

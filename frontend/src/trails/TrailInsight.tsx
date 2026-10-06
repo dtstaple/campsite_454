@@ -28,6 +28,7 @@ import TrailPanel, { type DetailState } from "./TrailPanel";
 import ThreeDControls from "./ThreeDControls";
 import { CAMERA, easeBearing, rigFor } from "./camera";
 import { disable3D, enable3D, prefersReducedMotion } from "./terrain3d";
+import type { CampsiteSelection } from "../campsite/selection";
 import "./trails.css";
 
 /** Below this zoom a route list would be most of a region; skip the request. */
@@ -45,11 +46,13 @@ const REDUCED_STEP_MS = 1500;
 
 interface Props {
   map: maplibregl.Map | null;
-  /** Open a campsite's detail panel (TM05-66). Without it, a click just flies there. */
-  onOpenCampsite?: (sourceId: string) => void;
+  /** Select a campsite (TM05-66, TM05-69). Without it, a click just flies there. */
+  onOpenCampsite?: (selection: CampsiteSelection) => void;
+  /** A campsite row is hovered (TM05-69): its source_id, or null. */
+  onHoverCampsite?: (sourceId: string | null) => void;
 }
 
-export default function TrailInsight({ map, onOpenCampsite }: Props) {
+export default function TrailInsight({ map, onOpenCampsite, onHoverCampsite }: Props) {
   const [selected, setSelected] = useState<{ osmId: number; name: string } | null>(null);
   const [state, setState] = useState<DetailState | null>(null);
   const [cursorM, setCursorM] = useState<number | null>(null);
@@ -300,13 +303,14 @@ export default function TrailInsight({ map, onOpenCampsite }: Props) {
 
   const close = useCallback(() => {
     if (is3D) turn3DOff();
+    onHoverCampsite?.(null);
     setSelected(null);
     setState(null);
     setCursorM(null);
     framed.current = null;
     (map?.getSource(SELECTED_SOURCE) as maplibregl.GeoJSONSource | undefined)?.setData(EMPTY);
     (map?.getSource(ALONG_SOURCE) as maplibregl.GeoJSONSource | undefined)?.setData(EMPTY);
-  }, [map, is3D, turn3DOff]);
+  }, [map, is3D, turn3DOff, onHoverCampsite]);
 
   useEffect(() => {
     if (!selected) return;
@@ -320,7 +324,9 @@ export default function TrailInsight({ map, onOpenCampsite }: Props) {
   const showCampsite = useCallback(
     (site: CampsiteAlong) => {
       setCursorM(site.distance_along_m);
-      if (onOpenCampsite) onOpenCampsite(site.id);
+      if (onOpenCampsite) {
+        onOpenCampsite({ id: site.id, lon: site.lon, lat: site.lat, name: site.name, score: site.score });
+      }
       else map?.flyTo({ center: [site.lon, site.lat], zoom: Math.max(map.getZoom(), 14) });
     },
     [map, onOpenCampsite],
@@ -336,6 +342,7 @@ export default function TrailInsight({ map, onOpenCampsite }: Props) {
       onScrub={scrub}
       onWithin={setWithinM}
       onCampsite={showCampsite}
+      onCampsiteHover={(site) => onHoverCampsite?.(site ? site.id : null)}
       onClose={close}
       controls={
         <ThreeDControls

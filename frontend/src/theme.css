@@ -66,6 +66,34 @@
   --map-campsites-radius: 6;
   --map-campsites-stroke-width: 1.5;
 
+  /* The selected campsite (TM05-69). Its circle grows and takes the selected-route yellow
+   * as a ring, the colour the map already uses for "the thing you chose", and every other
+   * campsite steps back. Hover (a trail-list row) is a smaller version of the same. */
+  --map-campsites-selected-radius: 10;
+  --map-campsites-selected-stroke-width: 3;
+  --map-campsites-selected-stroke: #ffd166;
+  --map-campsites-hover-radius: 8;
+  --map-campsites-dimmed-opacity: 0.45;
+
+  /* The raised pin over the selected campsite: a head on a thin stem, 52 px in all, so in
+   * 3D it reads as standing above the ground rather than printed on it. The ring is an
+   * ellipse because it lies on the ground. The head's colour is the site's score grade
+   * (--score-*, below), set per pin. */
+  --pin-head-size: 16px;
+  --pin-head-border: 2px;
+  --pin-stem-height: 36px;
+  --pin-stem-width: 2px;
+  --pin-stem-color: #ede7d9;
+  --pin-ring-width: 28px;
+  --pin-ring-height: 10px;
+  --pin-ring-color: rgba(255, 209, 102, 0.55);
+  --pin-ring-fill: rgba(255, 209, 102, 0.16);
+  --pin-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+  --pin-label-bg: rgba(21, 19, 15, 0.9);
+  --pin-label-max-width: 220px;
+  /* MapLibre's opacity for the pin while terrain hides its base. */
+  --pin-covered-opacity: 0.2;
+
   /* The widths above are what a line *looks* like; this is what it can be hit
    * by. A 1.2px stream or a 1.6px trail is far thinner than a pointer is
    * accurate, so each line layer is paired with a transparent copy drawn at

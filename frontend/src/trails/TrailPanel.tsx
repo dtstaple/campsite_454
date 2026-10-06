@@ -22,6 +22,8 @@ interface Props {
   onScrub?: (distance: number) => void;
   onWithin: (metres: number) => void;
   onCampsite: (campsite: CampsiteAlong) => void;
+  /** A list row is hovered or focused (TM05-69), or null when it no longer is. */
+  onCampsiteHover?: (campsite: CampsiteAlong | null) => void;
   onClose: () => void;
   /** Extra controls under the chart (the 3D toggle and flythrough, TM05-62). */
   controls?: ReactNode;
@@ -44,6 +46,7 @@ export default function TrailPanel({
   onScrub,
   onWithin,
   onCampsite,
+  onCampsiteHover,
   onClose,
   controls,
 }: Props) {
@@ -81,6 +84,7 @@ export default function TrailPanel({
           onScrub={onScrub}
           onWithin={onWithin}
           onCampsite={onCampsite}
+          onCampsiteHover={onCampsiteHover}
           controls={controls}
         />
       )}
@@ -96,6 +100,7 @@ function Ready({
   onScrub,
   onWithin,
   onCampsite,
+  onCampsiteHover,
   controls,
 }: Omit<Props, "state" | "onClose"> & { detail: RouteDetail }) {
   const profile = detail.profile;
@@ -168,7 +173,13 @@ function Ready({
                   type="button"
                   className="trail-campsite"
                   onClick={() => onCampsite(site)}
-                  onMouseEnter={() => onCursor(site.distance_along_m)}
+                  onMouseEnter={() => {
+                    onCursor(site.distance_along_m);
+                    onCampsiteHover?.(site);
+                  }}
+                  onMouseLeave={() => onCampsiteHover?.(null)}
+                  onFocus={() => onCampsiteHover?.(site)}
+                  onBlur={() => onCampsiteHover?.(null)}
                 >
                   <span className="trail-mile">mi {(site.distance_along_m / 1609.344).toFixed(1)}</span>
                   <span className="trail-campsite-name">
