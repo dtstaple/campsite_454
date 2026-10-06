@@ -67,6 +67,7 @@ export default function CampsiteDetail({ map, selection, onClose, renderSave }: 
     <>
       <CampsitePanel
         state={shown}
+        score={{ breakdown: selection?.breakdown ?? null, total: selection?.score ?? null }}
         saveButton={shown.status === "ready" ? renderSave(shown.detail) : null}
         onClose={onClose}
       />

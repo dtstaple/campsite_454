@@ -18,14 +18,22 @@ import {
   tagValue,
 } from "./format";
 import SatelliteInset from "./SatelliteInset";
+import ScoreBreakdown from "./ScoreBreakdown";
 
 export type CampsiteState =
   | { status: "loading" }
   | { status: "error"; message: string }
   | { status: "ready"; detail: CampsiteDetail };
 
+/** What the selection knows about the score (TM05-47): a contract-1 breakdown, a total, or neither. */
+export interface CampsiteScore {
+  breakdown: unknown;
+  total: number | null;
+}
+
 interface Props {
   state: CampsiteState;
+  score: CampsiteScore;
   /** The Save button, built by the page so it shares the map's saved list and session. */
   saveButton: ReactNode;
   onClose: () => void;
@@ -40,7 +48,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-export default function CampsitePanel({ state, saveButton, onClose }: Props) {
+export default function CampsitePanel({ state, score, saveButton, onClose }: Props) {
   return (
     <aside className="panel trail-panel campsite-panel" aria-label="Campsite">
       <header className="trail-header">
@@ -57,7 +65,7 @@ export default function CampsitePanel({ state, saveButton, onClose }: Props) {
         </button>
       </header>
       {state.status === "error" && <div className="trail-status is-error">{state.message}</div>}
-      {state.status === "ready" && <Body detail={state.detail} saveButton={saveButton} />}
+      {state.status === "ready" && <Body detail={state.detail} score={score} saveButton={saveButton} />}
     </aside>
   );
 }
@@ -77,7 +85,15 @@ function Title({ detail }: { detail: CampsiteDetail }) {
   );
 }
 
-function Body({ detail, saveButton }: { detail: CampsiteDetail; saveButton: ReactNode }) {
+function Body({
+  detail,
+  score,
+  saveButton,
+}: {
+  detail: CampsiteDetail;
+  score: CampsiteScore;
+  saveButton: ReactNode;
+}) {
   const facts = detail.facts;
   const shelter = shelterLabel(facts?.amenities.shelter_kind ?? null);
   const tags = facts?.amenities.osm_tags ?? {};
@@ -91,14 +107,7 @@ function Body({ detail, saveButton }: { detail: CampsiteDetail; saveButton: Reac
 
       <div className="campsite-actions">{saveButton}</div>
 
-      {/*
-        TM05-47 SLOT -- score breakdown (Sahaj Soni).
-        Deliberately empty: this story does not build the breakdown UI. Render TM05-47's
-        component here. The data is the contract-1 score from docs/scoring.md, available
-        per campsite from TM05-45's endpoint (and today from /api/routes/<id>/ for sites
-        along a route). See the TM05-47 handoff note in the run report.
-      */}
-      <section className="campsite-score-slot" data-slot="TM05-47-score-breakdown" />
+      <ScoreBreakdown breakdown={score.breakdown} total={score.total} />
 
       <dl className="campsite-facts">
         {shelter && <Row label="Site">{shelter}</Row>}
