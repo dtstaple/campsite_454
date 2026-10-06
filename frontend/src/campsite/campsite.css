@@ -145,14 +145,84 @@
   line-height: var(--leading-normal);
 }
 
-/* --- the selected site on the map --- */
+/* --- the selected site on the map: a raised pin (TM05-69) ---------------------------
+ *
+ * The Marker is anchored at this element's bottom centre, which is the foot of the stem:
+ * the site's coordinate, on the terrain in 3D. Head above, stem below, a flat ring around
+ * the foot, and the label beside the head. --pin-color is set per pin from the site's
+ * score grade. Never interactive: clicks fall through to the map.
+ */
 
-.campsite-selected-marker {
-  width: 18px;
-  height: 18px;
-  background: var(--map-campsites);
-  border: 3px solid var(--text-primary);
-  border-radius: 50%;
-  box-shadow: var(--shadow-panel);
+.campsite-pin {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   pointer-events: none;
+}
+
+.campsite-pin-head {
+  order: 0;
+  width: var(--pin-head-size);
+  height: var(--pin-head-size);
+  background: var(--pin-color, var(--score-none));
+  border: var(--pin-head-border) solid var(--text-primary);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--pin-shadow);
+}
+
+.campsite-pin-stem {
+  order: 1;
+  width: var(--pin-stem-width);
+  height: var(--pin-stem-height);
+  background: var(--pin-stem-color);
+  box-shadow: var(--pin-shadow);
+}
+
+/* Centred on the foot, so half of it lies "in front of" the site. */
+.campsite-pin-ring {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: var(--pin-ring-width);
+  height: var(--pin-ring-height);
+  background: var(--pin-ring-fill);
+  border: var(--pin-stem-width) solid var(--pin-ring-color);
+  border-radius: 50%;
+  transform: translate(-50%, 50%);
+}
+
+.campsite-pin-label {
+  position: absolute;
+  top: calc(var(--pin-head-size) / 2);
+  left: calc(50% + var(--pin-head-size) / 2 + var(--space-sm));
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  max-width: var(--pin-label-max-width);
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--pin-label-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-float);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+  transform: translateY(-50%);
+}
+
+.campsite-pin-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.campsite-pin-score {
+  padding: 0 var(--space-xs);
+  border-radius: var(--radius-sm);
+  background: var(--pin-color, var(--score-none));
+  color: var(--bg-base);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
 }
