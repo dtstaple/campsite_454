@@ -1,0 +1,73 @@
+/* Phone layout (TM05-103). Below 640px (PHONE_MAX_WIDTH in components/snaps.ts) the side
+ * panels are bottom sheets (components/sheet.css); this file keeps everything else clear of
+ * them, of the notch and of the home bar. Safe-area insets need viewport-fit=cover
+ * (index.html). */
+
+.site-header {
+  padding-top: max(var(--space-sm), env(safe-area-inset-top));
+  padding-left: max(var(--space-base), env(safe-area-inset-left));
+  padding-right: max(var(--space-base), env(safe-area-inset-right));
+}
+
+@media (max-width: 640px) {
+  .site-header {
+    gap: var(--space-sm);
+  }
+
+  .site-header .account-who {
+    display: none;
+  }
+
+  .site-nav {
+    gap: var(--space-sm);
+  }
+
+  /* The search spans the top; the mode switcher and layers sit under it. (`.app` raises
+   * these above the feature stylesheets, which load after this one.) */
+  .app .trail-search {
+    top: var(--space-sm);
+    width: calc(100% - 2 * var(--space-sm) - env(safe-area-inset-left) - env(safe-area-inset-right));
+  }
+
+  .app .overlay-left {
+    top: calc(var(--space-sm) + var(--phone-search-height));
+    left: calc(var(--space-sm) + env(safe-area-inset-left));
+    max-width: calc(100% - 2 * var(--space-sm));
+  }
+
+  /* A sheet covers the bottom of the map: pinch-zoom and two-finger tilt replace the zoom
+   * and compass buttons while one is open. */
+  .app:has(.sheet) .maplibregl-ctrl-bottom-right {
+    display: none;
+  }
+
+  .maplibregl-ctrl-bottom-right,
+  .maplibregl-ctrl-bottom-left {
+    margin-bottom: env(safe-area-inset-bottom);
+  }
+
+  .app .basemap-toggle {
+    left: calc(var(--space-sm) + env(safe-area-inset-left));
+    /* Above the open sheet, or else above MapLibre's attribution strip. */
+    bottom: calc(var(--sheet-height, var(--phone-attribution-height)) + var(--space-sm) + env(safe-area-inset-bottom));
+  }
+
+  .app .live-controls {
+    left: calc(var(--space-sm) + env(safe-area-inset-left));
+    bottom: calc(var(--sheet-height, var(--phone-attribution-height)) + var(--space-sm) + var(--live-controls-lift) + env(safe-area-inset-bottom));
+  }
+
+  /* Touch targets: at least 40px tall where a finger has to hit them. */
+  .trail-stop,
+  .trail-3d-button,
+  .waypoint-add {
+    min-height: 36px;
+  }
+
+  .profile,
+  .browse {
+    padding-left: max(var(--space-base), env(safe-area-inset-left));
+    padding-right: max(var(--space-base), env(safe-area-inset-right));
+    padding-bottom: calc(var(--space-2xl) + env(safe-area-inset-bottom));
+  }
+}

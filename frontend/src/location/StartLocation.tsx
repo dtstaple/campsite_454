@@ -1,7 +1,7 @@
 /**
  * Opens the map where the user is (TM05-78). Renders the "outside coverage" notice; the
- * rest happens on the map: a camera move, a dot where the user is, and MapLibre's locate
- * button for asking again. The decisions are in locate.ts.
+ * rest happens on the map: a camera move and a dot where the user is. Asking again, live
+ * tracking and follow mode are LiveLocation.tsx (TM05-103). The decisions are in locate.ts.
  *
  * The map opens on the default region straight away and moves only when an answer comes
  * back -- and not at all if the user has already started panning or zooming by then.
@@ -14,7 +14,6 @@ import { prefersReducedMotion } from "../trails/terrain3d";
 import {
   LOCATED_ZOOM,
   aboutKm,
-  forgetDenial,
   locateStart,
   type StartOutcome,
 } from "./locate";
@@ -41,16 +40,8 @@ export default function StartLocation({ map, onRegion }: Props) {
     if (!map || started.current) return;
     started.current = true;
 
-    // MapLibre's locate button: asking from it is an explicit "yes", so it clears a
-    // remembered denial.
-    const control = new maplibregl.GeolocateControl({
-      positionOptions: { enableHighAccuracy: false },
-      fitBoundsOptions: { maxZoom: LOCATED_ZOOM },
-      trackUserLocation: false,
-    });
-    control.on("geolocate", () => forgetDenial(safeStorage()));
-    map.addControl(control, "bottom-right");
-
+    // Asking again on demand is the live-location control's job (LiveLocation.tsx,
+    // TM05-103), which also clears a remembered denial.
     // Don't yank the map away from someone who has already started exploring it.
     let moved = false;
     const onMove = (event: { originalEvent?: unknown }) => {

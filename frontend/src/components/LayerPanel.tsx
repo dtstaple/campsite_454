@@ -19,6 +19,7 @@ import { REGIONS, type Region } from "../regions";
 import { CONTOUR_MIN_ZOOM } from "../map/contourConfig";
 import { BANDS } from "../slope/slope";
 import { SLOPE_MIN_ZOOM, slopeSupported } from "../slope/slopeLayer";
+import { PHONE_QUERY } from "./snaps";
 import { bandLabel, GRADES, gradeToken } from "../score/grade";
 
 interface Props {
@@ -116,7 +117,10 @@ export default function LayerPanel({
   onSlopeOpacity,
   onRegion,
 }: Props) {
-  const [open, setOpen] = useState(true);
+  // TM05-103: on a phone the layer list starts folded, so the map is visible.
+  const [open, setOpen] = useState(
+    () => typeof window === "undefined" || !window.matchMedia(PHONE_QUERY).matches,
+  );
   const primary = primaryLayer(mode);
 
   return (

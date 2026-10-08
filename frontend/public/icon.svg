@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- CampSite: a tent under a ridge line, in the theme.css base, accent and text colours. -->
+  <rect width="512" height="512" rx="112" fill="#15130f"/>
+  <path d="M40 330 L170 190 L230 250 L300 150 L472 330 Z" fill="#24211a"/>
+  <path d="M40 330 L170 190 L230 250 L300 150 L472 330" fill="none" stroke="#6f6858" stroke-width="10" stroke-linejoin="round"/>
+  <path d="M256 196 L376 392 H136 Z" fill="#c98f4e"/>
+  <path d="M256 196 L296 392 H216 Z" fill="#15130f"/>
+  <path d="M100 392 H412" stroke="#ede7d9" stroke-width="14" stroke-linecap="round"/>
+</svg>

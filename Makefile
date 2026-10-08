@@ -6,6 +6,7 @@
 #   make restore DUMP=<path-or-url>   load a database dump (fast data path)
 #   make data      rebuild all Adirondacks data from the sources (slow data path)
 #   make dev       run the backend (:8000) and frontend (:5173) together
+#   make dev-phone the same over HTTPS on the LAN, to test on a phone (TM05-103)
 #   make dump      write a dump of your database to dumps/
 
 # .env supplies POSTGRES_*, DB_CONTAINER_NAME and COMPOSE_PROJECT_NAME. Missing on the
@@ -33,10 +34,10 @@ PYTHON312 := $(shell command -v python3.12 2>/dev/null)
 PERSONAL_TABLES := auth_user auth_user_groups auth_user_user_permissions authtoken_token \
 	'accounts_*' django_session django_admin_log
 
-.PHONY: help setup doctor dev backend frontend data restore dump
+.PHONY: help setup doctor dev backend frontend data restore dump dev-phone
 
 help:
-	@sed -n '4,10p' Makefile | sed 's/^# //'
+	@sed -n '4,11p' Makefile | sed 's/^# //'
 
 setup:
 	@if [ -z "$(PYTHON312)" ]; then \
@@ -72,6 +73,22 @@ dev:
 	@trap 'kill 0' INT TERM; \
 		$(VPY) backend/manage.py runserver & \
 		(cd frontend && npm run dev) & \
+		wait
+
+# TM05-103: the app on a real phone over HTTPS (geolocation needs it). Vite serves HTTPS
+# on the LAN with a self-signed certificate and proxies /api to Django, which stays on
+# this machine. DEV_LAN_ORIGIN lets Django's dev settings trust that origin.
+# docs/setup.md, "Testing on a phone".
+LAN_IP ?= $(shell ipconfig getifaddr en0 2>/dev/null || hostname -I 2>/dev/null | cut -d' ' -f1)
+
+dev-phone:
+	@if [ -z "$(LAN_IP)" ]; then echo "Couldn't find this machine's LAN address; run make dev-phone LAN_IP=192.168.x.y"; exit 1; fi
+	@echo "On the phone (same Wi-Fi): https://$(LAN_IP):5173/discover"
+	@echo "Accept the certificate warning once: it is this machine's own self-signed one."
+	@echo "Running both; Ctrl-C stops both."
+	@trap 'kill 0' INT TERM; \
+		DEV_LAN_ORIGIN=https://$(LAN_IP):5173 $(VPY) backend/manage.py runserver 127.0.0.1:8000 & \
+		(cd frontend && PHONE=1 VITE_API_BASE_URL= npm run dev) & \
 		wait
 
 backend:

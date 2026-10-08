@@ -62,6 +62,7 @@ import {
 import type { FeatureCollection as GeoJsonFeatureCollection } from "geojson";
 import { addContourLayers, setContourBasemap, setContoursVisible } from "../map/contours";
 import StartLocation from "../location/StartLocation";
+import LiveLocation, { type LivePosition } from "../location/LiveLocation";
 import {
   addSlopeLayer,
   defaultSlopeOpacity,
@@ -302,6 +303,9 @@ export default function Discover() {
     },
     [session, saved],
   );
+
+  // TM05-103: the live GPS position, for "mi X.X along <trail>" in the trail panel.
+  const [userPosition, setUserPosition] = useState<LivePosition | null>(null);
 
   // TM05-100: an item clicked on the Profile page arrives as router state. It is taken
   // once, and the history entry is replaced so a reload does not open it again.
@@ -555,6 +559,7 @@ export default function Discover() {
 
       <TrailInsight
         map={mapInstance}
+        userPosition={userPosition}
         openRequest={
           openRequest?.kind === "trail" || openRequest?.kind === "plan" ? openRequest : null
         }
@@ -582,6 +587,7 @@ export default function Discover() {
         }}
       />
       <StartLocation map={mapInstance} onRegion={flyToRegion} />
+      <LiveLocation map={mapInstance} onPosition={setUserPosition} />
       <SatelliteLayers map={mapInstance} basemap={basemap} terrain={terrain} />
       <BasemapToggle value={basemap} onChange={setBasemap} />
     </div>

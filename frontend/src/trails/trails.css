@@ -746,3 +746,25 @@
   box-shadow: var(--pin-shadow);
   pointer-events: none;
 }
+
+/* --- Live mile (TM05-103) ----------------------------------------------------------- */
+
+.trail-live-mile {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
+  padding: 2px var(--space-sm);
+  border: 1px solid var(--live-dot);
+  border-radius: var(--radius-pill);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.trail-live-dot {
+  width: 8px;
+  height: 8px;
+  background: var(--live-dot);
+  border-radius: var(--radius-pill);
+}

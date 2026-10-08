@@ -1,0 +1,56 @@
+/* Bottom sheets on a phone (TM05-103). The 640px matches PHONE_MAX_WIDTH in snaps.ts. */
+
+@media (max-width: 640px) {
+  .panel.sheet {
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: auto;
+    max-width: none;
+    max-height: none;
+    padding-top: 0;
+    padding-bottom: calc(var(--space-md) + env(safe-area-inset-bottom));
+    padding-left: calc(var(--space-md) + env(safe-area-inset-left));
+    padding-right: calc(var(--space-md) + env(safe-area-inset-right));
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    border-bottom: none;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    transition: height var(--transition);
+  }
+
+  .panel.sheet.is-dragging {
+    transition: none;
+  }
+
+  /* At peek only the top of the panel shows; it should not scroll under the finger. */
+  .panel.sheet.is-peek {
+    overflow: hidden;
+  }
+
+  .sheet-handle {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    height: var(--sheet-handle-height);
+    margin: 0 calc(var(--space-md) * -1);
+    background: inherit;
+    cursor: grab;
+    touch-action: none;
+  }
+
+  .sheet-handle span {
+    width: var(--sheet-grip-width);
+    height: 5px;
+    background: var(--border-strong);
+    border-radius: var(--radius-pill);
+  }
+
+  .sheet-handle:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: -4px;
+  }
+}

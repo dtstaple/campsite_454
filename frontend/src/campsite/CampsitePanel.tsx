@@ -21,6 +21,7 @@ import {
 import SatelliteInset from "./SatelliteInset";
 import ScoreBreakdown from "./ScoreBreakdown";
 import LegalityVerdict from "./LegalityVerdict";
+import Sheet from "../components/Sheet";
 import { withoutLegalFactor } from "./legality";
 
 export type CampsiteState =
@@ -53,7 +54,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 
 export default function CampsitePanel({ state, score, saveButton, onClose }: Props) {
   return (
-    <aside className="panel trail-panel campsite-panel" aria-label="Campsite">
+    <Sheet className="panel trail-panel campsite-panel" label="Campsite">
       <header className="trail-header">
         <div>
           <div className="panel-subtitle trail-eyebrow">Campsite</div>
@@ -69,7 +70,7 @@ export default function CampsitePanel({ state, score, saveButton, onClose }: Pro
       </header>
       {state.status === "error" && <div className="trail-status is-error">{state.message}</div>}
       {state.status === "ready" && <Body detail={state.detail} score={score} saveButton={saveButton} />}
-    </aside>
+    </Sheet>
   );
 }
 

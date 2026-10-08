@@ -25,6 +25,7 @@ import { alongResults, searchSummary, type Candidate, type CandidateSearch } fro
 import { byMile, junctionMiles, type Connection } from "./connections";
 import { gpxFilename, gpxPath } from "./gpx";
 import SaveTrail from "./SaveTrail";
+import Sheet from "../components/Sheet";
 import { gradeAt, nearestIndex } from "./profile";
 
 export type DetailState =
@@ -53,6 +54,8 @@ interface Props {
   finder: Finder;
   onFind: () => void;
   onCandidate: (candidate: Candidate) => void;
+  /** TM05-103: "mi 2.3 along Van Hoevenberg Trail" while the hiker is on it. */
+  liveMile?: string | null;
   /** TM05-101: open a connecting trail; hover shows its junctions on the map. */
   onConnection?: (connection: Connection) => void;
   onConnectionHover?: (connection: Connection | null) => void;
@@ -100,11 +103,12 @@ export default function TrailPanel({
   onCandidate,
   onConnection,
   onConnectionHover,
+  liveMile,
 }: Props) {
   const name = state.status === "ready" ? state.detail.name : state.name;
 
   return (
-    <aside className="panel trail-panel" aria-label={`Trail: ${name}`}>
+    <Sheet className="panel trail-panel" label={`Trail: ${name}`}>
       <header className="trail-header">
         <div>
           <div className="panel-subtitle trail-eyebrow">Trail</div>
@@ -119,6 +123,12 @@ export default function TrailPanel({
           )}
           {state.status === "ready" && state.detail.operator && (
             <div className="trail-meta">{state.detail.operator}</div>
+          )}
+          {liveMile && (
+            <div className="trail-live-mile" role="status">
+              <span className="trail-live-dot" aria-hidden="true" />
+              {liveMile}
+            </div>
           )}
         </div>
         <button type="button" className="trail-close" onClick={onClose} aria-label="Close trail">
@@ -154,7 +164,7 @@ export default function TrailPanel({
           onConnectionHover={onConnectionHover}
         />
       )}
-    </aside>
+    </Sheet>
   );
 }
 
