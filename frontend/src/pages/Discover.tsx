@@ -42,6 +42,8 @@ import SavedPanel from "../components/SavedPanel";
 import SaveButton from "../components/SaveButton";
 import CampsiteDetail from "../campsite/CampsiteDetail";
 import TrailInsight from "../trails/TrailInsight";
+import Waypoints from "../waypoints/Waypoints";
+import { placement } from "../waypoints/placement";
 import BasemapToggle from "../basemap/BasemapToggle";
 import SatelliteLayers from "../basemap/SatelliteLayers";
 import { useBasemap } from "../basemap/useBasemap";
@@ -339,6 +341,8 @@ export default function Discover() {
     };
 
     instance.on("click", (event: maplibregl.MapMouseEvent) => {
+      // This click drops a new waypoint (TM05-80); nothing else should open for it.
+      if (placement.active) return;
       // A named route opens the trail panel (TrailInsight); no segment popup on top of it.
       if (isRouteHit(instance, event.point)) return;
       const hit = topClickable(event.point);
@@ -425,6 +429,8 @@ export default function Discover() {
           onTerrain={setTerrain}
           onRegion={flyToRegion}
         />
+        {/* Keyed by session: signing in or out starts the waypoints afresh. */}
+        <Waypoints key={session?.token ?? "signed-out"} map={mapInstance} session={session} />
       </div>
 
       {session && (

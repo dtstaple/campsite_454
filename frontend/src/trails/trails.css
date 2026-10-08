@@ -326,6 +326,11 @@
   text-decoration: none;
 }
 
+.trail-gpx-error {
+  color: var(--danger);
+  font-size: var(--text-xs);
+}
+
 /* --- map marker that follows the chart cursor ---------------------------------------- */
 
 .trail-cursor-marker {

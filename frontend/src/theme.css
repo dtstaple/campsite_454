@@ -277,3 +277,21 @@
    * 3.29:1 on imagery, and CIE76 dE 61 from F, the grade it must not be mistaken for. */
   --score-none: #8a8578;
 }
+
+/* --- Custom waypoints (TM05-80) ---------------------------------------------------------
+ * One colour and one glyph per kind, so a kind reads by shape as well as colour. Water is
+ * the map's water blue; the others avoid the score grades and the trail orange, so a
+ * waypoint is never mistaken for a campsite's grade. White glyphs on each fill clear
+ * 3:1, and the light ring separates the badge from both basemaps. */
+:root {
+  --waypoint-water: #2a8fc4;
+  --waypoint-camp: #6a5acd;
+  --waypoint-bailout: #c2410c;
+  --waypoint-custom: #5f6b7a;
+  --waypoint-glyph: #ffffff;
+  --waypoint-ring: rgba(255, 255, 255, 0.9);
+  --waypoint-size: 26px;
+  --waypoint-draft-opacity: 0.7;
+  /* Room above a waypoint for its editor popup; the map pans to make it. */
+  --waypoint-editor-room: 340px;
+}

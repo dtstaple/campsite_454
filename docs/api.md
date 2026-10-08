@@ -711,6 +711,64 @@ Errors:
 - **400** for a bad `campsites_within_m`.
 - **404** for an unknown route, or an unnamed or unknown way.
 
+## Custom waypoints (TM05-80)
+
+A signed-in user's own points on the map: a water source, a planned camp, a bail-out, or
+anything else. They live in the `planning` app, and every waypoint belongs to one user.
+
+| Method and path | What it does | Success |
+|---|---|---|
+| `GET /api/waypoints/` | The user's waypoints, oldest first | 200, a list |
+| `POST /api/waypoints/` | Create one: `{name, kind, note?, lon, lat}` | 201, the waypoint |
+| `GET /api/waypoints/<id>/` | One waypoint | 200 |
+| `PATCH /api/waypoints/<id>/` | Change any of `name`, `kind`, `note`, `lon`, `lat` | 200, the waypoint |
+| `DELETE /api/waypoints/<id>/` | Delete it | 204 |
+
+A waypoint looks like this:
+
+```json
+{"id": 1, "name": "Brook camp", "kind": "camp", "kind_label": "Camp",
+ "note": "Flat spot by the brook", "lon": -73.964725, "lat": 44.169079,
+ "created_at": "2026-10-08T04:29:36Z", "updated_at": "2026-10-08T04:29:39Z"}
+```
+
+Field rules:
+- `kind` is one of `water`, `camp`, `bailout` or `custom` (the default).
+- `name` is required, and is trimmed, with at most 80 characters.
+- `note` is optional, with at most 2,000 characters.
+- `lon` must be in −180..180 and `lat` in −90..90 (WGS84).
+- An invalid field returns **400** with DRF's `{field: [messages]}`.
+- A user can keep at most 1,000 waypoints. Past that, **400** with `{error}`.
+
+**Authentication** is `Authorization: Token <key>`, as for saved campsites (docs/auth.md).
+With no token, or a bad one, every endpoint returns **401**.
+
+**Isolation.** Every query is filtered by the signed-in user, and the owner is never taken
+from the request body. Another user's waypoint id returns **404**, the same as an id that
+doesn't exist. A 403 would confirm that the id exists. Deleting an account deletes its
+waypoints, through the CASCADE foreign key.
+
+**In GPX exports.** `GET /api/routes/<osm_id>/gpx/` and `/api/trails/<source_id>/gpx/`
+accept the same token, and it is optional there. When it is present, the user's own
+waypoints within `campsites_within_m` of the trail are added as `<wpt>` elements. That is
+the same distance the campsites use. Each one has `<name>`, the note as `<desc>`, and
+`<type>waypoint:<kind></type>`, plus a Garmin-style `<sym>`:
+
+| kind | sym |
+|---|---|
+| water | Drinking Water |
+| camp | Campground |
+| bailout | Trail Head |
+| custom | Flag, Blue |
+
+A signed-out download has no user waypoints. The trail panel's Download GPX link sends
+the token when the user is signed in.
+
+**On the map**, each waypoint has a marker coloured by kind (the `--waypoint-*` tokens in
+theme.css) with its own glyph: a drop, a tent, an arrow or a flag. Under the layer panel,
+"My waypoints" has **+ Add**: the next map click drops a draft and opens the editor.
+Clicking a marker reopens the editor to rename, retype, edit the note or delete.
+
 ## Not included yet
 
 **Scored campsites in the map layers.** The layer endpoints above return raw ingested

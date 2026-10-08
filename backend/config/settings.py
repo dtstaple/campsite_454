@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "scoring",
     "analysis",
     "enrichment",
+    "planning",
 ]
 
 MIDDLEWARE = [

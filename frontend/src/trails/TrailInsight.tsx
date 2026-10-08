@@ -44,6 +44,7 @@ import { sourceIdOf } from "../map/featureIds";
 /** Trail segments' click layer (map/layers.ts) and the campsite layer that outranks it. */
 const TRAIL_SEGMENTS_HIT = "trails-hit";
 const CAMPSITES_POINT = "campsites-point";
+import { placement } from "../waypoints/placement";
 import "./trails.css";
 
 /** Below this zoom a route list would be most of a region; skip the request. */
@@ -210,6 +211,7 @@ export default function TrailInsight({ map, onOpenCampsite, onHoverCampsite }: P
     };
 
     const onRouteClick = (event: maplibregl.MapLayerMouseEvent) => {
+      if (placement.active) return; // the click drops a waypoint (TM05-80)
       const feature = event.features?.[0];
       const osmId = Number(feature?.properties?.osm_id);
       if (!osmId) return;
@@ -226,6 +228,7 @@ export default function TrailInsight({ map, onOpenCampsite, onHoverCampsite }: P
     // The route handler wins where a route is drawn, and the page's handler (Discover)
     // wins where a campsite is: those clicks are left alone here.
     const onWayClick = (event: maplibregl.MapLayerMouseEvent) => {
+      if (placement.active) return; // the click drops a waypoint (TM05-80)
       if (isRouteHit(map, event.point)) return;
       if (
         map.getLayer(CAMPSITES_POINT) &&
