@@ -337,3 +337,10 @@
     right: 0;
   }
 }
+
+/* A derived campsite name (TM05-71): styled as the campsite panel styles it -- italic, in
+ * the secondary text colour -- so "Campsite near Calamity Brook" never reads as a real name. */
+.trail-campsite-name .is-derived {
+  font-style: italic;
+  color: var(--text-secondary);
+}

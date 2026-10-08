@@ -331,7 +331,7 @@ export default function TrailInsight({ map, onOpenCampsite, onHoverCampsite }: P
           id: site.id,
           lon: site.lon,
           lat: site.lat,
-          name: site.name,
+          name: site.display_name ?? site.name,
           score: site.score,
           breakdown: site.score_breakdown,
         });

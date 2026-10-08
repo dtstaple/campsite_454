@@ -555,6 +555,11 @@ Unknown `osm_id` → 404.
   from 3DEP (≈4–6 s); later requests read it (ms). If 3DEP is unavailable, `status` is
   `"unavailable"`, `reason` says why, `stats` and the series are absent, and **the rest of
   the response is still returned**.
+- **`campsites.items[].display_name` / `display_name_derived`** (TM05-71): the same name the
+  campsite detail endpoint gives the site. For an unnamed site that has been enriched, it is
+  derived from nearby features ("Campsite near Calamity Brook") and flagged. An unenriched
+  site falls back to its source `name`, which may be `null`. The trail list shows derived
+  names in italics, as the campsite panel does.
 - **`campsites.items[].position`** (TM05-73): `along`, `near_start` or `near_end`, with
   `position_label` "near the trailhead" or "near the trail's end", or `null` when along.
   A site past either end has no honest `distance_along_m`: it is 0 or the line's length.

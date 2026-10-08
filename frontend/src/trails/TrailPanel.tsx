@@ -8,6 +8,7 @@ import type { CampsiteAlong, RouteDetail } from "./api";
 import ElevationChart from "./ElevationChart";
 import {
   WITHIN_OPTIONS,
+  campsiteName,
   campsitePlace,
   duration,
   feet,
@@ -149,7 +150,7 @@ function Ready({
             cursorM={cursorM}
             markers={campsites.items.filter(isAlong).map((site) => ({
               distance: site.distance_along_m,
-              label: site.name ?? "Campsite",
+              label: campsiteName(site).text,
             }))}
             onHover={onCursor}
             onScrub={onScrub}
@@ -206,7 +207,16 @@ function Ready({
                     {campsitePlace(site).mile}
                   </span>
                   <span className="trail-campsite-name">
-                    {site.name ?? "Unnamed campsite"}
+                    <span
+                      className={campsiteName(site).derived ? "is-derived" : undefined}
+                      title={
+                        campsiteName(site).derived
+                          ? "No name in the source data; named from what is nearby"
+                          : undefined
+                      }
+                    >
+                      {campsiteName(site).text}
+                    </span>
                     <span className="trail-campsite-off">{campsitePlace(site).off}</span>
                   </span>
                   {site.score !== null && (
