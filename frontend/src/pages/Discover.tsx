@@ -60,6 +60,7 @@ import {
   type SavedCampsite,
 } from "../saved";
 import type { FeatureCollection as GeoJsonFeatureCollection } from "geojson";
+import { addContourLayers, setContourBasemap, setContoursVisible } from "../map/contours";
 import {
   ApiError,
   fetchMapData,
@@ -114,6 +115,20 @@ export default function Discover() {
       setHillshadeVisible(map.current, terrain && basemap !== "satellite");
     }
   }, [terrain, basemap]);
+
+  // Contour lines (TM05-83): like the hillshade, drawn by the map itself and shown or
+  // hidden in place; retinted for satellite imagery.
+  const [contours, setContours] = useState(true);
+  const contoursRef = useRef(contours);
+  const basemapRef = useRef(basemap);
+  useEffect(() => {
+    contoursRef.current = contours;
+    basemapRef.current = basemap;
+    if (map.current && styleReady.current) {
+      setContoursVisible(map.current, contours);
+      setContourBasemap(map.current, basemap);
+    }
+  }, [contours, basemap]);
 
   const switchMode = useCallback((id: ModeId) => {
     const next = modeById(id);
@@ -304,6 +319,7 @@ export default function Discover() {
     instance.on("load", () => {
       // First, so it lands under the basemap labels and under every data layer.
       addTerrainLayers(instance, terrainRef.current);
+      addContourLayers(instance, contoursRef.current, basemapRef.current);
       addMapSources(instance);
       addMapLayers(instance);
 
@@ -427,6 +443,8 @@ export default function Discover() {
           onToggle={toggleLayer}
           terrain={terrain}
           onTerrain={setTerrain}
+          contours={contours}
+          onContours={setContours}
           onRegion={flyToRegion}
         />
         {/* Keyed by session: signing in or out starts the waypoints afresh. */}

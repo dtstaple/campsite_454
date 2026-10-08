@@ -14,6 +14,7 @@
  */
 
 import type * as maplibregl from "maplibre-gl";
+import { CONTOUR_LINE_LAYER } from "../map/contours";
 import { numericToken, token } from "../theme";
 
 export const IMAGERY_SOURCE = "esri-world-imagery";
@@ -57,7 +58,8 @@ export function addImageryLayers(map: maplibregl.Map): void {
         "raster-saturation": numericToken("--map-imagery-saturation", -0.1),
       },
     },
-    firstSymbolLayerId(map),
+    // Under the contour lines when they exist (TM05-83), so they draw over the imagery.
+    map.getLayer(CONTOUR_LINE_LAYER) ? CONTOUR_LINE_LAYER : firstSymbolLayerId(map),
   );
 
   // Dark casings under the trail and stream lines, shown only over imagery: an orange

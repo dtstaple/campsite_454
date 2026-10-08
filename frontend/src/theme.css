@@ -295,3 +295,21 @@
   /* Room above a waypoint for its editor popup; the map pans to make it. */
   --waypoint-editor-room: 340px;
 }
+
+/* --- Contour lines (TM05-83) ------------------------------------------------------------
+ * Two sets: the dark basemap, and satellite imagery, where a brown line disappears into
+ * forest. Index lines (every fifth) are brighter and wider; only they are labelled. The
+ * halo is what keeps a label readable across both the dark map and busy imagery. */
+:root {
+  --map-contour: rgba(201, 170, 120, 0.38);
+  --map-contour-index: rgba(222, 192, 140, 0.72);
+  --map-contour-label: #e3cfa6;
+  --map-contour-label-halo: rgba(21, 19, 15, 0.85);
+  --map-contour-imagery: rgba(255, 246, 225, 0.3);
+  --map-contour-index-imagery: rgba(255, 246, 225, 0.82);
+  --map-contour-label-imagery: #fff6e1;
+  --map-contour-label-halo-imagery: rgba(10, 10, 8, 0.85);
+  --map-contour-width: 0.6;
+  --map-contour-index-width: 1.4;
+  --map-contour-label-size: 10;
+}
