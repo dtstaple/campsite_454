@@ -18,4 +18,5 @@ test("length, gain and distance, gain left out until it is known", () => {
 test("an empty list says why", () => {
   assert.equal(emptySearchMessage("zzzz"), 'No named trails match "zzzz".');
   assert.match(emptySearchMessage(""), /No named trails in or near this view/);
+  assert.equal(emptySearchMessage("", true), "No trails here match these filters. Loosen them, or clear them.");
 });

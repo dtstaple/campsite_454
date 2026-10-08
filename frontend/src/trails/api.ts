@@ -162,15 +162,24 @@ export interface RouteSearch {
   query: string;
   count: number;
   truncated: boolean;
+  /** TM05-85: routes the active filters could not judge (no profile yet), left out. */
+  unknown?: number;
   results: RouteHit[];
 }
 
 /** Named routes matching `q` anywhere, or (no `q`) in or near `bbox`; nearest `near` first. */
 export function searchRoutes(
-  options: { q?: string; bbox?: Bbox; near?: [number, number]; limit?: number },
+  options: {
+    q?: string;
+    bbox?: Bbox;
+    near?: [number, number];
+    limit?: number;
+    /** TM05-85 filter parameters, already in API units (filters.ts). */
+    filters?: Record<string, string>;
+  },
   signal?: AbortSignal,
 ) {
-  const params = new URLSearchParams();
+  const params = new URLSearchParams(options.filters ?? {});
   if (options.q) params.set("q", options.q);
   if (options.bbox) params.set("bbox", options.bbox.join(","));
   if (options.near) params.set("near", options.near.join(","));

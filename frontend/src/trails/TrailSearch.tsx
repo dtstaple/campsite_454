@@ -9,6 +9,17 @@ import { useEffect, useRef, useState } from "react";
 import type * as maplibregl from "maplibre-gl";
 import { clampBbox, type Bbox } from "../api";
 import { RouteApiError, searchRoutes, type RouteHit } from "./api";
+import {
+  CAMPSITE_DISTANCE_OPTIONS,
+  DIFFICULTY_OPTIONS,
+  NO_FILTERS,
+  ROUTE_TYPE_OPTIONS,
+  activeFilterCount,
+  filterParams,
+  toggled,
+  unknownNote,
+  type TrailFilters,
+} from "./filters";
 import { emptySearchMessage, routeHitMeta } from "./format";
 
 const VIEW_DEBOUNCE_MS = 400;
@@ -18,7 +29,7 @@ const LIMIT = 25;
 type ListState =
   | { status: "idle" }
   | { status: "loading" }
-  | { status: "ready"; hits: RouteHit[]; truncated: boolean }
+  | { status: "ready"; hits: RouteHit[]; truncated: boolean; unknown: number }
   | { status: "error"; message: string };
 
 interface Props {
@@ -30,6 +41,10 @@ export default function TrailSearch({ map, onPick }: Props) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(true);
   const [list, setList] = useState<ListState>({ status: "idle" });
+  // TM05-85: filters narrow the list; it refreshes as they change, no page reload.
+  const [filters, setFilters] = useState<TrailFilters>(NO_FILTERS);
+  const [showFilters, setShowFilters] = useState(false);
+  const filterKey = JSON.stringify(filterParams(filters));
   // Bumped when the map stops moving, so the list follows the view.
   const [viewVersion, setViewVersion] = useState(0);
 
@@ -61,12 +76,18 @@ export default function TrailSearch({ map, onPick }: Props) {
           bbox: clampBbox(map.getBounds().toArray().flat() as Bbox),
           near: [Number(centre.lng.toFixed(5)), Number(centre.lat.toFixed(5))],
           limit: LIMIT,
+          filters: JSON.parse(filterKey) as Record<string, string>,
         },
         controller.signal,
       )
         .then((found) => {
           if (ticket === requested.current) {
-            setList({ status: "ready", hits: found.results, truncated: found.truncated });
+            setList({
+              status: "ready",
+              hits: found.results,
+              truncated: found.truncated,
+              unknown: found.unknown ?? 0,
+            });
           }
         })
         .catch((error) => {
@@ -81,7 +102,7 @@ export default function TrailSearch({ map, onPick }: Props) {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [map, query, open, viewVersion]);
+  }, [map, query, open, viewVersion, filterKey]);
 
   const heading = query.trim() ? `Trails matching “${query.trim()}”` : "Trails near this view";
 
@@ -117,13 +138,33 @@ export default function TrailSearch({ map, onPick }: Props) {
       </div>
 
       {open && (
+        <div className="trail-filter-bar">
+          <button
+            type="button"
+            className="trail-search-toggle"
+            aria-expanded={showFilters}
+            onClick={() => setShowFilters((value) => !value)}
+          >
+            Filters{activeFilterCount(filters) ? ` (${activeFilterCount(filters)})` : ""}
+          </button>
+          {activeFilterCount(filters) > 0 && (
+            <button type="button" className="trail-search-toggle" onClick={() => setFilters(NO_FILTERS)}>
+              Clear filters
+            </button>
+          )}
+        </div>
+      )}
+
+      {open && showFilters && <FilterForm filters={filters} onChange={setFilters} />}
+
+      {open && (
         <div className="trail-search-results">
           <div className="trail-search-heading">{heading}</div>
           {list.status === "loading" && <div className="trail-search-note">Loading…</div>}
           {list.status === "error" && <div className="trail-search-note">{list.message}</div>}
           {list.status === "ready" && list.hits.length === 0 && (
             <div className="trail-search-note" role="status">
-              {emptySearchMessage(query)}
+              {emptySearchMessage(query, activeFilterCount(filters) > 0)}
             </div>
           )}
           {list.status === "ready" && list.hits.length > 0 && (
@@ -138,11 +179,77 @@ export default function TrailSearch({ map, onPick }: Props) {
               ))}
             </ol>
           )}
+          {list.status === "ready" && unknownNote(list.unknown) && (
+            <div className="trail-search-note">{unknownNote(list.unknown)}</div>
+          )}
           {list.status === "ready" && list.truncated && (
             <div className="trail-search-note">Showing the nearest {LIMIT}. Search by name for more.</div>
           )}
         </div>
       )}
     </section>
+  );
+}
+
+function FilterForm({
+  filters,
+  onChange,
+}: {
+  filters: TrailFilters;
+  onChange: (filters: TrailFilters) => void;
+}) {
+  const set = (patch: Partial<TrailFilters>) => onChange({ ...filters, ...patch });
+  return (
+    <form className="trail-filters" aria-label="Filter trails" onSubmit={(event) => event.preventDefault()}>
+      <fieldset>
+        <legend>Length (mi)</legend>
+        <input aria-label="Minimum length in miles" inputMode="decimal" placeholder="min"
+          value={filters.minLengthMi} onChange={(e) => set({ minLengthMi: e.target.value })} />
+        <span aria-hidden="true">–</span>
+        <input aria-label="Maximum length in miles" inputMode="decimal" placeholder="max"
+          value={filters.maxLengthMi} onChange={(e) => set({ maxLengthMi: e.target.value })} />
+      </fieldset>
+      <fieldset>
+        <legend>Gain (ft)</legend>
+        <input aria-label="Minimum gain in feet" inputMode="numeric" placeholder="min"
+          value={filters.minGainFt} onChange={(e) => set({ minGainFt: e.target.value })} />
+        <span aria-hidden="true">–</span>
+        <input aria-label="Maximum gain in feet" inputMode="numeric" placeholder="max"
+          value={filters.maxGainFt} onChange={(e) => set({ maxGainFt: e.target.value })} />
+      </fieldset>
+      <fieldset>
+        <legend>Difficulty</legend>
+        {DIFFICULTY_OPTIONS.map((option) => (
+          <label key={option.value}>
+            <input type="checkbox" checked={filters.difficulty.includes(option.value)}
+              onChange={() => set({ difficulty: toggled(filters.difficulty, option.value) })} />
+            {option.label}
+          </label>
+        ))}
+      </fieldset>
+      <fieldset>
+        <legend>Type</legend>
+        {ROUTE_TYPE_OPTIONS.map((option) => (
+          <label key={option.value}>
+            <input type="checkbox" checked={filters.routeType.includes(option.value)}
+              onChange={() => set({ routeType: toggled(filters.routeType, option.value) })} />
+            {option.label}
+          </label>
+        ))}
+      </fieldset>
+      <fieldset>
+        <legend>Campsites</legend>
+        <select aria-label="Has campsites within"
+          value={filters.campsitesWithinM ?? ""}
+          onChange={(e) => set({ campsitesWithinM: e.target.value ? Number(e.target.value) : null })}>
+          <option value="">Any</option>
+          {CAMPSITE_DISTANCE_OPTIONS.map((metres) => (
+            <option key={metres} value={metres}>
+              within {metres < 1000 ? `${metres} m` : `${metres / 1000} km`}
+            </option>
+          ))}
+        </select>
+      </fieldset>
+    </form>
   );
 }

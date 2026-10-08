@@ -119,7 +119,12 @@ export function routeHitMeta(hit: { length_m: number; gain_m: number | null; dis
 }
 
 /** What the list says when it is empty (TM05-74). */
-export function emptySearchMessage(query: string): string {
+export function emptySearchMessage(query: string, filtered = false): string {
+  if (filtered) {
+    return query.trim()
+      ? `No named trails match "${query.trim()}" with these filters.`
+      : "No trails here match these filters. Loosen them, or clear them.";
+  }
   return query.trim()
     ? `No named trails match "${query.trim()}".`
     : "No named trails in or near this view. Zoom out, or search by name.";

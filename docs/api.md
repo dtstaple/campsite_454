@@ -629,6 +629,28 @@ is **400**.
 - **An empty result** is `200` with `results: []`. The UI says "No named trails match …"
   or "No named trails in or near this view".
 
+### Filters (TM05-85)
+
+Filters narrow either list, and all of them combine. They are additional query parameters:
+
+| Parameter | Meaning |
+|---|---|
+| `min_length_m`, `max_length_m` | The route's length, in metres |
+| `min_gain_m`, `max_gain_m` | Its climb, in metres |
+| `difficulty` | Any of `easy`, `moderate`, `hard`, comma-separated |
+| `route_type` | Any of `loop`, `out_and_back`, `point_to_point` |
+| `campsites_within_m` | A campsite within this many metres of the route (up to 2000) |
+
+They read stored **RouteFacts**, one row per route in `enrichment`. The row is filled by
+`manage.py enrich_routes <region>` (part of `make data`, after the route profiles) and
+refreshed whenever a trail is opened.
+
+- **Gain and difficulty need the route's profile.** A route without one cannot answer
+  those filters. It is left out and counted in **`unknown`**, so the list can say "N trails
+  have no elevation data yet".
+- **Length always works.** Route type and "campsites within" need no profile.
+- **Bad values** (an unknown difficulty, a negative number, text) return 400.
+
 Measured on the dev DB: 70–150 ms warm; the first request of a process is slower, about
 1.6 s.
 
