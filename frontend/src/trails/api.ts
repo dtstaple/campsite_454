@@ -4,6 +4,7 @@
 
 import type { FeatureCollection, LineString, MultiLineString } from "geojson";
 import type { CandidateSearch } from "./candidates";
+import type { Connection } from "./connections";
 import { API_BASE_URL, type Bbox } from "../api";
 
 export interface RouteSummary {
@@ -103,6 +104,8 @@ export interface RouteDetail extends Omit<RouteSummary, "osm_id"> {
   /** Optional so an older backend without TM05-82 still renders. */
   difficulty?: Difficulty | null;
   route_type?: RouteType;
+  /** TM05-101: named trails meeting this one at a junction node, by mile. */
+  connections?: Connection[];
 }
 
 export class RouteApiError extends Error {}

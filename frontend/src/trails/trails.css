@@ -18,9 +18,11 @@
   overflow-y: auto;
 }
 
-/* The Saved panel lives in the same corner; the open trail takes precedence. */
-.app:has(.trail-panel) .saved-panel {
-  display: none;
+/* The panel scrolls; its sections keep their own height rather than being squeezed to
+ * fit, which shrank the elevation chart's SVG to nothing once the panel grew long. */
+.trail-panel > *,
+.trail-panel section > * {
+  flex-shrink: 0;
 }
 
 /* Keep the zoom/compass and attribution clear of the panel. */
@@ -695,4 +697,52 @@
 
 .candidate-detail .trail-stop {
   align-self: flex-start;
+}
+
+/* --- Connects to (TM05-101) --------------------------------------------------------- */
+
+.trail-connections ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.trail-connection {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: var(--space-xs);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  text-align: left;
+  cursor: pointer;
+}
+
+.trail-connection:hover,
+.trail-connection:focus-visible {
+  background: var(--bg-raised);
+  outline: none;
+}
+
+.trail-connection-mile {
+  flex: none;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.junction-marker {
+  width: var(--junction-size);
+  height: var(--junction-size);
+  background: var(--junction-fill);
+  border: 3px solid var(--junction-ring);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--pin-shadow);
+  pointer-events: none;
 }

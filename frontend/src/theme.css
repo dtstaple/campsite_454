@@ -350,3 +350,12 @@
   /* Room above a potential spot for its detail popup; the map pans to make it. */
   --candidate-popup-room: 380px;
 }
+
+/* --- Junctions (TM05-101) ---------------------------------------------------------------
+ * Where a connecting trail meets this one, shown while its row is hovered: a bright ring
+ * in the selected-route colour, so it reads as a place on this trail. */
+:root {
+  --junction-ring: #ffd166;
+  --junction-fill: rgba(255, 209, 102, 0.25);
+  --junction-size: 22px;
+}

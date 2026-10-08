@@ -240,3 +240,37 @@ limit doing its job: a long unnamed track is a different route, not a connector.
 
 **Cost.** Assembling all 4,000 trails took 119 s with bridging and 117 s without, so a
 single click pays about 0.5 ms more.
+
+## Connecting trails at junctions (TM05-101)
+
+The trail panel's **Connects to** section lists the other named trails that meet this one,
+with the mile of each junction on this trail. Clicking one opens it. Hovering one rings
+its junctions on the map (`--junction-*` tokens).
+
+**What counts as a junction.**
+- **A shared node.** A junction is an **OSM node shared** by one of this trail's ways and
+  another **named** way (`Trail.osm_node_ids`). A trail that only crosses or passes close
+  by, with no shared node, is not a junction, because OSM puts a node wherever two paths
+  really meet.
+- **Exact position.** Node ids are stored in vertex order, so a junction's position is
+  the vertex at that node.
+- **Mile.** The junction is placed along this trail's stitched line, so it matches the
+  panel's other miles.
+
+**What gets listed.**
+- **Which trail opens.** The other trail is named as the panel would open it: its route
+  when its way is a member of one (the longest, as for a clicked way), otherwise the
+  assembled trail of its name, opened through its lowest-numbered junction way.
+- **Left out:** unnamed ways, ways with this trail's own name (any case), and this route
+  itself.
+- **Ordering.** A trail that meets this one more than once lists each junction ("mi 1.7
+  and 2.3"). Junctions within 50 m along the line are merged into one. Entries are in
+  order of their first junction, and capped at 40.
+
+**Measured.** The Van Hoevenberg Trail has 13 connecting trails, from Mr. Van Ski Trail at
+mi 0.1 to the Mount Marcy Trail at mi 7.1, computed in 87–149 ms per request. The
+routes are looked up in one query, not one per way. Algonquin Trail lists Van Hoevenberg
+back.
+
+**Not built yet.** Planning a single hike across several connected trails is a future
+story. This section only lists the connections and opens them.

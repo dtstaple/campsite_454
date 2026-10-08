@@ -943,6 +943,24 @@ waypoints and overnight plans in tabs. It replaces the floating Saved panel.
   `display_name`, so derived names appear too. The saved-campsites list endpoint is
   unchanged (TM05-87).
 
+## Connecting trails in the route detail (TM05-101)
+
+`GET /api/routes/<osm_id>/` and `GET /api/trails/<source_id>/trail/` include
+`connections`. These are the named trails that share a junction node with this one, in
+order of the first junction along this trail:
+
+```json
+"connections": [
+  {"name": "Marcy Dam Truck Trail", "osm_id": 6619273, "way_id": null,
+   "junctions": [{"node_id": 2178563123, "lon": -73.9551, "lat": 44.1576, "distance_along_m": 2752.3},
+                 {"node_id": 2178563170, "lon": -73.9512, "lat": 44.1542, "distance_along_m": 3698.0}]},
+  {"name": "Old Marcy Dam Trail", "osm_id": null, "way_id": "way/371777637", "junctions": [...]}
+]
+```
+
+Open a route by its `osm_id`, or an assembled trail by its `way_id` (TM05-97). The rules
+are in docs/routes.md.
+
 ## Not included yet
 
 **Scored campsites in the map layers.** The layer endpoints above return raw ingested
