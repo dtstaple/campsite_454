@@ -337,3 +337,66 @@ def test_a_failing_overpass_call_records_a_failed_run_and_re_raises():
     assert run.status == IngestRun.Status.FAILED
     assert "Overpass is having a day" in run.notes
     assert run.record_count == 0
+
+
+# --- lean-tos (TM05-75) -----------------------------------------------------------------
+
+LEAN_TO = {
+    "type": "node",
+    "id": 9001,
+    "lat": 44.1847,
+    "lon": -73.9512,
+    "tags": {"amenity": "shelter", "shelter_type": "lean_to", "name": "Marcy Dam Lean-to #1"},
+}
+
+
+def test_the_query_also_asks_for_lean_to_shelters():
+    query = OsmCampsitesAdapter(client=stub_client([])).build_query(TINY)
+    assert 'node["amenity"="shelter"]["shelter_type"="lean_to"]' in query
+    assert 'way["amenity"="shelter"]["shelter_type"="lean_to"]' in query
+    # Other shelters are not campsites and are not asked for.
+    assert '["amenity"="shelter"](' not in query
+
+
+def test_a_lean_to_shelter_becomes_a_lean_to_campsite():
+    record = OsmCampsitesAdapter(client=stub_client([])).to_record(LEAN_TO)
+    assert record["site_type"] == Campsite.SiteType.LEAN_TO
+    assert record["source_id"] == "node/9001"
+    assert record["name"] == "Marcy Dam Lean-to #1"
+
+
+def test_an_element_returned_twice_is_normalised_once():
+    """A lean-to also tagged tourism=camp_site matches both filters: one row, lean_to."""
+    both = {**LEAN_TO, "tags": {**LEAN_TO["tags"], "tourism": "camp_site"}}
+    adapter = OsmCampsitesAdapter(client=stub_client([]))
+    records = list(adapter.normalize([[both], [both]]))
+    assert [r["source_id"] for r in records] == ["node/9001"]
+    assert records[0]["site_type"] == Campsite.SiteType.LEAN_TO
+
+
+@pytest.mark.django_db
+@pytest.mark.integration
+def test_a_nearby_but_separate_element_is_kept_not_merged():
+    """A tent pad mapped 10 m from the lean-to is a different OSM element: both stay."""
+    pad = {
+        "type": "node",
+        "id": 9002,
+        "lat": LEAN_TO["lat"] + 10 / 111_120,
+        "lon": LEAN_TO["lon"],
+        "tags": {"tourism": "camp_site", "backcountry": "yes"},
+    }
+    adapter_for([[LEAN_TO, pad], []]).run(ADK)
+    assert set(Campsite.objects.values_list("source_id", "site_type")) == {
+        ("node/9001", Campsite.SiteType.LEAN_TO),
+        ("node/9002", Campsite.SiteType.PRIMITIVE),
+    }
+
+
+@pytest.mark.django_db
+@pytest.mark.integration
+def test_run_parameters_record_both_tag_filters(elements):
+    run = adapter_for([elements, []]).run(ADK)
+    assert run.parameters["tag_filters"] == [
+        '["tourism"="camp_site"]',
+        '["amenity"="shelter"]["shelter_type"="lean_to"]',
+    ]

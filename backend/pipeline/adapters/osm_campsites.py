@@ -29,6 +29,23 @@ duplicate sites already captured rather than add new ones. The queried element t
 recorded in every run's parameters, so a run states what it looked for rather than leaving
 the omission implicit.
 
+Lean-tos (TM05-75)
+-----------------
+Adirondack lean-tos are mostly mapped as `amenity=shelter` + `shelter_type=lean_to`, not
+`tourism=camp_site`, so a camp_site-only query missed most of them and the High Peaks looked
+sparse. The query now also asks for those shelters. They are places to spend the night,
+first come first served, which is exactly what "campsites along this trail" is for.
+
+- **Same element, one row.** A lean-to that is also tagged `tourism=camp_site` matches both
+  selectors. Overpass's union returns each element once, and normalize() drops any repeat
+  of a source_id within a batch as well, so it is ingested once, with site_type lean_to.
+- **Nearby but separate elements are not merged.** A lean-to node a few metres from a
+  separately mapped campsite is a different OSM element, and may be a different thing (the
+  shelter, and tent pads beside it). Both are kept; the ingest command can report such pairs
+  (within 15 m) for a human to look at.
+- Other shelters (`shelter_type=picnic_shelter`, `basic_hut`, ...) are not campsites and are
+  not asked for.
+
 Site type is mapped narrowly on purpose
 ---------------------------------------
 Only tags that say something unambiguous are mapped. `backcountry=yes` means primitive;
@@ -52,6 +69,13 @@ from pipeline.overpass import OverpassClient
 # The element types worth asking for. Relations are excluded at the query, not filtered
 # out afterwards, so they are never transferred -- see the module docstring.
 CAMPSITE_ELEMENT_TYPES = ("node", "way")
+
+# Overpass tag filters, each one a set of features this adapter ingests (TM05-75 added the
+# lean-to shelters). Recorded in every run's parameters.
+TAG_FILTERS = (
+    '["tourism"="camp_site"]',
+    '["amenity"="shelter"]["shelter_type"="lean_to"]',
+)
 
 # OSM tag to Campsite.SiteType. Checked in order, first match wins, so the more specific
 # shelter and group cases are tested before the broad backcountry one.
@@ -103,7 +127,9 @@ class OsmCampsitesAdapter(SourceAdapter):
         """
         bbox = aoi.as_overpass_bbox()
         parts = "".join(
-            f'{element}["tourism"="camp_site"]({bbox});' for element in CAMPSITE_ELEMENT_TYPES
+            f"{element}{tags}({bbox});"
+            for tags in TAG_FILTERS
+            for element in CAMPSITE_ELEMENT_TYPES
         )
         return f"[out:json][timeout:{self.query_timeout_seconds}];({parts});out center;"
 
@@ -115,10 +141,16 @@ class OsmCampsitesAdapter(SourceAdapter):
     # --- normalize --------------------------------------------------------------------
 
     def normalize(self, raw: Iterable[list[dict]]) -> Iterator[dict]:
+        seen: set[str] = set()
         for elements in raw:
             for element in elements:
                 if element.get("type") not in CAMPSITE_ELEMENT_TYPES:
                     continue
+                # One row per OSM element, even if it matched two tag filters (TM05-75).
+                source_id = self.source_id_for(element)
+                if source_id in seen:
+                    continue
+                seen.add(source_id)
                 yield self.to_record(element)
 
     def to_record(self, element: dict) -> dict:
@@ -195,5 +227,6 @@ class OsmCampsitesAdapter(SourceAdapter):
             endpoint=self.client.endpoint,
             element_types=list(CAMPSITE_ELEMENT_TYPES),
             tourism_value="camp_site",
+            tag_filters=list(TAG_FILTERS),
         )
         return parameters
