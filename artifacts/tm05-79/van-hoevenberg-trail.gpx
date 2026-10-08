@@ -3,12 +3,12 @@
  <metadata>
   <name>Van Hoevenberg Trail</name>
   <desc>11.4 km. Campsites within 500 m of the trail.</desc>
-  <time>2026-10-08T04:18:10Z</time>
+  <time>2026-10-08T04:20:43Z</time>
   <bounds minlat="44.112732" minlon="-73.963958" maxlat="44.183176" maxlon="-73.914013" />
  </metadata>
  <wpt lat="44.181868" lon="-73.963958">
   <name>Wilderness Campground at Heart Lake</name>
-  <desc>CampSite score 0/100. Not permitted. near the trailhead</desc>
+  <desc>CampSite score 0/100. Not permitted. Near the trailhead</desc>
   <sym>Campground</sym>
   <type>campsite</type>
  </wpt>
