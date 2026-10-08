@@ -241,6 +241,47 @@ use `make backend` and `make frontend`.
 Open **http://localhost:5173** (see [Troubleshooting](#the-basemap-is-blank) for why
 `localhost`).
 
+### Testing on a phone (iPhone or Android)
+
+Location (the GPS dot, **Follow me**, "mi X.X along" a trail) only works over **HTTPS**.
+The one exception is `localhost`, and a phone can't reach your laptop's localhost. To try
+it on a real phone:
+
+1. Put the phone and the computer on the **same Wi-Fi**.
+2. Run **`make dev-phone`**. It prints the address to open, for example
+   `https://192.168.1.20:5173/discover`.
+   - If it can't find the LAN address, give it yourself:
+     `make dev-phone LAN_IP=192.168.1.20`. On macOS the address is
+     `ipconfig getifaddr en0`.
+3. Open that address in **Safari** on the iPhone.
+   - Safari warns that the connection isn't private, because the certificate is your
+     computer's own throwaway self-signed one.
+   - Tap **Show Details → visit this website**, then confirm. This happens once per
+     certificate.
+4. When the map asks for your location, tap **Allow**. Then:
+   - **Location** (bottom left) shows the GPS dot and accuracy circle.
+   - **Follow me** keeps the map on you. Dragging the map turns it off.
+5. To install it: **Share → Add to Home Screen**. It opens full-screen with the CampSite
+   icon. It has no offline support.
+
+**What `make dev-phone` does:**
+- Django runs on `127.0.0.1:8000` as usual. It is not exposed to the network.
+- Vite serves the frontend over HTTPS on all interfaces (`PHONE=1`, with
+  `@vitejs/plugin-basic-ssl`), and **proxies `/api`** to Django.
+  `VITE_API_BASE_URL` is empty, so the page calls `/api/...` on its own origin. The phone
+  then needs no CORS and hits no mixed-content block.
+- `DEV_LAN_ORIGIN=https://<lan-ip>:5173` tells `settings.py` to trust that origin for
+  CORS and CSRF. It does so **only while `DEBUG` is on**, and it is ignored in
+  production.
+
+**If it doesn't work:**
+- **Safari can't connect:** the phone is on another network (a guest Wi-Fi isolates
+  devices), or the macOS firewall is blocking Node. Allow "node" in **System Settings →
+  Network → Firewall → Options**.
+- **The location button says location is blocked:** in iOS, go to **Settings → Privacy &
+  Security → Location Services → Safari Websites** and choose **While Using the App**. Then
+  reload.
+
 ## 5. Log in
 
 - **The app:** click **Create account** (top right) on http://localhost:5173. The account lives

@@ -115,6 +115,15 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 CORS_ALLOWED_ORIGINS = os.environ.get("CORS_ALLOWED_ORIGINS", "http://localhost:3000").split(",")
 
+# TM05-103: `make dev-phone` serves the frontend over HTTPS on the LAN so a phone can test
+# geolocation. In development only (DEBUG on), trust that one origin for CORS and CSRF. It
+# is ignored when DEBUG is off, so it can never widen a production deployment.
+DEV_LAN_ORIGIN = os.environ.get("DEV_LAN_ORIGIN", "").strip()
+CSRF_TRUSTED_ORIGINS: list[str] = []
+if DEBUG and DEV_LAN_ORIGIN:
+    CORS_ALLOWED_ORIGINS.append(DEV_LAN_ORIGIN)
+    CSRF_TRUSTED_ORIGINS.append(DEV_LAN_ORIGIN)
+
 # GEOS logs a warning for every ring it finds invalid while reading source geometry.
 # Real data produces these in bulk -- one small PAD-US bounding box emitted 149 lines,
 # and NHD will emit thousands -- which buries anything worth reading. Raising this logger

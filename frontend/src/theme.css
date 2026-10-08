@@ -366,3 +366,20 @@
   --browse-card-min: 240px;
   --browse-spark-height: 44px;
 }
+
+/* --- Phone layout (TM05-103) ------------------------------------------------------------- */
+:root {
+  --sheet-handle-height: 28px;
+  --sheet-grip-width: 40px;
+  --live-dot: #3b82f6;
+  --live-dot-ring: #ffffff;
+  --live-accuracy-fill: rgba(59, 130, 246, 0.14);
+  --live-accuracy-line: rgba(59, 130, 246, 0.55);
+  --live-dot-size: 16px;
+  /* Room under the live-location buttons for the Map / Satellite toggle. */
+  --live-controls-lift: 64px;
+  /* The search bar's height on a phone, which the layer column sits under. */
+  --phone-search-height: 52px;
+  /* MapLibre's attribution, expanded, at phone width: two lines. */
+  --phone-attribution-height: 60px;
+}

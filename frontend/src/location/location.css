@@ -21,3 +21,63 @@
   margin-left: var(--space-xs);
   color: var(--text-secondary);
 }
+
+/* --- Live location (TM05-103) ------------------------------------------------------ */
+
+/* The one-shot start dot gives way to the live one. */
+.is-live-location .user-location-dot {
+  display: none;
+}
+
+.live-dot {
+  width: var(--live-dot-size);
+  height: var(--live-dot-size);
+  background: var(--live-dot);
+  border: 3px solid var(--live-dot-ring);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--pin-shadow);
+}
+
+/* Bottom left, above the Map / Satellite toggle; on a phone, above the open sheet. */
+.live-controls {
+  position: absolute;
+  left: calc(var(--space-md) + env(safe-area-inset-left));
+  bottom: calc(var(--sheet-height, 0px) + var(--space-md) + var(--live-controls-lift) + env(safe-area-inset-bottom));
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  max-width: calc(100% - 2 * var(--space-md));
+}
+
+.live-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: 40px;
+  padding: var(--space-xs) var(--space-md);
+  background: var(--bg-floating);
+  backdrop-filter: blur(var(--blur-floating));
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-panel);
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+}
+
+.live-button.is-active {
+  color: var(--live-dot);
+  border-color: var(--live-dot);
+}
+
+.live-problem {
+  flex-basis: 100%;
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--bg-floating);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: var(--text-xs);
+}

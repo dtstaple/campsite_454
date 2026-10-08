@@ -38,6 +38,7 @@ import TrailPanel, { type DetailState, type Finder } from "./TrailPanel";
 import AlongMarkers from "./AlongMarkers";
 import { candidatesPath, type Candidate } from "./candidates";
 import { connectionTarget, type Junction } from "./connections";
+import { mileLabel } from "../location/live";
 import ThreeDControls from "./ThreeDControls";
 import { CAMERA, easeBearing, rigFor } from "./camera";
 import { disable3D, enable3D, prefersReducedMotion } from "./terrain3d";
@@ -78,6 +79,8 @@ interface Props {
   onHoverCampsite?: (sourceId: string | null) => void;
   /** TM05-100: a saved trail or plan to open once, from the Profile page. */
   openRequest?: Extract<OpenRequest, { kind: "trail" | "plan" }> | null;
+  /** TM05-103: the hiker's live position, for "mi X.X along <trail>". */
+  userPosition?: { lon: number; lat: number } | null;
 }
 
 export default function TrailInsight({
@@ -85,6 +88,7 @@ export default function TrailInsight({
   onOpenCampsite,
   onHoverCampsite,
   openRequest,
+  userPosition,
 }: Props) {
   // A named route by relation id, or (TM05-97) a named trail way, which the API resolves to
   // its route or to a trail assembled from the connected same-name ways.
@@ -521,6 +525,11 @@ export default function TrailInsight({
       }
       finder={finder}
       onFind={() => trailKey && setFinding({ key: trailKey, finder: { status: "loading" } })}
+      liveMile={
+        line && userPosition && state.status === "ready"
+          ? mileLabel(line, [userPosition.lon, userPosition.lat], state.detail.name)
+          : null
+      }
       onConnection={(connection) => {
         const target = connectionTarget(connection);
         if (!target) return;
