@@ -15,7 +15,7 @@ import json
 from django.contrib.gis.db.models.functions import AsGeoJSON
 from django.db import connection
 from django.db.models import Value
-from django.http import Http404
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -23,6 +23,8 @@ from rest_framework.response import Response
 from analysis.analyses.elevation import RouteProfile, stitch
 from analysis.base import AnalysisError
 from api.bbox import InvalidBbox, parse_bbox
+from api.gpx import CONTENT_TYPE, Waypoint, build_gpx, campsite_waypoints, track_points
+from api.gpx import filename as gpx_filename
 from api.layers import COORDINATE_PRECISION, SimplifyPreserveTopology, envelope
 from api.views import InvalidParameter, _bad_request, _int_param, _simplify_param
 from enrichment.models import CampsiteFacts
@@ -177,18 +179,11 @@ def way_trail_view(request, source_id: str):
     except InvalidParameter as exc:
         return _bad_request(exc)
 
-    way = Trail.objects.filter(source_id=source_id).first()
-    if way is None:
-        raise Http404(f"No trail way with source_id {source_id!r}")
-    if not (way.name or "").strip():
-        raise Http404(f"{source_id} has no name, so there is no trail to assemble")
-
-    route = route_for_way(way)
-    if route is not None:
+    way, route, assembled = trail_for_way(source_id)
+    if not assembled:
         detail = route_detail(route, within)
         remember_facts(route, detail)
         return Response({**detail, "assembled": False, "assembly": None})
-    route = assembled_route(way)
     detail = route_detail(route, within)
     detail["assembled"] = True
     detail["assembly"] = {
@@ -197,6 +192,21 @@ def way_trail_view(request, source_id: str):
         "note": "Assembled from mapped segments",
     }
     return Response(detail)
+
+
+def trail_for_way(source_id: str) -> tuple[Trail, TrailRoute, bool]:
+    """A clicked way's trail: (way, route, assembled). Its named route when it is a member
+    of one, otherwise the trail assembled from connected same-name ways (TM05-97). 404s
+    for an unknown or unnamed way."""
+    way = Trail.objects.filter(source_id=source_id).first()
+    if way is None:
+        raise Http404(f"No trail way with source_id {source_id!r}")
+    if not (way.name or "").strip():
+        raise Http404(f"{source_id} has no name, so there is no trail to assemble")
+    route = route_for_way(way)
+    if route is not None:
+        return way, route, False
+    return way, assembled_route(way), True
 
 
 def remember_facts(route: TrailRoute, detail: dict) -> None:
@@ -285,3 +295,50 @@ def route_detail(route: TrailRoute, within: int) -> dict:
             "items": campsites,
         },
     }
+
+
+@api_view(["GET"])
+def route_gpx_view(request, osm_id: int):
+    """A named route as a GPX 1.1 download (TM05-79): track plus campsite waypoints."""
+    try:
+        within = _int_param(request, "campsites_within_m", DEFAULT_WITHIN_M, MAX_WITHIN_M)
+    except InvalidParameter as exc:
+        return _bad_request(exc)
+    route = get_object_or_404(TrailRoute, osm_id=osm_id)
+    return gpx_response(route.name, route_gpx(route, within))
+
+
+@api_view(["GET"])
+def way_gpx_view(request, source_id: str):
+    """A clicked way's trail (TM05-97) as a GPX 1.1 download."""
+    try:
+        within = _int_param(request, "campsites_within_m", DEFAULT_WITHIN_M, MAX_WITHIN_M)
+    except InvalidParameter as exc:
+        return _bad_request(exc)
+    _, route, _ = trail_for_way(source_id)
+    return gpx_response(route.name, route_gpx(route, within))
+
+
+def route_gpx(route, within: int, extra_waypoints: list[Waypoint] | None = None) -> bytes:
+    """The GPX for a stored or assembled route, built from the trail panel's payload so the
+    download matches what the user was looking at (api/gpx.py)."""
+    detail = route_detail(route, within)
+    line_m, _ = stitch(route.geom)
+    profile = detail["profile"]
+    profiled = profile["status"] == "ok"
+    track = track_points(
+        line_m,
+        profile["distance_m"] if profiled else None,
+        profile["elevation_m"] if profiled else None,
+    )
+    waypoints = campsite_waypoints(detail["campsites"]["items"]) + list(extra_waypoints or [])
+    desc = f"{line_m.length / 1000:.1f} km. Campsites within {within} m of the trail."
+    if not profiled:
+        desc += " Elevation unavailable."
+    return build_gpx(detail["name"] or "Trail", track, waypoints, desc=desc)
+
+
+def gpx_response(name: str, body: bytes) -> HttpResponse:
+    response = HttpResponse(body, content_type=CONTENT_TYPE)
+    response["Content-Disposition"] = f'attachment; filename="{gpx_filename(name)}"'
+    return response

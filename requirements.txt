@@ -22,3 +22,7 @@ pytest==8.3.3
 pytest-cov==5.0.0
 pytest-django==4.9.0
 ruff==0.6.9
+# Test-only: validates exported GPX against the vendored GPX 1.1 XSD (TM05-79). The
+# standard library cannot validate XML Schema; xmlschema is pure Python (no libxml2 build,
+# unlike lxml), MIT-licensed, and pulls in only elementpath.
+xmlschema==4.1.0

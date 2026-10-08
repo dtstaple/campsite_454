@@ -4,6 +4,7 @@
  */
 
 import type { ReactNode } from "react";
+import { API_BASE_URL } from "../api";
 import type { CampsiteAlong, RouteDetail } from "./api";
 import ElevationChart from "./ElevationChart";
 import {
@@ -18,6 +19,7 @@ import {
   percent,
   routeTypeText,
 } from "./format";
+import { gpxPath } from "./gpx";
 import { gradeAt, nearestIndex } from "./profile";
 
 export type DetailState =
@@ -175,6 +177,8 @@ function Ready({
         </div>
       )}
 
+      <GpxDownload detail={detail} withinM={withinM} />
+
       <section className="trail-campsites" aria-label="Campsites along this trail">
         <div className="trail-campsites-head">
           <div className="panel-subtitle">Campsites along this trail</div>
@@ -264,6 +268,22 @@ function Readout({
       <span>mi {(distances[index] / 1609.344).toFixed(2)}</span>
       <span>{feet(elevations[index])}</span>
       <span>{percent(gradeAt(distances, elevations, index))} grade</span>
+    </div>
+  );
+}
+
+/** TM05-79: the trail as a GPX file, with the campsites currently listed as waypoints. */
+function GpxDownload({ detail, withinM }: { detail: RouteDetail; withinM: number }) {
+  const path = gpxPath(detail, withinM);
+  if (!path) return null;
+  return (
+    <div className="trail-actions">
+      {/* A plain link: the API answers with Content-Disposition: attachment, so the browser
+          saves the file (the download attribute is ignored across origins). */}
+      <a className="trail-3d-button trail-gpx" href={`${API_BASE_URL}${path}`} download>
+        Download GPX
+      </a>
+      <span className="trail-3d-hint">Track and campsites within {withinM < 1000 ? `${withinM} m` : `${withinM / 1000} km`}</span>
     </div>
   );
 }
