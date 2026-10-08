@@ -25,6 +25,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
 from analysis.analyses import elevation
+from analysis.analyses.elevation import stitch
 from geodata.models import METRIC_SRID, PublicLand, Trail, TrailRoute, WaterFeature
 from planning import candidates as search
 from planning.candidates import LABEL, ROAD_NOTE, config, spread
@@ -148,8 +149,12 @@ def test_candidates_are_found_spread_out_and_capped(route):
     assert all(c["distance_from_route_m"] <= 500 for c in found)
     counts = body["counts"]
     assert counts["sampled"] >= counts["passed"] >= counts["scored"] >= len(found)
-    # The flattest survivor at each station is scored: one per 200 m station here.
-    assert counts["scored"] == LENGTH // config()["sample_spacing_m"] + 1
+    # The flattest survivor at each station is scored: one per 200 m station here. Count
+    # the stations on the same stitched line the search used: after the round trip through
+    # EPSG:4326 its length is a hair either side of 4,000 m, so 20 or 21 stations.
+    line_m, _ = stitch(route.geom)
+    stations = {s["station_along_m"] for s in search.sample_points(line_m, 500, config())}
+    assert counts["scored"] == len(stations)
 
 
 def test_public_land_filter_keeps_only_open_public_land(route):
