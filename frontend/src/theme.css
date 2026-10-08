@@ -359,3 +359,10 @@
   --junction-fill: rgba(255, 209, 102, 0.25);
   --junction-size: 22px;
 }
+
+/* --- Discover trails (TM05-102) --------------------------------------------------------- */
+:root {
+  --browse-max-width: 1080px;
+  --browse-card-min: 240px;
+  --browse-spark-height: 44px;
+}

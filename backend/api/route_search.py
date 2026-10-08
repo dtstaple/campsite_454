@@ -29,6 +29,14 @@ Filters (TM05-85) narrow either list, and all of them combine:
 They read the stored RouteFacts (enrichment/route_facts.py). A route whose facts cannot
 answer an active filter -- usually no profile yet, so no gain or difficulty -- is left out
 and counted in `unknown`, so the UI can say so rather than pretend it does not exist.
+
+The Discover page (TM05-102) browses with the same endpoint:
+
+    region=adirondacks               routes inside a region of pipeline/regions.yml
+    sort=distance|length|gain|name   distance needs `near`; unknown gain sorts last
+    offset=24                        the next page (with `limit`); `total` counts them all
+    cards=1                          card data: difficulty, route type, a sparkline of the
+                                     stored profile, and the campsites within 500 m
 """
 
 from __future__ import annotations
@@ -37,6 +45,7 @@ import unicodedata
 
 from django.contrib.gis.db.models.functions import Distance
 from django.contrib.gis.geos import Point
+from django.db import connection
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
@@ -46,12 +55,18 @@ from api.layers import envelope
 from api.views import InvalidParameter, _bad_request, _int_param
 from enrichment.models import RouteFacts
 from geodata.models import METRIC_SRID, TrailRoute
+from pipeline.regions import RegionConfigError, get_region
 
 DIFFICULTIES = ("easy", "moderate", "hard")
 ROUTE_TYPES = ("loop", "out_and_back", "point_to_point")
 
 DEFAULT_LIMIT = 25
 MAX_LIMIT = 100
+SORTS = ("distance", "length", "gain", "name")
+#: Points in a card's elevation sparkline: enough for a shape, small enough to send 24.
+SPARKLINE_POINTS = 32
+#: A card's campsite count: campsites within this of the route (the panel's default).
+CARD_CAMPSITES_WITHIN_M = 500
 #: "Near the view": the bbox grown by this share of its width and height on each side.
 NEAR_MARGIN = 0.5
 
@@ -173,23 +188,94 @@ def gain_of(route: TrailRoute) -> float | None:
     return outcome.value["stats"]["gain_m"] if outcome else None
 
 
+def sparkline(route: TrailRoute) -> list[float] | None:
+    """The stored profile's elevations, averaged down to SPARKLINE_POINTS, or None when no
+    profile is stored. Never computed here."""
+    outcome = RouteProfile().lookup(route.geom, {})
+    if outcome is None:
+        return None
+    values = outcome.value["elevation_m"]
+    if len(values) <= SPARKLINE_POINTS:
+        return [round(v, 1) for v in values]
+    step = len(values) / SPARKLINE_POINTS
+    out = []
+    for k in range(SPARKLINE_POINTS):
+        chunk = values[int(k * step) : max(int((k + 1) * step), int(k * step) + 1)]
+        out.append(round(sum(chunk) / len(chunk), 1))
+    return out
+
+
+def campsite_counts(routes: list[TrailRoute], within_m: float) -> dict[int, int]:
+    """Campsites within `within_m` of each route, in one indexed query."""
+    if not routes:
+        return {}
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT r.id, (SELECT count(*) FROM geodata_campsite c
+                          WHERE ST_DWithin(c.geom_m, r.geom_m, %s))
+            FROM geodata_trailroute r WHERE r.id = ANY(%s)
+            """,
+            [within_m, [route.pk for route in routes]],
+        )
+        return dict(cursor.fetchall())
+
+
+def facts_or_none(route: TrailRoute) -> RouteFacts | None:
+    try:
+        return route.facts
+    except RouteFacts.DoesNotExist:
+        return None
+
+
+def sort_key(sort: str):
+    if sort == "length":
+        return lambda route: (-(route.length_m or 0), normalise(route.name))
+
+    if sort == "gain":
+
+        def by_gain(route):
+            facts = facts_or_none(route)
+            gain = facts.gain_m if facts else None
+            return (gain is None, -(gain or 0), normalise(route.name))
+
+        return by_gain
+    if sort == "distance":
+        return lambda route: (route.distance.m, normalise(route.name))
+    return lambda route: (normalise(route.name), route.osm_id)
+
+
 @api_view(["GET"])
 def route_search_view(request):
     try:
         limit = _int_param(request, "limit", DEFAULT_LIMIT, MAX_LIMIT)
+        offset = _int_param(request, "offset", 0, 100_000)
         centre = parse_point(request.query_params.get("near"))
         raw_bbox = request.query_params.get("bbox")
         bbox = parse_bbox(raw_bbox) if raw_bbox else None
         filters = parse_filters(request)
+        sort = request.query_params.get("sort") or ("distance" if centre else "name")
+        if sort not in SORTS:
+            raise InvalidParameter(f"sort must be one of {', '.join(SORTS)}, got {sort!r}")
+        if sort == "distance" and centre is None:
+            raise InvalidParameter("sort=distance needs near=lon,lat")
+        region_name = request.query_params.get("region")
+        region = get_region(region_name) if region_name else None
     except (InvalidBbox, InvalidParameter) as exc:
         return _bad_request(exc)
+    except RegionConfigError as exc:
+        return _bad_request(InvalidParameter(str(exc)))
+    cards = request.query_params.get("cards") in ("1", "true")
 
     query = (request.query_params.get("q") or "").strip()
     words = [normalise(word) for word in query.split()]
-    if not words and bbox is None:
-        return _bad_request(InvalidParameter("Give a search term (q) or a view (bbox)."))
+    if not words and bbox is None and region is None:
+        return _bad_request(InvalidParameter("Give a search term (q), a view (bbox) or a region."))
 
     routes = TrailRoute.objects.exclude(name="")
+    if region is not None:
+        # TM05-102: a region is a hard boundary, unlike the view's "near".
+        routes = routes.filter(geom__bboverlaps=envelope(region.bbox))
     if bbox is not None and not words:
         # The Discover list: in or near the view. A name search looks everywhere.
         routes = routes.filter(geom__bboverlaps=envelope(grown(bbox)))
@@ -200,13 +286,12 @@ def route_search_view(request):
     verdicts = [(route, passes(route, filters)) for route in named]
     candidates = [route for route, ok in verdicts if ok]
     unknown = sum(1 for _, ok in verdicts if ok is None)
-    if centre is not None:
-        candidates.sort(key=lambda route: (route.distance.m, normalise(route.name)))
-    else:
-        candidates.sort(key=lambda route: (normalise(route.name), route.osm_id))
+    candidates.sort(key=sort_key(sort))
+    page = candidates[offset : offset + limit]
+    counts = campsite_counts(page, CARD_CAMPSITES_WITHIN_M) if cards else {}
 
     results = []
-    for route in candidates[:limit]:
+    for route in page:
         centroid = route.geom.centroid
         gain = gain_of(route)
         results.append(
@@ -219,11 +304,27 @@ def route_search_view(request):
                 "distance_m": round(route.distance.m, 1) if centre is not None else None,
             }
         )
+        if cards:
+            facts = facts_or_none(route)
+            results[-1].update(
+                {
+                    "difficulty": (facts.difficulty or None) if facts else None,
+                    "route_type": facts.route_type if facts else None,
+                    "route_type_estimated": facts.route_type_estimated if facts else None,
+                    "sparkline": sparkline(route),
+                    "campsites": counts.get(route.pk, 0),
+                    "campsites_within_m": CARD_CAMPSITES_WITHIN_M,
+                }
+            )
     return Response(
         {
             "query": query,
             "count": len(results),
-            "truncated": len(candidates) > limit,
+            "total": len(candidates),
+            "offset": offset,
+            "sort": sort,
+            "region": region.name if region else None,
+            "truncated": len(candidates) > offset + limit,
             # Routes the active filters could not judge (no profile yet, say): left out.
             "unknown": unknown,
             "results": results,

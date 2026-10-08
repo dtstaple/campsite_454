@@ -961,6 +961,42 @@ order of the first junction along this trail:
 Open a route by its `osm_id`, or an assembled trail by its `way_id` (TM05-97). The rules
 are in docs/routes.md.
 
+## Discover trails: browsing a region (TM05-102)
+
+The **Discover trails** page (`/trails`, in the header) browses with the same
+`GET /api/routes/search/` endpoint as the map's search (TM05-74), with the same filters
+(TM05-85). It adds these parameters:
+
+| Parameter | Meaning |
+|---|---|
+| `region=adirondacks` | Routes inside a region of `backend/pipeline/regions.yml`: the route's bounding box overlaps the region's box. A long route such as the Appalachian Trail is in every region it crosses. An unknown region returns **400**, listing the regions that exist. |
+| `sort=distance\|length\|gain\|name` | `distance` (the default when `near` is given) is metres from `near` to the route. `length` and `gain` sort the longest or the most climbing first, with unknown gain last. `name` is the default without `near`. `sort=distance` without `near` returns **400**. |
+| `offset=24` | The next page, used with `limit` (at most 100). The response has `total` (every match), `offset`, `truncated` (more after this page), `sort` and `region`. |
+| `cards=1` | Adds card data to each result (below). |
+
+Each result's card data:
+- `difficulty` and `route_type` (with `route_type_estimated`), from the stored RouteFacts
+- `sparkline`: up to 32 elevations (m) averaged from the **stored** profile, or null when
+  none is stored. It is never computed here.
+- `campsites`: mapped campsites within `campsites_within_m` (500 m), counted in one indexed
+  query per page
+
+### `GET /api/regions/`
+
+The regions in `regions.yml`, for the page's selector: `{id, label, bbox, states, trails}`.
+`trails` is the number of named routes in the region's box. The page lists regions with
+no trails yet as disabled.
+
+**Measured.** A 24-card page of the Adirondacks sorted by gain took 0.4 s.
+
+**The page.**
+- **Region and sort.** The region choice is remembered in the browser. "Distance from map
+  view" measures from the map's last centre when it is inside the region, otherwise from
+  the region's centre.
+- **Paging.** Results come 24 at a time with **Show more**.
+- **Opening.** A card opens the map with that trail's panel, which fits the view to the
+  trail.
+
 ## Not included yet
 
 **Scored campsites in the map layers.** The layer endpoints above return raw ingested
