@@ -144,6 +144,8 @@ def test_enriched_site_is_scored_from_stored_values(network):
         "score",
         "factors",
         "caps",
+        "suitability_score",
+        "legal_status",
     }
     assert result["contract"] == 1
     assert [f["key"] for f in result["factors"]] == list(load().weights)

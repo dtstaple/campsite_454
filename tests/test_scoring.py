@@ -19,7 +19,8 @@ from geodata.models import Campsite, PublicLand, Trail, WaterFeature
 from scoring.config import ScoringConfigError, load, parse
 from scoring.curves import peak_curve
 from scoring.engine import ScoringError, score_campsite, score_location
-from scoring.factors import LegalFactor, TrailFactor, WaterFactor
+from scoring.factors import NOT_AVAILABLE, FactorResult, LegalFactor, TrailFactor, WaterFactor
+from scoring.legal_gate import legal_status
 
 LON, LAT = -73.85, 44.18
 M_PER_DEG_LAT = 111_120
@@ -341,6 +342,8 @@ class TestEngine:
             "score",
             "factors",
             "caps",
+            "suitability_score",
+            "legal_status",
         }
         assert result["contract"] == 1
         assert [f["key"] for f in result["factors"]] == list(shipped().weights)
@@ -444,6 +447,80 @@ class TestEngine:
     def test_unknown_factor_in_config_is_rejected(self):
         with pytest.raises(ScoringConfigError):
             score_location(LON, LAT, parse(raw_config(water=1, altitude=1)))
+
+
+@pytest.mark.django_db
+@pytest.mark.integration
+class TestLegalGate:
+    """TM05-76: legality reported beside the score, never folded into "permitted"."""
+
+    def good_site(self):
+        water(60)
+        trail(60)
+
+    def test_open_public_land_is_permitted(self):
+        self.good_site()
+        parcel("open", "1")
+        status = score_location(LON, LAT)["legal_status"]
+        assert status["status"] == "permitted"
+        assert status["basis"]["public_access"] == "open"
+
+    def test_closed_land_is_not_permitted_whatever_the_suitability(self):
+        self.good_site()
+        parcel("closed", "1")
+        result = score_location(LON, LAT)
+        assert result["legal_status"]["status"] == "not_permitted"
+        # The place itself is excellent: suitability says so, the gate still says no.
+        assert result["suitability_score"] >= 80
+        assert result["score"] == 0
+
+    @pytest.mark.parametrize("access", ["restricted", "unknown"])
+    def test_restricted_or_unknown_access_is_unknown_not_permitted(self, access):
+        self.good_site()
+        parcel(access, "1")
+        status = score_location(LON, LAT)["legal_status"]
+        assert status["status"] == "unknown"
+
+    def test_outside_every_parcel_is_unknown_not_permitted(self):
+        self.good_site()
+        result = score_location(LON, LAT)
+        assert result["legal_status"]["status"] == "unknown"
+        assert result["legal_status"]["basis"]["parcels"] == 0
+        assert "probably private" in result["legal_status"]["reason"]
+
+    def test_most_restrictive_overlapping_parcel_decides(self):
+        parcel("open", "1", source_id="open-one")
+        parcel("closed", "2", source_id="closed-one")
+        assert score_location(LON, LAT)["legal_status"]["status"] == "not_permitted"
+
+    def test_a_legal_factor_that_could_not_be_evaluated_is_unknown(self):
+        missing = FactorResult("legal", "Legal status", NOT_AVAILABLE, None, None, "")
+        assert legal_status(missing)["status"] == "unknown"
+        assert legal_status(None)["status"] == "unknown"
+
+    def test_the_gate_reads_its_access_lists_from_config(self):
+        self.good_site()
+        parcel("restricted", "1")
+        raw = raw_config()
+        raw["factors"]["legal"]["gate"] = {"permitted": ["open", "restricted"], "not_permitted": []}
+        assert score_location(LON, LAT, parse(raw))["legal_status"]["status"] == "permitted"
+
+    def test_suitability_leaves_legality_out(self):
+        self.good_site()
+        parcel("open", "1")
+        open_land = score_location(LON, LAT)
+        PublicLand.objects.all().delete()
+        no_land = score_location(LON, LAT)
+        # Legality moves the combined score; suitability is the same place either way.
+        assert no_land["score"] < open_land["score"]
+        assert no_land["suitability_score"] == open_land["suitability_score"]
+
+    def test_suitability_is_null_when_only_legality_could_be_evaluated(self):
+        parcel("open", "1")
+        config = parse(raw_config(legal=1.0))
+        result = score_location(LON, LAT, config)
+        assert result["suitability_score"] is None
+        assert result["legal_status"]["status"] == "permitted"
 
 
 @pytest.mark.django_db

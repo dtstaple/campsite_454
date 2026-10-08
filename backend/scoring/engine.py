@@ -13,12 +13,17 @@ The combination is a weighted mean over the factors that could be evaluated:
 
 then any caps (land marked closed) are applied. Each factor's `contribution` is its share
 of that total, so the breakdown always adds up to the number shown.
+
+Alongside it (TM05-76): `legal_status`, the legal gate (scoring/legal_gate.py), and
+`suitability_score`, the same weighted mean without the legal factor -- how good a place
+it is to camp, separate from whether you may.
 """
 
 from __future__ import annotations
 
 from scoring.config import ScoringConfig, ScoringConfigError, load
 from scoring.factors import FACTORS, NOT_AVAILABLE, FactorResult
+from scoring.legal_gate import legal_status
 
 CONTRACT_VERSION = 1
 
@@ -87,6 +92,8 @@ def combine(results: list[FactorResult], config: ScoringConfig, lon: float, lat:
     for cap in caps:
         total = min(total, cap["max_score"])
 
+    legal = next((r for r in results if r.key == "legal"), None)
+
     return {
         "contract": CONTRACT_VERSION,
         "model_version": config.model_version,
@@ -95,4 +102,18 @@ def combine(results: list[FactorResult], config: ScoringConfig, lon: float, lat:
         "score": int(round(max(0.0, min(100.0, total)))),
         "factors": factors,
         "caps": caps,
+        "suitability_score": suitability(counted, config),
+        "legal_status": legal_status(legal, config.factor("legal").get("gate")),
     }
+
+
+def suitability(counted: list[FactorResult], config: ScoringConfig) -> int | None:
+    """The weighted mean over every evaluated factor except legality (TM05-76), with no
+    caps: legal caps are legality, which legal_status reports. None when nothing but
+    legality could be evaluated."""
+    rest = [r for r in counted if r.key != "legal"]
+    weight = sum(config.weights[r.key] for r in rest)
+    if weight <= 0:
+        return None
+    total = sum(config.weights[r.key] * (r.score or 0.0) for r in rest) / weight
+    return int(round(max(0.0, min(100.0, total))))

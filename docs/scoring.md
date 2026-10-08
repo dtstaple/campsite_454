@@ -10,7 +10,11 @@ has two parts:
 
 ---
 
-## 1. Output contract (version 1)
+## 1. Output contract (version 1, revision 1.1)
+
+Revision 1.1 (TM05-76) added `suitability_score` and `legal_status`. It only adds fields,
+so `contract` is still `1` and every contract-1 consumer keeps working (see the change log
+at the end of this section).
 
 A score is a JSON object. Every field below is always present; nothing is omitted when
 empty, it is `null` or `[]` instead, so a consumer never has to test for a missing key.
@@ -55,7 +59,20 @@ empty, it is `null` or `[]` instead, so a consumer never has to test for a missi
       "explanation": "Land cover is not measured yet (planned: Sentinel-2, Sprint 5)."
     }
   ],
-  "caps": []
+  "caps": [],
+  "suitability_score": 79,
+  "legal_status": {
+    "status": "permitted",
+    "label": "Public land open to camping",
+    "reason": "Inside State Wilderness, open to the public, GAP status 1.",
+    "basis": {
+      "public_access": "open",
+      "gap_status": "1",
+      "manager": "NYSDEC",
+      "designation": "State Wilderness",
+      "parcels": 1
+    }
+  }
 }
 ```
 
@@ -70,7 +87,33 @@ empty, it is `null` or `[]` instead, so a consumer never has to test for a missi
 | `score` | int, 0–100 | The overall score, rounded. Already reflects any `caps`. |
 | `factors` | array | One entry per factor, **always in the same order** (see §2), including factors that could not be scored. |
 | `caps` | array | Rules that overrode the weighted total. Empty in the common case. |
+| `suitability_score` | int 0–100, or `null` | *Since 1.1.* How good a place it is to camp, **leaving legality out**: the same weighted mean over every evaluated factor except `legal`, with no caps. `null` only if nothing but legality could be evaluated. |
+| `legal_status` | object | *Since 1.1.* Whether you may camp there, reported separately from the score. See [Legal status (the gate)](#legal-status-the-gate). |
 
+### Legal status (the gate)
+
+`legal_status` is `{status, label, reason, basis}`:
+
+| `status` | When | `label` |
+|---|---|---|
+| `permitted` | The governing PAD-US parcel's public access is **open** | Public land open to camping |
+| `not_permitted` | The governing parcel's access is **closed** | Not permitted |
+| `unknown` | Anything else: restricted access, access unknown, outside every mapped parcel, or the legal factor could not be evaluated | Legality unknown |
+
+- **Show it whatever the score says.** A `not_permitted` site can have a high
+  `suitability_score` (good water, flat ground). That is the point of the gate: display
+  "Not permitted" next to it rather than letting a good number imply you may camp there.
+- **`unknown` is never `permitted`.** Outside public land is `unknown`, not
+  `not_permitted`: it is probably private, but PAD-US is incomplete, so we do not claim it.
+  Restricted access is `unknown` too; the `reason` says a permit may be needed.
+- **`reason`** is a sentence for the user. **`basis`** holds the legal factor's measurement
+  (`public_access`, `gap_status`, `manager`, `designation`, `parcels`), or `null` when the
+  factor could not be evaluated.
+- Which access values count as permitted or not permitted is config
+  (`factors.legal.gate` in `config.yml`), so it can change without a code change.
+- **`score` is unchanged.** It still includes the legal factor and the closed-land cap,
+  exactly as in 1.0. New consumers should show `suitability_score` and `legal_status`
+  side by side. Existing ones keep working on `score`.
 ### Factor fields
 
 | Field | Type | Meaning |
@@ -127,6 +170,13 @@ marked **closed** to public access caps the score at 0.
 
 Within `contract: 1`, fields are only ever **added**, never renamed, removed or re-typed.
 New factor keys may appear. Anything breaking bumps `contract`.
+
+### Change log
+
+| Revision | Story | Change |
+|---|---|---|
+| 1.0 | TM05-43 | The contract as first published. |
+| 1.1 | TM05-76 | Added `suitability_score` and `legal_status`. Additive only, so `contract` stays `1`. A consumer that rejects any `contract` other than `1` (as the campsite panel's `parseScore` does) keeps working. |
 
 ---
 
@@ -223,6 +273,9 @@ From PAD-US: the parcels whose polygon contains the point.
   entry giving the reason.
 - **Outside every parcel**: `status: no_data`, score **15** — probably private land, but
   PAD-US is incomplete, so not zero.
+- **The gate (TM05-76).** The same facts also decide `legal_status`, which is reported
+  beside the score (§1). The factor's weight still shapes `score`; the gate is what says
+  whether camping is allowed.
 
 `measurement`: `public_access`, `gap_status`, `manager`, `designation` (all null outside
 public land), `parcels` (how many contain the point).

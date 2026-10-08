@@ -74,6 +74,12 @@ factors:
       "": 0.85
     # Land marked closed caps the overall score, whatever the other factors say.
     closed_caps_total_at: 0
+    # The legal gate (TM05-76), reported as legal_status beside the score. Access values
+    # not listed here -- restricted, unknown, or no parcel at all -- are "unknown",
+    # never "permitted".
+    gate:
+      permitted: [open]
+      not_permitted: [closed]
 
   weather:
     # Live forecast through the analysis cache (TM05-44): Open-Meteo, 0.05 deg grid,
