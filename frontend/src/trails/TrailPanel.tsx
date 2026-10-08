@@ -21,6 +21,7 @@ import {
   percent,
   routeTypeText,
 } from "./format";
+import { alongResults, searchSummary, type Candidate, type CandidateSearch } from "./candidates";
 import { gpxFilename, gpxPath } from "./gpx";
 import { gradeAt, nearestIndex } from "./profile";
 
@@ -46,14 +47,26 @@ interface Props {
   planner?: ReactNode;
   /** TM05-81: the Night button on each campsite row; omitted when signed out. */
   stops?: StopChoice;
+  /** TM05-99: the "Find campsites along this trail" search. */
+  finder: Finder;
+  onFind: () => void;
+  onCandidate: (candidate: Candidate) => void;
 }
 
 export interface StopChoice {
   ids: readonly string[];
   /** The night each chosen stop falls on, once the server has ordered them. */
   nightOf: Readonly<Record<string, number>>;
-  onToggle: (campsite: CampsiteAlong) => void;
+  /** Add or remove a stop by id: a campsite's source_id, or a candidate's id. */
+  onToggle: (id: string) => void;
 }
+
+/** TM05-99: where the trail's campsite search is. Nothing is shown until it is asked for. */
+export type Finder =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "ready"; search: CandidateSearch | null }
+  | { status: "error"; message: string };
 
 function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
@@ -77,6 +90,9 @@ export default function TrailPanel({
   controls,
   planner,
   stops,
+  finder,
+  onFind,
+  onCandidate,
 }: Props) {
   const name = state.status === "ready" ? state.detail.name : state.name;
 
@@ -124,6 +140,9 @@ export default function TrailPanel({
           controls={controls}
           planner={planner}
           stops={stops}
+          finder={finder}
+          onFind={onFind}
+          onCandidate={onCandidate}
         />
       )}
     </aside>
@@ -142,6 +161,9 @@ function Ready({
   controls,
   planner,
   stops,
+  finder,
+  onFind,
+  onCandidate,
 }: Omit<Props, "state" | "onClose"> & { detail: RouteDetail }) {
   const profile = detail.profile;
   const campsites = detail.campsites;
@@ -177,7 +199,7 @@ function Ready({
             distances={profile.distance_m}
             elevations={profile.elevation_m}
             cursorM={cursorM}
-            markers={campsites.items.filter(isAlong).map((site) => ({
+            markers={(finder.status === "idle" ? [] : campsites.items.filter(isAlong)).map((site) => ({
               distance: site.distance_along_m,
               label: campsiteName(site).text,
             }))}
@@ -199,9 +221,9 @@ function Ready({
       <GpxDownload detail={detail} withinM={withinM} />
       {planner}
 
-      <section className="trail-campsites" aria-label="Campsites along this trail">
+      <section className="trail-campsites" aria-label="Places to camp along this trail">
         <div className="trail-campsites-head">
-          <div className="panel-subtitle">Campsites along this trail</div>
+          <div className="panel-subtitle">Places to camp</div>
           <label className="trail-within">
             within
             <select value={withinM} onChange={(event) => onWithin(Number(event.target.value))}>
@@ -213,59 +235,45 @@ function Ready({
             </select>
           </label>
         </div>
-        {campsites.count === 0 ? (
-          <div className="trail-empty">
-            No mapped campsites within {withinM < 1000 ? `${withinM} m` : `${withinM / 1000} km`} of
-            this trail.
+
+        {finder.status === "idle" ? (
+          <div className="trail-find">
+            <p className="trail-find-prompt">
+              Planning an overnight? Find places to camp along this trail.
+            </p>
+            <button type="button" className="button-primary trail-find-button" onClick={onFind}>
+              Find campsites along this trail
+            </button>
           </div>
         ) : (
-          <ol className="trail-campsite-list">
-            {campsites.items.map((site) => (
-              <li key={site.id}>
-                <button
-                  type="button"
-                  className="trail-campsite"
-                  onClick={() => onCampsite(site)}
-                  onMouseEnter={() => {
-                    // Past either end there is no point on the profile to show (TM05-73).
-                    onCursor(isAlong(site) ? site.distance_along_m : null);
-                    onCampsiteHover?.(site);
-                  }}
-                  onMouseLeave={() => onCampsiteHover?.(null)}
-                  onFocus={() => onCampsiteHover?.(site)}
-                  onBlur={() => onCampsiteHover?.(null)}
-                >
-                  <span className="trail-mile" title={site.position_label ?? undefined}>
-                    {campsitePlace(site).mile}
-                  </span>
-                  <span className="trail-campsite-name">
-                    <span
-                      className={campsiteName(site).derived ? "is-derived" : undefined}
-                      title={
-                        campsiteName(site).derived
-                          ? "No name in the source data; named from what is nearby"
-                          : undefined
-                      }
-                    >
-                      {campsiteName(site).text}
-                    </span>
-                    <span className="trail-campsite-off">{campsitePlace(site).off}</span>
-                  </span>
-                  {site.score !== null && (
-                    <span
-                      className="trail-score"
-                      title={site.score_breakdown.caps[0]?.reason ?? "Campsite score, 0-100"}
-                    >
-                      {site.score}
-                    </span>
-                  )}
-                </button>
-                {stops && <StopButton site={site} stops={stops} />}
-              </li>
-            ))}
-          </ol>
+          <>
+            {finder.status === "loading" && (
+              <div className="trail-status">
+                <span className="spinner" />
+                Searching for potential spots: public land, 150 ft from trails and water, DEC
+                elevation limits, gentle ground. The first search of a trail samples the
+                terrain and can take up to half a minute; after that it is instant.
+              </div>
+            )}
+            {finder.status === "error" && (
+              <div className="trail-status is-error">{finder.message}</div>
+            )}
+            <AlongList
+              campsites={campsites.items}
+              search={finder.status === "ready" ? finder.search : null}
+              stops={stops}
+              withinM={withinM}
+              onCampsite={onCampsite}
+              onCandidate={onCandidate}
+              onCursor={onCursor}
+              onCampsiteHover={onCampsiteHover}
+            />
+            {finder.status === "ready" && finder.search?.reason && (
+              <div className="trail-empty">{finder.search.reason}</div>
+            )}
+            {campsites.truncated && <div className="trail-empty">Showing the first 100.</div>}
+          </>
         )}
-        {campsites.truncated && <div className="trail-empty">Showing the first 100.</div>}
       </section>
     </>
   );
@@ -341,12 +349,20 @@ function GpxDownload({ detail, withinM }: { detail: RouteDetail; withinM: number
   );
 }
 
-/** TM05-81: choose a campsite as an overnight stop, or take it out of the plan. */
-function StopButton({ site, stops }: { site: CampsiteAlong; stops: StopChoice }) {
-  const chosen = stops.ids.includes(site.id);
-  const night = stops.nightOf[site.id];
-  const along = isAlong(site);
-  const label = campsiteName(site).text;
+/** TM05-81: choose a place as an overnight stop, or take it out of the plan. */
+function StopButton({
+  id,
+  label,
+  along,
+  stops,
+}: {
+  id: string;
+  label: string;
+  along: boolean;
+  stops: StopChoice;
+}) {
+  const chosen = stops.ids.includes(id);
+  const night = stops.nightOf[id];
   return (
     <button
       type="button"
@@ -360,9 +376,130 @@ function StopButton({ site, stops }: { site: CampsiteAlong; stops: StopChoice })
             : `Stop overnight at ${label}`
           : "Past the end of the trail, so it cannot be a stop along it"
       }
-      onClick={() => stops.onToggle(site)}
+      onClick={() => stops.onToggle(id)}
     >
       {chosen ? (night ? `Night ${night}` : "Night") : "+ Night"}
     </button>
+  );
+}
+
+/**
+ * TM05-99: mapped campsites and potential spots in one list, by mile. A potential spot is
+ * labelled as unverified and drawn with its own dashed style, never the score colours.
+ */
+function AlongList({
+  campsites,
+  search,
+  stops,
+  withinM,
+  onCampsite,
+  onCandidate,
+  onCursor,
+  onCampsiteHover,
+}: {
+  campsites: CampsiteAlong[];
+  search: CandidateSearch | null;
+  stops?: StopChoice;
+  withinM: number;
+  onCampsite: (campsite: CampsiteAlong) => void;
+  onCandidate: (candidate: Candidate) => void;
+  onCursor: (distance: number | null) => void;
+  onCampsiteHover?: (campsite: CampsiteAlong | null) => void;
+}) {
+  const rows = alongResults(campsites, search?.candidates ?? []);
+  const within = withinM < 1000 ? `${withinM} m` : `${withinM / 1000} km`;
+  if (rows.length === 0 && search) {
+    return (
+      <div className="trail-empty">
+        No mapped campsites or potential spots within {within} of this trail.
+      </div>
+    );
+  }
+  return (
+    <>
+      <div className="trail-find-summary">{searchSummary(campsites.length, search)}</div>
+      <ol className="trail-campsite-list">
+        {rows.map((row) =>
+          row.kind === "campsite" ? (
+            <li key={row.id}>
+              <button
+                type="button"
+                className="trail-campsite"
+                onClick={() => onCampsite(row.site)}
+                onMouseEnter={() => {
+                  // Past either end there is no point on the profile to show (TM05-73).
+                  onCursor(isAlong(row.site) ? row.site.distance_along_m : null);
+                  onCampsiteHover?.(row.site);
+                }}
+                onMouseLeave={() => onCampsiteHover?.(null)}
+                onFocus={() => onCampsiteHover?.(row.site)}
+                onBlur={() => onCampsiteHover?.(null)}
+              >
+                <span className="trail-mile" title={row.site.position_label ?? undefined}>
+                  {campsitePlace(row.site).mile}
+                </span>
+                <span className="trail-campsite-name">
+                  <span
+                    className={campsiteName(row.site).derived ? "is-derived" : undefined}
+                    title={
+                      campsiteName(row.site).derived
+                        ? "No name in the source data; named from what is nearby"
+                        : undefined
+                    }
+                  >
+                    {campsiteName(row.site).text}
+                  </span>
+                  <span className="trail-campsite-off">{campsitePlace(row.site).off}</span>
+                </span>
+                {row.site.score !== null && (
+                  <span
+                    className="trail-score"
+                    title={row.site.score_breakdown.caps[0]?.reason ?? "Campsite score, 0-100"}
+                  >
+                    {row.site.score}
+                  </span>
+                )}
+              </button>
+              {stops && (
+                <StopButton
+                  id={row.id}
+                  label={campsiteName(row.site).text}
+                  along={isAlong(row.site)}
+                  stops={stops}
+                />
+              )}
+            </li>
+          ) : (
+            <li key={row.id} className="is-candidate">
+              <button
+                type="button"
+                className="trail-campsite"
+                onClick={() => onCandidate(row.candidate)}
+                onMouseEnter={() => onCursor(row.candidate.distance_along_m)}
+              >
+                <span className="trail-mile">
+                  mi {(row.candidate.distance_along_m / 1609.344).toFixed(1)}
+                </span>
+                <span className="trail-campsite-name">
+                  <span className="trail-candidate-label">{row.candidate.label}</span>
+                  <span className="trail-campsite-off">
+                    {Math.round(row.candidate.distance_from_route_m)} m off trail ·{" "}
+                    {row.candidate.slope_deg.toFixed(0)}° slope
+                  </span>
+                </span>
+                {row.candidate.score !== null && (
+                  <span className="trail-score trail-candidate-score" title="Computed score, 0-100">
+                    {row.candidate.score}
+                  </span>
+                )}
+              </button>
+              {stops && (
+                <StopButton id={row.id} label={row.candidate.label} along stops={stops} />
+              )}
+            </li>
+          ),
+        )}
+      </ol>
+    </>
   );
 }

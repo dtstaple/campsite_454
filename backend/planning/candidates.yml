@@ -1,0 +1,27 @@
+# Potential campsites along a trail (TM05-99). docs/candidates.md explains every value.
+# Tuning one is an edit here; every value is part of the cache key, so cached searches
+# from an old config are not reused.
+
+# Sample stations every this many metres along the trail's stitched line.
+sample_spacing_m: 200
+# At each station, points this far to each side of the line. Only offsets inside the
+# user's corridor (the trail panel's "within") are used.
+offsets_m: [60, 120, 200, 300, 450, 700, 1000]
+
+# Hard filters: a candidate must pass every one.
+# NY State Land Camping Rules: a non-designated site must be at least 150 ft (45.72 m)
+# from any road, trail, spring, stream, pond or other body of water.
+rule_distance_m: 45.72
+# Gentle ground. The slope factor's curve (scoring/config.yml) is ideal to 3 degrees and
+# halves by 8; 5 degrees keeps candidates where a tent pitches comfortably.
+max_slope_deg: 5
+# Ground slope is measured on a 3x3 stencil this far apart, as for campsites (TM05-64).
+stencil_m: 10
+
+# Keeping the best: highest score first, at least this far apart along the trail
+# (about 0.5 mi), at most this many.
+min_spacing_m: 805
+max_results: 8
+# Scoring is the slow step, so only the flattest survivor at each station is scored, and
+# at most this many of those, evenly spread along the trail.
+max_scored: 60

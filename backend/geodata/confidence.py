@@ -10,6 +10,9 @@ came from and how much it says, plus its provenance. docs/confidence.md has the 
     limited_info       an OpenStreetMap site with no name and fewer than
                        MIN_INFORMATIVE_TAGS informative tags: somebody marked a spot, and
                        little more is known.
+    computed           not a record at all: a potential spot computed from land, trail,
+                       water, elevation and slope data (TM05-99). Nobody has mapped a
+                       campsite there. Always labelled "Potential spot (unverified)".
 
 The level describes the record, not the site: a well-used spot can be limited_info simply
 because nobody has tagged it.
@@ -23,12 +26,34 @@ from geodata.models import Campsite
 OFFICIAL = "official"
 COMMUNITY_MAPPED = "community_mapped"
 LIMITED_INFO = "limited_info"
+COMPUTED = "computed"
 
 LABELS = {
     OFFICIAL: "Official listing",
     COMMUNITY_MAPPED: "Community-mapped",
     LIMITED_INFO: "Limited info",
+    COMPUTED: "Computed",
 }
+
+COMPUTED_REASON = (
+    "Computed from public land, trail, water, elevation and slope data. Nobody has mapped "
+    "a campsite here."
+)
+
+
+def computed_payload() -> dict:
+    """The `confidence` object for a potential campsite (TM05-99): same shape as a mapped
+    campsite's, so the panel reads both the same way."""
+    return {
+        "level": COMPUTED,
+        "label": LABELS[COMPUTED],
+        "reason": COMPUTED_REASON,
+        "source": "computed",
+        "source_label": "CampSite candidate search",
+        "operator": None,
+        "last_updated": None,
+    }
+
 
 #: Tags that say something about the site. OSM_TAGS (what the panel surfaces) plus the
 #: ones the adapter reads into Campsite fields. `tourism`, `amenity` and `name` are not

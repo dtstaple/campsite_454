@@ -30,7 +30,7 @@ from api.routes import DEFAULT_WITHIN_M, gpx_response, trail_for_way
 from geodata.models import Campsite, TrailRoute
 
 from .models import PlanStop, TripPlan
-from .plans import PlanError, build_plan
+from .plans import CANDIDATE_PREFIX, CandidateStop, PlanError, build_plan, is_candidate
 from .queries import as_gpx, waypoints_near
 
 MAX_PLANS_PER_USER = 200
@@ -53,15 +53,27 @@ def _resolve_trail(osm_id, from_way):
 
 
 def _sites(stop_ids):
+    """Campsite rows for campsite ids, CandidateStops for potential campsites (TM05-99)."""
     if not isinstance(stop_ids, list) or not all(isinstance(i, str) for i in stop_ids):
         raise PlanError("stop_ids must be a list of campsite ids.")
-    sites = list(Campsite.objects.filter(source_id__in=stop_ids).select_related("facts"))
-    missing = sorted(set(stop_ids) - {site.source_id for site in sites})
-    if missing:
-        raise PlanError(f"No campsite with id {', '.join(missing)}.")
     if len(stop_ids) != len(set(stop_ids)):
         raise PlanError("Each campsite can be a stop only once.")
-    return sites
+    candidates = [CandidateStop(i) for i in stop_ids if i.startswith(CANDIDATE_PREFIX)]
+    mapped = [i for i in stop_ids if not i.startswith(CANDIDATE_PREFIX)]
+    sites = list(Campsite.objects.filter(source_id__in=mapped).select_related("facts"))
+    missing = sorted(set(mapped) - {site.source_id for site in sites})
+    if missing:
+        raise PlanError(f"No campsite with id {', '.join(missing)}.")
+    return sites + candidates
+
+
+def _stop_rows(plan, sites):
+    return [
+        PlanStop(plan=plan, candidate_id=site.source_id, point=site.geom)
+        if is_candidate(site)
+        else PlanStop(plan=plan, campsite=site)
+        for site in sites
+    ]
 
 
 def _public(plan: dict) -> dict:
@@ -83,7 +95,10 @@ def _saved(plan: TripPlan, worked: dict | None) -> dict:
 
 def _work_out(plan: TripPlan) -> dict:
     route = _resolve_trail(plan.osm_id, plan.from_way)
-    sites = [stop.campsite for stop in plan.stops.select_related("campsite__facts")]
+    sites = [
+        stop.campsite if stop.campsite_id else CandidateStop(stop.candidate_id)
+        for stop in plan.stops.select_related("campsite__facts")
+    ]
     return build_plan(route, sites)
 
 
@@ -139,7 +154,7 @@ def plans_view(request):
             from_way="" if route.osm_id else str(request.data.get("from_way")),
             trail_name=route.name,
         )
-        PlanStop.objects.bulk_create(PlanStop(plan=plan, campsite=site) for site in sites)
+        PlanStop.objects.bulk_create(_stop_rows(plan, sites))
     return Response(_saved(plan, worked), status=status.HTTP_201_CREATED)
 
 
@@ -174,9 +189,7 @@ def plan_view(request, pk: int):
                     plan.name = name
                 if sites is not None:
                     plan.stops.all().delete()
-                    PlanStop.objects.bulk_create(
-                        PlanStop(plan=plan, campsite=site) for site in sites
-                    )
+                    PlanStop.objects.bulk_create(_stop_rows(plan, sites))
                 plan.save()
         return Response(_saved(plan, _work_out(plan)))
     except PlanError as error:
@@ -204,8 +217,8 @@ def plan_gpx_view(request, pk: int):
             lat=stop["lat"],
             name=f"Night {stop['night']}: {stop['display_name'] or 'Campsite'}",
             desc=_stop_desc(stop, worked["days"]),
-            sym="Campground",
-            type="overnight-stop",
+            sym="Campground" if stop["kind"] == "campsite" else "Flag, Red",
+            type="overnight-stop" if stop["kind"] == "campsite" else "overnight-stop:unverified",
         )
         for stop in worked["stops"]
     ]

@@ -51,7 +51,9 @@ export const MODES: readonly ActivityMode[] = [
     label: "Camping",
     icon: "camping",
     enabled: true,
-    layers: { trails: true, water: true, "public-land": true, campsites: true },
+    // TM05-99: mapped campsites start off in every mode. Hikers find places to camp
+    // with the trail panel's "Find campsites along this trail"; the layer is one click away.
+    layers: { trails: true, water: true, "public-land": true, campsites: false },
     terrain: true,
     emphasis: ["campsites", "water", "public-land", "trails"],
   },

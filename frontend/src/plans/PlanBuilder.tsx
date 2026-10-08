@@ -216,7 +216,7 @@ export default function PlanBuilder({ detail, session, draft, onDraft, onWorked 
                     <td>{day.day}</td>
                     <td>
                       <span className="plan-to">{day.to}</span>
-                      {stop && (
+                      {stop && stop.legality.label !== day.to && (
                         <span className={`plan-verdict is-${stop.legality.verdict}`}>
                           {stop.legality.label}
                         </span>

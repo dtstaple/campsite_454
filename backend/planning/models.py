@@ -82,10 +82,21 @@ class PlanStop(models.Model):
 
     plan = models.ForeignKey(TripPlan, on_delete=models.CASCADE, related_name="stops")
     campsite = models.ForeignKey(
-        "geodata.Campsite", on_delete=models.CASCADE, related_name="plan_stops"
+        "geodata.Campsite",
+        on_delete=models.CASCADE,
+        related_name="plan_stops",
+        null=True,
+        blank=True,
     )
+    # TM05-99: a potential campsite has no row; its id is its position.
+    candidate_id = models.CharField(max_length=64, blank=True, default="")
+    point = gis_models.PointField(srid=4326, null=True, blank=True)
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=["plan", "campsite"], name="unique_plan_stop")
+            models.UniqueConstraint(fields=["plan", "campsite"], name="unique_plan_stop"),
+            models.CheckConstraint(
+                condition=models.Q(campsite__isnull=False) | ~models.Q(candidate_id=""),
+                name="plan_stop_is_a_campsite_or_candidate",
+            ),
         ]
