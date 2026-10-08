@@ -24,6 +24,7 @@ from analysis.base import AnalysisError
 from api.bbox import InvalidBbox, parse_bbox
 from api.layers import COORDINATE_PRECISION, SimplifyPreserveTopology, envelope
 from api.views import InvalidParameter, _bad_request, _int_param, _simplify_param
+from enrichment.models import CampsiteFacts
 from geodata.models import Campsite, TrailRoute
 from geodata.route_rating import config as route_config
 from geodata.route_rating import difficulty, position_along, route_type
@@ -127,6 +128,20 @@ def _profile_payload(route):
     }
 
 
+def display_name(site: Campsite) -> dict:
+    """`display_name` and `display_name_derived`, exactly as the campsite detail endpoint
+    gives them, so the trail list and the panel always agree on a site's name."""
+    source_name = (site.name or "").strip()
+    try:
+        facts = site.facts
+    except CampsiteFacts.DoesNotExist:
+        facts = None
+    return {
+        "display_name": (facts.display_name if facts else source_name) or None,
+        "display_name_derived": bool(facts and facts.display_name_derived),
+    }
+
+
 @api_view(["GET"])
 def route_detail_view(request, osm_id: int):
     """One route: properties, stitched line, elevation profile, campsites along it."""
@@ -146,7 +161,7 @@ def route_detail_view(request, osm_id: int):
         located = cursor.fetchall()
     truncated = len(located) > MAX_CAMPSITES
     located = located[:MAX_CAMPSITES]
-    sites = Campsite.objects.in_bulk([row[0] for row in located])
+    sites = Campsite.objects.select_related("facts").in_bulk([row[0] for row in located])
 
     config = load_scoring_config()
     along_settings = route_config()["along"]
@@ -159,6 +174,9 @@ def route_detail_view(request, osm_id: int):
                 "id": site.source_id,
                 "source": site.source,
                 "name": site.name or None,
+                # The same name the detail panel shows, derived when the source has none
+                # (TM05-71, from TM05-64's enrichment).
+                **display_name(site),
                 "site_type": site.site_type,
                 "lon": round(site.geom.x, 6),
                 "lat": round(site.geom.y, 6),

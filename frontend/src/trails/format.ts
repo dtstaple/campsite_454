@@ -88,3 +88,14 @@ export function campsitePlace(site: {
   }
   return { mile: `mi ${(site.distance_along_m / 1609.344).toFixed(1)}`, off: `${off} m off trail` };
 }
+
+/** The name the trail list shows, and whether it was derived (TM05-71). Falls back to the
+ * source name, then to "Unnamed campsite", for an API without display names. */
+export function campsiteName(site: {
+  name: string | null;
+  display_name?: string | null;
+  display_name_derived?: boolean;
+}): { text: string; derived: boolean } {
+  if (site.display_name) return { text: site.display_name, derived: Boolean(site.display_name_derived) };
+  return { text: site.name ?? "Unnamed campsite", derived: false };
+}

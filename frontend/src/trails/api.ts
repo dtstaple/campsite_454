@@ -52,6 +52,9 @@ export interface CampsiteAlong {
   id: string;
   source: string;
   name: string | null;
+  /** TM05-71: the detail panel's name, derived from nearby features when the source has none. */
+  display_name?: string | null;
+  display_name_derived?: boolean;
   site_type: string;
   lon: number;
   lat: number;
