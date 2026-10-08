@@ -1,0 +1,27 @@
+# How named routes are described to a user (TM05-82, TM05-73). docs/routes.md explains
+# every value. Tuning one is an edit here, not a code change.
+
+difficulty:
+  # Shenandoah National Park's hiking rating: sqrt(gain_ft * 2 * distance_mi), on the route
+  # as mapped (one way). A route takes the first band whose `below` it is under; the last
+  # band has no upper bound. Shenandoah's own five bands (50 / 100 / 150 / 200) are folded
+  # into three: its "moderately strenuous" (100-150) counts as Moderate here.
+  bands:
+    - { label: Easy, below: 50 }
+    - { label: Moderate, below: 150 }
+    - { label: Hard, below: null }
+
+route_type:
+  # Start and end of the stitched line within this many metres: a loop. Measured, not
+  # estimated.
+  loop_max_gap_m: 200
+  # Another trail (not one of the route's own ways) within this of an end: that end
+  # connects onward.
+  connect_m: 30
+  # A lake or pond within this of an end: the end is at a pond.
+  pond_m: 100
+  # An end within this many metres (vertical) of the route's highest point: a summit --
+  # but only if the route climbs at least summit_min_relief_m to get there, so a flat
+  # route's ends are not "summits".
+  summit_within_m: 15
+  summit_min_relief_m: 100
