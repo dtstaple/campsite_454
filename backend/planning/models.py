@@ -100,3 +100,40 @@ class PlanStop(models.Model):
                 name="plan_stop_is_a_campsite_or_candidate",
             ),
         ]
+
+
+class SavedTrail(models.Model):
+    """A trail the user saved from the trail panel (TM05-100). Kept by the trail's stable
+    identity, like a plan: a route by its OSM relation id, an assembled trail by the way
+    it was opened from. `name` is a snapshot for the Profile list."""
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="saved_trails"
+    )
+    osm_id = models.BigIntegerField(null=True, blank=True)
+    from_way = models.CharField(max_length=64, blank=True, default="")
+    name = models.CharField(max_length=255)
+    length_m = models.FloatField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(osm_id__isnull=False) | ~models.Q(from_way=""),
+                name="saved_trail_has_a_trail",
+            ),
+            models.UniqueConstraint(
+                fields=["user", "osm_id"],
+                condition=models.Q(osm_id__isnull=False),
+                name="unique_saved_route",
+            ),
+            models.UniqueConstraint(
+                fields=["user", "from_way"],
+                condition=models.Q(osm_id__isnull=True),
+                name="unique_saved_assembled_trail",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.name} saved by {self.user}"

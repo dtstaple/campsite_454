@@ -49,6 +49,8 @@ const TRAIL_SEGMENTS_HIT = "trails-hit";
 const CAMPSITES_POINT = "campsites-point";
 import { placement } from "../waypoints/placement";
 import PlanBuilder from "../plans/PlanBuilder";
+import { getPlan } from "../plans/api";
+import type { OpenRequest } from "../profile/openRequest";
 import type { WorkedPlan } from "../plans/api";
 import { draftFor, toggleStop, type PlanDraft } from "../plans/draft";
 import { useSession } from "../session";
@@ -73,9 +75,16 @@ interface Props {
   onOpenCampsite?: (selection: CampsiteSelection) => void;
   /** A campsite row is hovered (TM05-69): its source_id, or null. */
   onHoverCampsite?: (sourceId: string | null) => void;
+  /** TM05-100: a saved trail or plan to open once, from the Profile page. */
+  openRequest?: Extract<OpenRequest, { kind: "trail" | "plan" }> | null;
 }
 
-export default function TrailInsight({ map, onOpenCampsite, onHoverCampsite }: Props) {
+export default function TrailInsight({
+  map,
+  onOpenCampsite,
+  onHoverCampsite,
+  openRequest,
+}: Props) {
   // A named route by relation id, or (TM05-97) a named trail way, which the API resolves to
   // its route or to a trail assembled from the connected same-name ways.
   const [selected, setSelected] = useState<
@@ -96,6 +105,40 @@ export default function TrailInsight({ map, onOpenCampsite, onHoverCampsite }: P
   // candidate search runs, until the hiker asks for it.
   const [finding, setFinding] = useState<{ key: string; finder: Finder } | null>(null);
   const [openCandidate, setOpenCandidate] = useState<Candidate | null>(null);
+
+  // --- TM05-100: open a saved trail or plan, once ------------------------------------
+  const requestHandled = useRef(false);
+  const pendingPlan = useRef<number | null>(null);
+  useEffect(() => {
+    if (!map || !openRequest || requestHandled.current) return;
+    requestHandled.current = true;
+    pendingPlan.current = openRequest.kind === "plan" ? openRequest.planId : null;
+    // Loading is set here, from the request, as a map click sets it from its event.
+    setState({ status: "loading", name: openRequest.name });
+    setSelected(
+      "osmId" in openRequest.trail
+        ? { osmId: openRequest.trail.osmId, name: openRequest.name }
+        : { wayId: openRequest.trail.wayId, name: openRequest.name },
+    );
+  }, [map, openRequest]);
+  const loadedKey = state?.status === "ready" ? state.detail.source_id : null;
+  useEffect(() => {
+    const planId = pendingPlan.current;
+    if (!loadedKey || planId === null || !session) return;
+    pendingPlan.current = null;
+    getPlan(session, planId)
+      .then((plan) => {
+        setPlanDraft({
+          trailKey: loadedKey,
+          planId: plan.id,
+          name: plan.name,
+          stopIds: plan.stops.map((stop) => stop.id),
+        });
+        // A plan's nights can be potential spots, which only the search lists.
+        setFinding({ key: loadedKey, finder: { status: "loading" } });
+      })
+      .catch(() => undefined); // the trail is open; the plan just isn't loaded
+  }, [loadedKey, session]);
 
   const line = useMemo<MeasuredLine | null>(
     () =>

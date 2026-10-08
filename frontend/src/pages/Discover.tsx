@@ -34,11 +34,11 @@ import {
 } from "../map/layers";
 import { popupContent } from "../map/popups";
 import { sourceIdOf, withSourceIds } from "../map/featureIds";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useSession } from "../session";
 import ModeSwitcher from "../modes/ModeSwitcher";
 import LayerPanel from "../components/LayerPanel";
-import SavedPanel from "../components/SavedPanel";
+import { requestFromState, type OpenRequest } from "../profile/openRequest";
 import SaveButton from "../components/SaveButton";
 import CampsiteDetail from "../campsite/CampsiteDetail";
 import TrailInsight from "../trails/TrailInsight";
@@ -303,10 +303,34 @@ export default function Discover() {
     [session, saved],
   );
 
-  /** Centre the map on a saved campsite. */
-  const flyToSaved = useCallback((campsite: SavedCampsite) => {
-    map.current?.flyTo({ center: [campsite.lon, campsite.lat], zoom: Math.max(13, DEFAULT_ZOOM) });
+  // TM05-100: an item clicked on the Profile page arrives as router state. It is taken
+  // once, and the history entry is replaced so a reload does not open it again.
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [openRequest] = useState<OpenRequest | null>(() => requestFromState(location.state));
+  useEffect(() => {
+    if (openRequest) navigate(location.pathname, { replace: true, state: null });
+    // Only on arrival.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  const openedCampsite = useRef(false);
+  useEffect(() => {
+    if (!mapInstance || openRequest?.kind !== "campsite" || openedCampsite.current) return;
+    openedCampsite.current = true;
+    mapInstance.jumpTo({
+      center: [openRequest.lon, openRequest.lat],
+      zoom: Math.max(mapInstance.getZoom(), 13),
+    });
+    // The campsite panel opens with the raised pin (TM05-69), whether or not the
+    // Campsites layer is on.
+    setSelection({
+      id: openRequest.id,
+      lon: openRequest.lon,
+      lat: openRequest.lat,
+      name: openRequest.name,
+      score: null,
+    });
+  }, [mapInstance, openRequest]);
 
   /** Jump to one of the regions that has data. */
   const flyToRegion = useCallback((region: Region) => {
@@ -472,16 +496,14 @@ export default function Discover() {
           onRegion={flyToRegion}
         />
         {/* Keyed by session: signing in or out starts the waypoints afresh. */}
-        <Waypoints key={session?.token ?? "signed-out"} map={mapInstance} session={session} />
+        <Waypoints
+          key={session?.token ?? "signed-out"}
+          map={mapInstance}
+          session={session}
+          focus={openRequest?.kind === "waypoint" ? openRequest : null}
+        />
       </div>
 
-      {session && (
-        <SavedPanel
-          saved={saved}
-          onShow={flyToSaved}
-          onUnsave={(campsite) => void toggleSaved(campsite)}
-        />
-      )}
 
       {popupSave &&
         createPortal(
@@ -525,6 +547,9 @@ export default function Discover() {
 
       <TrailInsight
         map={mapInstance}
+        openRequest={
+          openRequest?.kind === "trail" || openRequest?.kind === "plan" ? openRequest : null
+        }
         onOpenCampsite={setSelection}
         onHoverCampsite={setHoveredCampsite}
       />

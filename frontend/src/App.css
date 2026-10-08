@@ -593,68 +593,6 @@
   border-radius: var(--radius-md) !important;
 }
 
-/* --- saved campsites ---------------------------------------------------------------
- *
- * Below the layers panel, same surface treatment, so the two read as one column of
- * controls rather than two competing cards.
- */
-.saved-panel {
-  left: auto;
-  right: var(--space-md);
-  min-width: 200px;
-  max-width: 260px;
-  max-height: 40vh;
-  overflow-y: auto;
-}
-
-.saved-empty {
-  color: var(--text-tertiary);
-  font-size: var(--text-sm);
-  line-height: var(--leading-snug);
-}
-
-.saved-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.saved-list li {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-}
-
-.saved-row {
-  flex: 1;
-  padding: var(--space-xs) 0;
-  background: none;
-  border: none;
-  color: var(--text-primary);
-  font-family: var(--font-sans);
-  font-size: var(--text-base);
-  text-align: left;
-  cursor: pointer;
-}
-
-.saved-row:hover {
-  color: var(--map-campsites);
-}
-
-.saved-remove {
-  padding: 0 var(--space-xs);
-  background: none;
-  border: none;
-  color: var(--text-tertiary);
-  font-size: var(--text-lg);
-  line-height: 1;
-  cursor: pointer;
-}
-
-.saved-remove:hover {
-  color: var(--danger);
-}
-
 /* --- region shortcuts, at the top of the layers panel --- */
 .regions {
   display: flex;

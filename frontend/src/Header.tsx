@@ -17,7 +17,7 @@ export default function Header() {
   function handleSignOut() {
     signOut();
     // Back to the front door. Staying put would leave a signed-out user looking at a
-    // Saved panel that just emptied itself for no visible reason.
+    // Profile or a waypoint list that just emptied itself for no visible reason.
     navigate("/");
   }
 
@@ -36,6 +36,10 @@ export default function Header() {
       <div className="site-account">
         {session ? (
           <>
+            {/* TM05-100: saved campsites, trails, waypoints and plans. */}
+            <NavLink to="/profile" className="nav-link account-profile">
+              Profile
+            </NavLink>
             <span className="account-who">
               Signed in as <b>{session.username}</b>
             </span>
