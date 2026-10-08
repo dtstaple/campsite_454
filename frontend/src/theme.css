@@ -322,3 +322,14 @@
   --user-location-halo: rgba(59, 130, 246, 0.25);
   --user-location-size: 16px;
 }
+
+/* --- Slope-angle shading (TM05-84) ------------------------------------------------------
+ * The bands backcountry maps use: yellow 27-30°, orange 30-35°, red 35-45°, purple 45°+.
+ * Under 27° is left clear. Opaque here; the layer's opacity slider dims them together. */
+:root {
+  --slope-27: #f2e14c;
+  --slope-30: #f59e0b;
+  --slope-35: #e5412d;
+  --slope-45: #8e3fb8;
+  --slope-default-opacity: 0.55;
+}

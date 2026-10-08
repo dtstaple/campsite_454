@@ -17,6 +17,8 @@ import { orderedLayers } from "../map/layers";
 import { primaryLayer, type ActivityMode } from "../modes/modes";
 import { REGIONS, type Region } from "../regions";
 import { CONTOUR_MIN_ZOOM } from "../map/contourConfig";
+import { BANDS } from "../slope/slope";
+import { SLOPE_MIN_ZOOM, slopeSupported } from "../slope/slopeLayer";
 import { bandLabel, GRADES, gradeToken } from "../score/grade";
 
 interface Props {
@@ -33,6 +35,11 @@ interface Props {
   /** TM05-83: contour lines, drawn from zoom CONTOUR_MIN_ZOOM. */
   contours: boolean;
   onContours: (on: boolean) => void;
+  /** TM05-84: slope-angle shading and its opacity (0-1). */
+  slope: boolean;
+  onSlope: (on: boolean) => void;
+  slopeOpacity: number;
+  onSlopeOpacity: (opacity: number) => void;
   onRegion: (region: Region) => void;
 }
 
@@ -51,6 +58,35 @@ function ScoreLegend() {
         No score yet
       </li>
     </ul>
+  );
+}
+
+/** TM05-84: what the slope colours mean, the caveat, and the opacity control. */
+function SlopeLegend({ opacity, onOpacity }: { opacity: number; onOpacity: (o: number) => void }) {
+  return (
+    <div className="slope-legend">
+      <ul aria-label="Slope angle bands">
+        {BANDS.map((band) => (
+          <li key={band.band}>
+            <span className="swatch" style={{ background: `var(${band.token})` }} />
+            {band.label}
+          </li>
+        ))}
+      </ul>
+      <p className="slope-note">Terrain information, not an avalanche forecast.</p>
+      <label className="slope-opacity">
+        Opacity
+        <input
+          type="range"
+          min={0.1}
+          max={1}
+          step={0.05}
+          value={opacity}
+          onChange={(event) => onOpacity(Number(event.target.value))}
+        />
+        <span className="count">{Math.round(opacity * 100)}%</span>
+      </label>
+    </div>
   );
 }
 
@@ -74,6 +110,10 @@ export default function LayerPanel({
   onTerrain,
   contours,
   onContours,
+  slope,
+  onSlope,
+  slopeOpacity,
+  onSlopeOpacity,
   onRegion,
 }: Props) {
   const [open, setOpen] = useState(true);
@@ -156,6 +196,23 @@ export default function LayerPanel({
               {contours && zoom < CONTOUR_MIN_ZOOM ? `zoom ${CONTOUR_MIN_ZOOM}+` : contours ? "ft" : ""}
             </span>
           </label>
+          {slopeSupported() && (
+            <>
+              <label className={`row${slope ? "" : " off"}`}>
+                <input
+                  type="checkbox"
+                  checked={slope}
+                  onChange={(event) => onSlope(event.target.checked)}
+                />
+                <span className="swatch swatch-slope" />
+                Slope angle
+                <span className="count">
+                  {slope && zoom < SLOPE_MIN_ZOOM ? `zoom ${SLOPE_MIN_ZOOM}+` : ""}
+                </span>
+              </label>
+              {slope && <SlopeLegend opacity={slopeOpacity} onOpacity={onSlopeOpacity} />}
+            </>
+          )}
 
           {/* Data sits in a few regions hundreds of miles apart, so free panning mostly
               finds empty map. These jump straight to the places that have something. */}
