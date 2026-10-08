@@ -160,6 +160,14 @@ export interface RouteHit {
   centroid: [number, number];
   /** From the view centre, in metres; null when no centre was given. */
   distance_m: number | null;
+  /** TM05-102 card data, present when asked for with `cards`. */
+  difficulty?: "easy" | "moderate" | "hard" | null;
+  route_type?: "loop" | "out_and_back" | "point_to_point" | null;
+  route_type_estimated?: boolean | null;
+  /** Elevations (m) along the trail from the stored profile, or null if none is stored. */
+  sparkline?: number[] | null;
+  campsites?: number;
+  campsites_within_m?: number;
 }
 
 export interface RouteSearch {
@@ -168,7 +176,23 @@ export interface RouteSearch {
   truncated: boolean;
   /** TM05-85: routes the active filters could not judge (no profile yet), left out. */
   unknown?: number;
+  /** TM05-102: every match, across pages. */
+  total?: number;
+  offset?: number;
   results: RouteHit[];
+}
+
+export interface Region {
+  id: string;
+  label: string;
+  bbox: Bbox;
+  states: string[];
+  /** Named trails inside it: zero for a region in regions.yml that holds no data yet. */
+  trails: number;
+}
+
+export function fetchRegions(signal?: AbortSignal) {
+  return getJson<Region[]>(`${API_BASE_URL}/api/regions/`, signal);
 }
 
 /** Named routes matching `q` anywhere, or (no `q`) in or near `bbox`; nearest `near` first. */
@@ -178,6 +202,11 @@ export function searchRoutes(
     bbox?: Bbox;
     near?: [number, number];
     limit?: number;
+    /** TM05-102: browsing a region, sorted and paged, with card data. */
+    region?: string;
+    sort?: "distance" | "length" | "gain" | "name";
+    offset?: number;
+    cards?: boolean;
     /** TM05-85 filter parameters, already in API units (filters.ts). */
     filters?: Record<string, string>;
   },
@@ -188,6 +217,10 @@ export function searchRoutes(
   if (options.bbox) params.set("bbox", options.bbox.join(","));
   if (options.near) params.set("near", options.near.join(","));
   if (options.limit) params.set("limit", String(options.limit));
+  if (options.region) params.set("region", options.region);
+  if (options.sort) params.set("sort", options.sort);
+  if (options.offset) params.set("offset", String(options.offset));
+  if (options.cards) params.set("cards", "1");
   return getJson<RouteSearch>(`${API_BASE_URL}/api/routes/search/?${params}`, signal);
 }
 

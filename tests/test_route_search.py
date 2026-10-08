@@ -90,6 +90,10 @@ def test_an_empty_result_is_an_empty_list_not_an_error():
     assert response.json() == {
         "query": "zzzz",
         "count": 0,
+        "total": 0,
+        "offset": 0,
+        "sort": "name",
+        "region": None,
         "truncated": False,
         "unknown": 0,
         "results": [],

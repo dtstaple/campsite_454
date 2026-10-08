@@ -191,7 +191,8 @@ export default function TrailSearch({ map, onPick }: Props) {
   );
 }
 
-function FilterForm({
+/** The filter controls (TM05-85), shared with the Discover page (TM05-102). */
+export function FilterForm({
   filters,
   onChange,
 }: {

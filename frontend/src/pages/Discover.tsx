@@ -339,6 +339,14 @@ export default function Discover() {
   }, []);
 
   const currentRegion = regionAt(center);
+  // TM05-102: the Discover page sorts "distance from map view" from here.
+  useEffect(() => {
+    try {
+      localStorage.setItem("campsite.lastView", JSON.stringify(center));
+    } catch {
+      /* not remembered; the Discover page uses the region centre */
+    }
+  }, [center]);
 
   // --- map setup, once ------------------------------------------------------------
 

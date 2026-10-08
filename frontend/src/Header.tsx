@@ -28,8 +28,12 @@ export default function Header() {
       </Link>
 
       <nav className="site-nav">
+        {/* TM05-102: browse trails as cards; the map is where they open. */}
+        <NavLink to="/trails" className="nav-link">
+          Discover trails
+        </NavLink>
         <NavLink to="/discover" className="nav-link">
-          Discover
+          Map
         </NavLink>
       </nav>
 
