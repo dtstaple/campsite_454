@@ -17,10 +17,13 @@ PRINT = (
 
 
 def settings_with(**env):
+    # Without pytest-cov's variables: it would otherwise measure this child interpreter
+    # too, and its statement-only data cannot be combined with the suite's branch data.
+    base = {k: v for k, v in os.environ.items() if not k.startswith(("COV_CORE_", "COVERAGE"))}
     result = subprocess.run(
         [sys.executable, "-c", PRINT],
         cwd=BACKEND,
-        env={**os.environ, **env},
+        env={**base, **env},
         capture_output=True,
         text=True,
         check=True,
