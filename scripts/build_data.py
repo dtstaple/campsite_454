@@ -36,6 +36,8 @@ def steps(region: str) -> list[tuple[str, list[str]]]:
         ("osm-routes", ["ingest", "osm-routes", region]),
         ("route-profiles", ["build_route_profiles", region]),
         ("enrich", ["enrich_campsites", region]),
+        # TM05-85: the Discover filters' stored facts; needs the profiles above.
+        ("route-facts", ["enrich_routes", region]),
     ]
 
 

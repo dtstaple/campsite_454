@@ -87,7 +87,13 @@ def test_an_empty_result_is_an_empty_list_not_an_error():
     route(1, "Mount Marcy Trail", 0)
     response = search(q="zzzz")
     assert response.status_code == 200
-    assert response.json() == {"query": "zzzz", "count": 0, "truncated": False, "results": []}
+    assert response.json() == {
+        "query": "zzzz",
+        "count": 0,
+        "truncated": False,
+        "unknown": 0,
+        "results": [],
+    }
 
 
 def test_results_are_ordered_by_distance_from_the_view_centre():

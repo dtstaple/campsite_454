@@ -26,6 +26,7 @@ from api.bbox import InvalidBbox, parse_bbox
 from api.layers import COORDINATE_PRECISION, SimplifyPreserveTopology, envelope
 from api.views import InvalidParameter, _bad_request, _int_param, _simplify_param
 from enrichment.models import CampsiteFacts
+from enrichment.route_facts import save_route_facts
 from geodata.assembly import assembled_route, route_for_way
 from geodata.models import Campsite, Trail, TrailRoute
 from geodata.route_rating import config as route_config
@@ -161,7 +162,9 @@ def route_detail_view(request, osm_id: int):
         return _bad_request(exc)
 
     route = get_object_or_404(TrailRoute, osm_id=osm_id)
-    return Response(route_detail(route, within))
+    detail = route_detail(route, within)
+    remember_facts(route, detail)
+    return Response(detail)
 
 
 @api_view(["GET"])
@@ -182,7 +185,9 @@ def way_trail_view(request, source_id: str):
 
     route = route_for_way(way)
     if route is not None:
-        return Response({**route_detail(route, within), "assembled": False, "assembly": None})
+        detail = route_detail(route, within)
+        remember_facts(route, detail)
+        return Response({**detail, "assembled": False, "assembly": None})
     route = assembled_route(way)
     detail = route_detail(route, within)
     detail["assembled"] = True
@@ -192,6 +197,16 @@ def way_trail_view(request, source_id: str):
         "note": "Assembled from mapped segments",
     }
     return Response(detail)
+
+
+def remember_facts(route: TrailRoute, detail: dict) -> None:
+    """Refresh the route's stored filter facts (TM05-85) from the profile just served, so a
+    trail someone has opened is filterable by gain and difficulty from then on."""
+    profile = detail["profile"]
+    if profile["status"] != "ok":
+        return
+    value = {"stats": profile["stats"], "elevation_m": profile["elevation_m"]}
+    save_route_facts(route, value)
 
 
 def route_detail(route: TrailRoute, within: int) -> dict:

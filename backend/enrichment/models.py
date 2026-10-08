@@ -61,3 +61,33 @@ class CampsiteFacts(models.Model):
 
     def __str__(self):
         return f"facts for {self.campsite_id} (v{self.method_version})"
+
+
+class RouteFacts(models.Model):
+    """Derived facts per named route (TM05-85), what the Discover filters read.
+
+    Stored rather than computed per request: route type needs a stitched line and end
+    queries (~30 ms a route), difficulty needs the elevation profile. `enrich_routes`
+    fills the table, and opening a trail refreshes its row. Null means not known yet --
+    usually because the route's profile has never been computed -- never zero.
+    """
+
+    route = models.OneToOneField(
+        "geodata.TrailRoute", on_delete=models.CASCADE, primary_key=True, related_name="facts"
+    )
+    computed_at = models.DateTimeField()
+    length_m = models.FloatField()
+    gain_m = models.FloatField(null=True, blank=True)
+    loss_m = models.FloatField(null=True, blank=True)
+    difficulty = models.CharField(max_length=16, blank=True)
+    shenandoah = models.FloatField(null=True, blank=True)
+    route_type = models.CharField(max_length=16)
+    route_type_estimated = models.BooleanField(default=True)
+    #: Distance to the nearest campsite within NEAREST_CAMPSITE_MAX_M; null if none.
+    nearest_campsite_m = models.FloatField(null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["difficulty"]),
+            models.Index(fields=["route_type"]),
+        ]
