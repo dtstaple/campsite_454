@@ -156,6 +156,10 @@
   --chart-marker: var(--map-campsites);
   --chart-height: 132px;
 
+  /* Trail search and the Discover list (TM05-74), floating top centre over the map. */
+  --trail-search-width: 340px;
+  --trail-search-list-height: 300px;
+
   /* --- spacing --- */
   --space-xs: 4px;
   --space-sm: 8px;

@@ -146,6 +146,38 @@ export function fetchTrailForWay(sourceId: string, withinM: number, signal?: Abo
   return getJson<RouteDetail>(`${API_BASE_URL}/api/trails/${path}/trail/?${params}`, signal);
 }
 
+/** One result of the trail search / Discover list (TM05-74). */
+export interface RouteHit {
+  osm_id: number;
+  name: string;
+  length_m: number;
+  /** From the cached profile; null until the route's profile has been computed once. */
+  gain_m: number | null;
+  centroid: [number, number];
+  /** From the view centre, in metres; null when no centre was given. */
+  distance_m: number | null;
+}
+
+export interface RouteSearch {
+  query: string;
+  count: number;
+  truncated: boolean;
+  results: RouteHit[];
+}
+
+/** Named routes matching `q` anywhere, or (no `q`) in or near `bbox`; nearest `near` first. */
+export function searchRoutes(
+  options: { q?: string; bbox?: Bbox; near?: [number, number]; limit?: number },
+  signal?: AbortSignal,
+) {
+  const params = new URLSearchParams();
+  if (options.q) params.set("q", options.q);
+  if (options.bbox) params.set("bbox", options.bbox.join(","));
+  if (options.near) params.set("near", options.near.join(","));
+  if (options.limit) params.set("limit", String(options.limit));
+  return getJson<RouteSearch>(`${API_BASE_URL}/api/routes/search/?${params}`, signal);
+}
+
 /** One route in detail. The first request for a route can take seconds (profile). */
 export function fetchRouteDetail(osmId: number, withinM: number, signal?: AbortSignal) {
   const params = new URLSearchParams({ campsites_within_m: String(withinM) });

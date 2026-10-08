@@ -106,3 +106,21 @@ export function isNamedTrail(properties: Record<string, unknown> | null | undefi
   const name = properties?.name;
   return typeof name === "string" && name.trim() !== "";
 }
+
+/** "4.4 mi · 2,616 ft gain · 3.2 mi away" for a trail search result (TM05-74). Gain is
+ * left out until the route's profile has been computed once. */
+export function routeHitMeta(hit: { length_m: number; gain_m: number | null; distance_m: number | null }): string {
+  const parts = [`${(hit.length_m / 1609.344).toFixed(1)} mi`];
+  if (hit.gain_m !== null) parts.push(`${Math.round(hit.gain_m * 3.28084).toLocaleString("en-US")} ft gain`);
+  if (hit.distance_m !== null) {
+    parts.push(hit.distance_m < 160 ? "in view" : `${(hit.distance_m / 1609.344).toFixed(1)} mi away`);
+  }
+  return parts.join(" · ");
+}
+
+/** What the list says when it is empty (TM05-74). */
+export function emptySearchMessage(query: string): string {
+  return query.trim()
+    ? `No named trails match "${query.trim()}".`
+    : "No named trails in or near this view. Zoom out, or search by name.";
+}
