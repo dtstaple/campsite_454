@@ -61,6 +61,7 @@ import {
 } from "../saved";
 import type { FeatureCollection as GeoJsonFeatureCollection } from "geojson";
 import { addContourLayers, setContourBasemap, setContoursVisible } from "../map/contours";
+import StartLocation from "../location/StartLocation";
 import {
   ApiError,
   fetchMapData,
@@ -524,6 +525,7 @@ export default function Discover() {
           );
         }}
       />
+      <StartLocation map={mapInstance} onRegion={flyToRegion} />
       <SatelliteLayers map={mapInstance} basemap={basemap} terrain={terrain} />
       <BasemapToggle value={basemap} onChange={setBasemap} />
     </div>

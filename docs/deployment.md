@@ -175,6 +175,11 @@ warnings, and several more gaps exist beyond those:
   `SESSION_COOKIE_SECURE`, and `CSRF_COOKIE_SECURE` should be turned on (the four
   `check --deploy` warnings), along with `SECURE_PROXY_SSL_HEADER` if a proxy terminates
   TLS.
+- **Geolocation needs HTTPS (TM05-78).** Browsers only offer `navigator.geolocation` in a
+  secure context: `https://`, or `http://localhost` and `http://127.0.0.1` in development.
+  On a plain-HTTP deployment the map never asks for the user's location. It silently opens
+  on the default region, and the locate button on the map does nothing. Serve the frontend
+  over HTTPS. See docs/location.md.
 - **A production web server.** `manage.py runserver` is a development server. The backend
   needs a WSGI server such as gunicorn, which isn't in `requirements.txt` yet, usually
   behind nginx or the platform's router.
