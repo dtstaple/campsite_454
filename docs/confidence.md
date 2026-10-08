@@ -15,8 +15,10 @@ campsite panel.
 | `official` | Official listing | The record comes from an official dataset. Today that is **only Recreation.gov (RIDB)**, the federal reservation system. |
 | `community_mapped` | Community-mapped | An OpenStreetMap record with a **name**, or with at least **2 informative tags**. |
 | `limited_info` | Limited info | An OpenStreetMap record with **no name and fewer than 2 informative tags**: somebody marked a spot, and little more is known. |
+| `computed` | Computed | **Not a record.** A potential spot the candidate search computed from public land, trail, water, elevation and slope data (TM05-99, docs/candidates.md). Nobody has mapped a campsite there. Always labelled "Potential spot (unverified)". |
 
 Checked in that order. A record from a source with no rule yet is `limited_info`.
+`computed` never applies to a campsite record; only candidate spots carry it.
 
 **Informative tags** are the OSM tags the panel surfaces (`operator`, `description`, `tents`,
 `fireplace`, `toilets`, `drinking_water`, `fee`, `access`, and the rest of

@@ -13,6 +13,8 @@ export type TrailRef = { osm_id: number } | { from_way: string };
 export interface PlanStop {
   night: number;
   id: string;
+  /** TM05-99: "candidate" for a potential spot, which always carries a warning. */
+  kind?: "campsite" | "candidate";
   display_name: string | null;
   display_name_derived: boolean;
   lon: number;

@@ -865,6 +865,52 @@ shows:
 
 Signed out, the section offers sign-in.
 
+## Potential campsites (TM05-99)
+
+### `GET /api/routes/<osm_id>/candidates/[?campsites_within_m=500]`
+### `GET /api/trails/<source_id>/candidates/[?campsites_within_m=500]`
+
+These return computed **potential campsites** along a trail: points that pass every hard
+filter of NY's rules for camping away from a designated site, scored, spread at least
+0.5 mi apart, and at most 8. The method, honesty rules and measurements are in
+docs/candidates.md. Answers are cached per route, corridor and config: the first request
+for a trail can take 15–35 s (3DEP), and later ones about 5 ms.
+
+```json
+{"status": "ok", "within_m": 500, "cached": false, "compute_ms": 19208,
+ "counts": {"sampled": 570, "passed": 31, "scored": 13, "kept": 3,
+            "rejected": {"public_land": 44, "trail": 71, "water": 44, "elevation": 207,
+                         "terrain": 0, "slope": 173}},
+ "reason": null,
+ "candidates": [{
+   "id": "candidate/-73.963412,44.171280", "kind": "candidate",
+   "label": "Potential spot (unverified)",
+   "lon": -73.963412, "lat": 44.17128, "distance_along_m": 1300.2,
+   "distance_from_route_m": 60.0, "side": "left", "score": 98,
+   "confidence": {"level": "computed", "label": "Computed", ...},
+   "checks": [{"key": "public_land", "passed": true, "label": "On public land with open access (High Peaks Wilderness)."}, ...],
+   "not_checked": "Road distance isn't checked; verify current rules on the ground.",
+   "rule": {"text": "Camping is prohibited within 150 feet of any road, trail, ...", "source": "https://dec.ny.gov/..."},
+   "elevation_m": 669.1, "slope_deg": 0.6, "nearest_trail_m": 60.0, "nearest_water_m": 87.0,
+   "score_breakdown": {...}}]}
+```
+
+**Fields:**
+- `reason` is a sentence explaining an empty result, and null otherwise.
+- `score_breakdown` is the scoring engine's contract-1 result, without weather.
+- **When 3DEP fails:** `status: "unavailable"` with a `reason`, and no candidates.
+
+**Errors:**
+- **400** for a bad `campsites_within_m`.
+- **404** for an unknown route, or an unnamed or unknown way.
+
+**Candidates as plan stops (TM05-81).** A candidate's `id` can be sent in a plan's
+`stop_ids` beside campsite ids. Such a stop comes back with:
+- `kind: "candidate"`
+- `display_name` "Potential spot (unverified)"
+- an `unknown` legality labelled the same
+- the unverified-stop `warning`
+
 ## Not included yet
 
 **Scored campsites in the map layers.** The layer endpoints above return raw ingested

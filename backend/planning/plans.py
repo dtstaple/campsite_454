@@ -13,14 +13,17 @@ which is the direction its profile and the trail panel's miles use.
 
 from dataclasses import dataclass
 
+from django.contrib.gis.geos import Point
+
 from analysis.analyses.elevation import RouteProfile, stitch
 from analysis.base import AnalysisError
 from api.routes import MAX_WITHIN_M, display_name, facts_of
+from geodata.models import METRIC_SRID
 from geodata.route_rating import ALONG, NEAR_START, position_along
 from geodata.route_rating import config as route_config
 from scoring.config import load as load_scoring_config
 from scoring.engine import score_campsite
-from scoring.verdict import PERMITTED, legality_verdict
+from scoring.verdict import PERMITTED, RULES, UNKNOWN, legality_verdict
 
 from .days import day_stats, smoothed_profile
 
@@ -35,6 +38,35 @@ class PlanError(ValueError):
     """A plan that cannot be made, with a message for the person making it."""
 
 
+CANDIDATE_PREFIX = "candidate/"
+CANDIDATE_LABEL = "Potential spot (unverified)"
+CANDIDATE_WARNING = (
+    "{label}: a computed spot, not a mapped campsite. It passed the public land, 150 ft, "
+    "elevation and slope checks, but road distance isn't checked; verify current rules "
+    "on the ground."
+)
+
+
+class CandidateStop:
+    """A potential campsite (TM05-99) chosen as a stop. Not a database row: its id,
+    "candidate/<lon>,<lat>", is its position, so a plan can keep it and find it again."""
+
+    def __init__(self, source_id: str):
+        try:
+            lon, lat = (float(part) for part in source_id[len(CANDIDATE_PREFIX) :].split(","))
+        except ValueError:
+            raise PlanError(f"{source_id} is not a potential campsite id.") from None
+        if not (-180 <= lon <= 180 and -90 <= lat <= 90):
+            raise PlanError(f"{source_id} is not a potential campsite id.")
+        self.source_id = source_id
+        self.geom = Point(lon, lat, srid=4326)
+        self.geom_m = self.geom.transform(METRIC_SRID, clone=True)
+
+
+def is_candidate(site) -> bool:
+    return isinstance(site, CandidateStop)
+
+
 @dataclass
 class Located:
     site: object
@@ -44,7 +76,22 @@ class Located:
 
 
 def _name(site) -> str:
+    if is_candidate(site):
+        return f"The {CANDIDATE_LABEL[0].lower()}{CANDIDATE_LABEL[1:]}"
     return display_name(site)["display_name"] or "this campsite"
+
+
+def _candidate_legality() -> dict:
+    return {
+        "verdict": UNKNOWN,
+        "label": CANDIDATE_LABEL,
+        "reason": "Computed from public land, trail, water, elevation and slope data. "
+        "Nobody has mapped a campsite here, and road distance isn't checked.",
+        "rule": RULES["designated_150"],
+        "designated": False,
+        "designation_basis": None,
+        "elevation_ft": None,
+    }
 
 
 def locate(route, line_m, sites) -> list[Located]:
@@ -112,11 +159,18 @@ def build_plan(route, sites) -> dict:
     stop_payloads, warnings = [], []
     for night, stop in enumerate(stops, start=1):
         site = stop.site
-        result = score_campsite(site, config)
-        legality = legality_verdict(site, facts_of(site), result["legal_status"])
-        name = display_name(site)
-        warning = None
-        if legality["verdict"] != PERMITTED:
+        if is_candidate(site):
+            result = {"score": None}
+            legality = _candidate_legality()
+            name = {"display_name": CANDIDATE_LABEL, "display_name_derived": False}
+            warning = f"Night {night}, " + CANDIDATE_WARNING.format(label=CANDIDATE_LABEL)
+            warnings.append(warning)
+        else:
+            result = score_campsite(site, config)
+            legality = legality_verdict(site, facts_of(site), result["legal_status"])
+            name = display_name(site)
+            warning = None
+        if warning is None and legality["verdict"] != PERMITTED:
             label = name["display_name"] or "campsite"
             warning = f"Night {night}, {label}: {legality['label']}."
             if legality.get("reason"):
@@ -126,6 +180,7 @@ def build_plan(route, sites) -> dict:
             {
                 "night": night,
                 "id": site.source_id,
+                "kind": "candidate" if is_candidate(site) else "campsite",
                 **name,
                 "lon": round(site.geom.x, 6),
                 "lat": round(site.geom.y, 6),

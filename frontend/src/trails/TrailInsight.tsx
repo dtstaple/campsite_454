@@ -13,6 +13,7 @@ import * as maplibregl from "maplibre-gl";
 import type { Feature, FeatureCollection, Point } from "geojson";
 import { clampBbox, type Bbox } from "../api";
 import {
+  fetchCandidates,
   fetchRouteDetail,
   fetchRoutes,
   fetchTrailForWay,
@@ -33,7 +34,9 @@ import {
   SELECTED_HIT,
   SELECTED_SOURCE,
 } from "./mapLayers";
-import TrailPanel, { type DetailState } from "./TrailPanel";
+import TrailPanel, { type DetailState, type Finder } from "./TrailPanel";
+import AlongMarkers from "./AlongMarkers";
+import { candidatesPath, type Candidate } from "./candidates";
 import ThreeDControls from "./ThreeDControls";
 import { CAMERA, easeBearing, rigFor } from "./camera";
 import { disable3D, enable3D, prefersReducedMotion } from "./terrain3d";
@@ -88,6 +91,11 @@ export default function TrailInsight({ map, onOpenCampsite, onHoverCampsite }: P
   const { session } = useSession();
   const [planDraft, setPlanDraft] = useState<PlanDraft | null>(null);
   const [worked, setWorked] = useState<WorkedPlan | null>(null);
+
+  // TM05-99: the campsite search, per trail. Nothing along the trail is drawn, and no
+  // candidate search runs, until the hiker asks for it.
+  const [finding, setFinding] = useState<{ key: string; finder: Finder } | null>(null);
+  const [openCandidate, setOpenCandidate] = useState<Candidate | null>(null);
 
   const line = useMemo<MeasuredLine | null>(
     () =>
@@ -322,15 +330,6 @@ export default function TrailInsight({ map, onOpenCampsite, onHoverCampsite }: P
       properties: {},
       geometry: detail.line,
     });
-    const points: Feature<Point>[] = detail.campsites.items.map((site) => ({
-      type: "Feature",
-      properties: { id: site.id },
-      geometry: { type: "Point", coordinates: [site.lon, site.lat] },
-    }));
-    (map.getSource(ALONG_SOURCE) as maplibregl.GeoJSONSource | undefined)?.setData({
-      type: "FeatureCollection",
-      features: points,
-    });
     if (framed.current !== detail.source_id) {
       framed.current = detail.source_id;
       const bounds = new maplibregl.LngLatBounds();
@@ -417,6 +416,17 @@ export default function TrailInsight({ map, onOpenCampsite, onHoverCampsite }: P
     for (const stop of worked.stops) if (draft.stopIds.includes(stop.id)) nightOf[stop.id] = stop.night;
   }
 
+  const finder: Finder =
+    trailKey && finding?.key === trailKey ? finding.finder : { status: "idle" };
+  const finderOpen = finder.status !== "idle";
+  const readyDetail = state?.status === "ready" ? state.detail : null;
+  const searchPath = readyDetail ? candidatesPath(readyDetail, withinM) : null;
+  const candidates = finder.status === "ready" ? (finder.search?.candidates ?? []) : [];
+  const nights =
+    draft && worked && worked.trail.source_id === draft.trailKey
+      ? worked.stops.filter((stop) => draft.stopIds.includes(stop.id))
+      : [];
+
   if (!state) return search;
   return (
     <>
@@ -447,10 +457,17 @@ export default function TrailInsight({ map, onOpenCampsite, onHoverCampsite }: P
           ? {
               ids: draft.stopIds,
               nightOf,
-              onToggle: (site) => setPlanDraft(toggleStop(draft, site.id)),
+              onToggle: (id) => setPlanDraft(toggleStop(draft, id)),
             }
           : undefined
       }
+      finder={finder}
+      onFind={() => trailKey && setFinding({ key: trailKey, finder: { status: "loading" } })}
+      onCandidate={(candidate) => {
+        setCursorM(candidate.distance_along_m);
+        setOpenCandidate(candidate);
+        map?.easeTo({ center: [candidate.lon, candidate.lat], zoom: Math.max(map.getZoom(), 14) });
+      }}
       controls={
         <ThreeDControls
           is3D={is3D}
@@ -462,6 +479,89 @@ export default function TrailInsight({ map, onOpenCampsite, onHoverCampsite }: P
         />
       }
     />
+      <AlongMarkers
+        map={map}
+        candidates={candidates}
+        nights={nights}
+        open={openCandidate && candidates.some((c) => c.id === openCandidate.id) ? openCandidate : null}
+        onOpen={setOpenCandidate}
+        stop={
+          session && draft && openCandidate
+            ? {
+                chosen: draft.stopIds.includes(openCandidate.id),
+                night: nightOf[openCandidate.id],
+                onToggle: () => setPlanDraft(toggleStop(draft, openCandidate.id)),
+              }
+            : undefined
+        }
+      />
+      <FinderEffects
+        map={map}
+        trailKey={trailKey}
+        open={finderOpen}
+        path={searchPath}
+        campsites={readyDetail?.campsites.items ?? null}
+        onResult={(key, next) => setFinding((current) => (current?.key === key ? { key, finder: next } : current))}
+      />
     </>
   );
+}
+
+/**
+ * The search's side effects, kept out of the component above: run the candidate search
+ * (again when the corridor changes), and draw the mapped campsites along the trail while
+ * the finder is open.
+ */
+function FinderEffects({
+  map,
+  trailKey,
+  open,
+  path,
+  campsites,
+  onResult,
+}: {
+  map: maplibregl.Map | null;
+  trailKey: string | null;
+  open: boolean;
+  path: string | null;
+  campsites: CampsiteAlong[] | null;
+  onResult: (key: string, finder: Finder) => void;
+}) {
+  const report = useRef(onResult);
+  useEffect(() => {
+    report.current = onResult;
+  }, [onResult]);
+
+  useEffect(() => {
+    if (!open || !trailKey || !path) return;
+    const controller = new AbortController();
+    report.current(trailKey, { status: "loading" });
+    fetchCandidates(path, controller.signal)
+      .then((search) => report.current(trailKey, { status: "ready", search }))
+      .catch((error) => {
+        if (controller.signal.aborted) return;
+        report.current(trailKey, {
+          status: "error",
+          message: `Potential spots are unavailable right now (${error instanceof Error ? error.message : String(error)}). Mapped campsites are listed below.`,
+        });
+      });
+    return () => controller.abort();
+  }, [open, trailKey, path]);
+
+  useEffect(() => {
+    const source = map?.getSource(ALONG_SOURCE) as maplibregl.GeoJSONSource | undefined;
+    if (!source) return;
+    if (!open || !campsites) {
+      source.setData(EMPTY);
+      return;
+    }
+    const points: Feature<Point>[] = campsites.map((site) => ({
+      type: "Feature",
+      properties: { id: site.id },
+      geometry: { type: "Point", coordinates: [site.lon, site.lat] },
+    }));
+    source.setData({ type: "FeatureCollection", features: points });
+  }, [map, open, campsites]);
+
+  return null;
 }

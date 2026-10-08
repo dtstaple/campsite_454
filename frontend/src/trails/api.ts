@@ -3,6 +3,7 @@
  */
 
 import type { FeatureCollection, LineString, MultiLineString } from "geojson";
+import type { CandidateSearch } from "./candidates";
 import { API_BASE_URL, type Bbox } from "../api";
 
 export interface RouteSummary {
@@ -191,4 +192,12 @@ export function searchRoutes(
 export function fetchRouteDetail(osmId: number, withinM: number, signal?: AbortSignal) {
   const params = new URLSearchParams({ campsites_within_m: String(withinM) });
   return getJson<RouteDetail>(`${API_BASE_URL}/api/routes/${osmId}/?${params}`, signal);
+}
+
+/**
+ * TM05-99: potential campsites along a trail, by route or by the way it was opened from.
+ * The first search of a trail samples terrain and can take up to about 30 s.
+ */
+export function fetchCandidates(path: string, signal?: AbortSignal) {
+  return getJson<CandidateSearch>(`${API_BASE_URL}${path}`, signal);
 }

@@ -333,3 +333,20 @@
   --slope-45: #8e3fb8;
   --slope-default-opacity: 0.55;
 }
+
+/* --- Potential campsites and plan nights (TM05-99) --------------------------------------
+ * A potential spot is a dashed ring: hollow, so it never reads as a mapped campsite (a
+ * solid circle) or as a score grade (the --score-* fills). The ring is the accent, kept
+ * apart from the campsite red and from every grade. A night is a numbered pin on top;
+ * an unverified night gets the same dashed edge. */
+:root {
+  --candidate-ring: #e3cfa6;
+  --candidate-fill: rgba(21, 19, 15, 0.55);
+  --candidate-ring-width: 2px;
+  --candidate-size: 18px;
+  --night-marker-bg: #ede7d9;
+  --night-marker-text: #15130f;
+  --night-marker-size: 22px;
+  /* Room above a potential spot for its detail popup; the map pans to make it. */
+  --candidate-popup-room: 380px;
+}
