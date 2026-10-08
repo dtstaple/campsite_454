@@ -769,6 +769,102 @@ theme.css) with its own glyph: a drop, a tent, an arrow or a flag. Under the lay
 "My waypoints" has **+ Add**: the next map click drops a draft and opens the editor.
 Clicking a marker reopens the editor to rename, retype, edit the note or delete.
 
+## Overnight plans (TM05-81)
+
+An overnight plan is a set of campsites along one trail, chosen as nightly stops. The API
+returns each day's distance, gain and loss. Plans live in the `planning` app and belong to
+one user. Authentication and isolation work exactly as for waypoints: every endpoint takes
+`Authorization: Token <key>` and returns **401** without one. Another user's plan returns
+**404**.
+
+| Method and path | What it does |
+|---|---|
+| `POST /api/plans/preview/` | Work out a plan without saving it (the trail panel calls this on every change) |
+| `GET /api/plans/[?osm_id=…\|?from_way=…]` | The user's plans, newest first, optionally for one trail: `{id, name, osm_id, from_way, trail_name, nights, created_at, updated_at}` |
+| `POST /api/plans/` | Save one. **201** with the worked-out plan |
+| `GET /api/plans/<id>/` | Reopen one, worked out against its trail as it is now |
+| `PATCH /api/plans/<id>/` | Change `name` and/or `stop_ids`. An invalid change is rejected and changes nothing |
+| `DELETE /api/plans/<id>/` | **204** |
+| `GET /api/plans/<id>/gpx/` | The plan as GPX 1.1 |
+
+**Request body**: `{"osm_id": 6619234, "stop_ids": ["node/…", "node/…"], "name": "…"}`.
+- `osm_id` names a route. For a trail assembled from segments (TM05-97), use
+  `from_way: "way/…"` instead.
+- `stop_ids` are campsite ids, in any order.
+- `name` is optional, up to 120 characters. It defaults to "<trail>: N nights".
+
+**Worked-out plan**, the shape of preview, create, read and update:
+
+```json
+{"trail": {"osm_id": 6619234, "source_id": "relation/6619234", "name": "Van Hoevenberg Trail", "length_m": 11372.9},
+ "nights": 2,
+ "stops": [{"night": 1, "id": "node/…", "display_name": "Phelps Brook Lean-to", "lon": …, "lat": …,
+            "distance_along_m": 2931.8, "distance_from_route_m": 13.5, "score": 79,
+            "legality": {"verdict": "permitted", "label": "Permitted · designated site", …},
+            "warning": null}, …],
+ "days": [{"day": 1, "from": "Start", "to": "Phelps Brook Lean-to", "start_m": 0, "end_m": 2931.8,
+           "distance_m": 2931.8, "gain_m": 62.7, "loss_m": 30.9}, …],
+ "totals": {"distance_m": 11372.9, "gain_m": 1010.3, "loss_m": 49.8},
+ "profile": {"status": "ok", "reason": null},
+ "warnings": []}
+```
+
+Saved plans also carry `id`, `name`, `osm_id`, `from_way`, `trail_name` and the
+timestamps.
+
+**Ordering.** Stops are put in order by their position along the route's stitched line,
+whatever order they were sent in. Night *n* is the *n*-th stop from the route's start. A
+plan runs in the route's own direction, the same direction as the trail panel's miles and
+profile.
+
+**Rejected stops** return **400** with `{"error": "<sentence>"}`, naming the campsite:
+- A campsite past either end of the route. "Off the end" uses the same rule as the trail
+  list (`routes.yml`, `along`): more than 100 m from the line, and within 50 m of an end.
+  For example: "Wilderness Campground at Heart Lake is off the end of Van Hoevenberg
+  Trail: it lies before the trail's start, 151 m from the trail. Choose a campsite along
+  the trail."
+- A campsite more than 5 km from the route.
+- No stops, the same campsite twice, an unknown id, or more than 30 stops.
+- A body that names no trail. An unknown trail returns **404**.
+
+**Days.** A plan with N stops has N+1 days: start → stop 1 → … → stop N → end.
+- A day's distance is measured along the stitched line between stop positions.
+- Gain and loss come from the route's **stored** elevation profile, the one the trail
+  panel computed when the trail was first opened. If no profile is stored yet, it is
+  computed once and stored.
+- The profile is smoothed over its whole length with the route's own 100 m window. Each
+  day's slice is then counted with the same 3 m threshold, so a one-day plan reports
+  exactly the route's gain and loss.
+- Across several days, the threshold restarts at each stop, so the days' sums can differ
+  from the route figure by up to about 3 m per stop. The Van Hoevenberg Trail with 2
+  stops: 3,306 ft against the route's 3,305 ft.
+- When the profile is unavailable, days have distance only (`gain_m`/`loss_m` null), and
+  `profile.status` is `unavailable`.
+
+**Legality.** Every stop carries its legality verdict (docs/scoring.md). A stop that isn't
+"permitted" gets a `warning`, also collected in `warnings`, for example: "Night 2,
+Campsite near Van Hoevenberg Trail: Unknown: check current rules. Not a designated site
+we can confirm. …". The trail panel shows each stop's verdict beside its day, and lists
+the warnings above the table.
+
+**GPX** (`/api/plans/<id>/gpx/`) contains:
+- the route's track, with elevations, as in TM05-79
+- each stop as a `<wpt>` named "Night N: <campsite>", with `<type>overnight-stop</type>`
+  and its day's distance, climb and verdict in `<desc>`
+- the user's own waypoints within 500 m of the trail (TM05-80)
+
+General campsites that aren't stops are left out, so the file is the trip itself. The
+file name is the plan's name, for example `marcy-dam-overnight.gpx`.
+
+**In the trail panel**, signed in, each campsite along the trail has a **+ Night** button
+(disabled for sites past the trail's ends). The Overnight plan section above the list
+shows:
+- the day table, with totals and warnings
+- Save or Update, and Download plan GPX
+- "Your plans for this trail", each with Open and Delete
+
+Signed out, the section offers sign-in.
+
 ## Not included yet
 
 **Scored campsites in the map layers.** The layer endpoints above return raw ingested

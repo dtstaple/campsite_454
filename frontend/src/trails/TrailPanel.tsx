@@ -42,6 +42,17 @@ interface Props {
   onClose: () => void;
   /** Extra controls under the chart (the 3D toggle and flythrough, TM05-62). */
   controls?: ReactNode;
+  /** The overnight plan section (TM05-81), under the GPX download. */
+  planner?: ReactNode;
+  /** TM05-81: the Night button on each campsite row; omitted when signed out. */
+  stops?: StopChoice;
+}
+
+export interface StopChoice {
+  ids: readonly string[];
+  /** The night each chosen stop falls on, once the server has ordered them. */
+  nightOf: Readonly<Record<string, number>>;
+  onToggle: (campsite: CampsiteAlong) => void;
 }
 
 function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
@@ -64,6 +75,8 @@ export default function TrailPanel({
   onCampsiteHover,
   onClose,
   controls,
+  planner,
+  stops,
 }: Props) {
   const name = state.status === "ready" ? state.detail.name : state.name;
 
@@ -109,6 +122,8 @@ export default function TrailPanel({
           onCampsite={onCampsite}
           onCampsiteHover={onCampsiteHover}
           controls={controls}
+          planner={planner}
+          stops={stops}
         />
       )}
     </aside>
@@ -125,6 +140,8 @@ function Ready({
   onCampsite,
   onCampsiteHover,
   controls,
+  planner,
+  stops,
 }: Omit<Props, "state" | "onClose"> & { detail: RouteDetail }) {
   const profile = detail.profile;
   const campsites = detail.campsites;
@@ -180,6 +197,7 @@ function Ready({
       )}
 
       <GpxDownload detail={detail} withinM={withinM} />
+      {planner}
 
       <section className="trail-campsites" aria-label="Campsites along this trail">
         <div className="trail-campsites-head">
@@ -242,6 +260,7 @@ function Ready({
                     </span>
                   )}
                 </button>
+                {stops && <StopButton site={site} stops={stops} />}
               </li>
             ))}
           </ol>
@@ -319,5 +338,31 @@ function GpxDownload({ detail, withinM }: { detail: RouteDetail; withinM: number
       </span>
       {failed && <span className="trail-gpx-error">{failed}</span>}
     </div>
+  );
+}
+
+/** TM05-81: choose a campsite as an overnight stop, or take it out of the plan. */
+function StopButton({ site, stops }: { site: CampsiteAlong; stops: StopChoice }) {
+  const chosen = stops.ids.includes(site.id);
+  const night = stops.nightOf[site.id];
+  const along = isAlong(site);
+  const label = campsiteName(site).text;
+  return (
+    <button
+      type="button"
+      className="trail-stop"
+      aria-pressed={chosen}
+      disabled={!along && !chosen}
+      title={
+        along
+          ? chosen
+            ? `Remove ${label} from the plan`
+            : `Stop overnight at ${label}`
+          : "Past the end of the trail, so it cannot be a stop along it"
+      }
+      onClick={() => stops.onToggle(site)}
+    >
+      {chosen ? (night ? `Night ${night}` : "Night") : "+ Night"}
+    </button>
   );
 }
