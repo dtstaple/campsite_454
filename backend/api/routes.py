@@ -32,6 +32,7 @@ from api.views import InvalidParameter, _bad_request, _int_param, _simplify_para
 from enrichment.models import CampsiteFacts
 from enrichment.route_facts import save_route_facts
 from geodata.assembly import assembled_route, route_for_way
+from geodata.junctions import connections
 from geodata.models import Campsite, Trail, TrailRoute
 from geodata.route_rating import config as route_config
 from geodata.route_rating import difficulty, position_along, route_type
@@ -291,6 +292,8 @@ def route_detail(route: TrailRoute, within: int) -> dict:
             else None
         ),
         "route_type": route_type(route, line_m, profile["elevation_m"] if profiled else None),
+        # TM05-101: the named trails this one meets at a junction node, by mile.
+        "connections": connections(route, line_m),
         "campsites": {
             "within_m": within,
             "count": len(campsites),

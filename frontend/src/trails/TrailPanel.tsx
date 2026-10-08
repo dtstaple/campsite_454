@@ -22,6 +22,7 @@ import {
   routeTypeText,
 } from "./format";
 import { alongResults, searchSummary, type Candidate, type CandidateSearch } from "./candidates";
+import { byMile, junctionMiles, type Connection } from "./connections";
 import { gpxFilename, gpxPath } from "./gpx";
 import SaveTrail from "./SaveTrail";
 import { gradeAt, nearestIndex } from "./profile";
@@ -52,6 +53,9 @@ interface Props {
   finder: Finder;
   onFind: () => void;
   onCandidate: (candidate: Candidate) => void;
+  /** TM05-101: open a connecting trail; hover shows its junctions on the map. */
+  onConnection?: (connection: Connection) => void;
+  onConnectionHover?: (connection: Connection | null) => void;
 }
 
 export interface StopChoice {
@@ -94,6 +98,8 @@ export default function TrailPanel({
   finder,
   onFind,
   onCandidate,
+  onConnection,
+  onConnectionHover,
 }: Props) {
   const name = state.status === "ready" ? state.detail.name : state.name;
 
@@ -144,6 +150,8 @@ export default function TrailPanel({
           finder={finder}
           onFind={onFind}
           onCandidate={onCandidate}
+          onConnection={onConnection}
+          onConnectionHover={onConnectionHover}
         />
       )}
     </aside>
@@ -165,6 +173,8 @@ function Ready({
   finder,
   onFind,
   onCandidate,
+  onConnection,
+  onConnectionHover,
 }: Omit<Props, "state" | "onClose"> & { detail: RouteDetail }) {
   const profile = detail.profile;
   const campsites = detail.campsites;
@@ -217,6 +227,30 @@ function Ready({
           Elevation is unavailable right now ({profile.reason}). Distance:{" "}
           {miles(detail.line.length_m)}.
         </div>
+      )}
+
+      {detail.connections && detail.connections.length > 0 && (
+        <section className="trail-connections" aria-label="Connecting trails">
+          <div className="panel-subtitle">Connects to</div>
+          <ul>
+            {byMile(detail.connections).map((connection) => (
+              <li key={`${connection.osm_id ?? connection.way_id}`}>
+                <button
+                  type="button"
+                  className="trail-connection"
+                  onClick={() => onConnection?.(connection)}
+                  onMouseEnter={() => onConnectionHover?.(connection)}
+                  onMouseLeave={() => onConnectionHover?.(null)}
+                  onFocus={() => onConnectionHover?.(connection)}
+                  onBlur={() => onConnectionHover?.(null)}
+                >
+                  <span className="trail-connection-name">{connection.name}</span>
+                  <span className="trail-connection-mile">{junctionMiles(connection)}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       <GpxDownload detail={detail} withinM={withinM} />

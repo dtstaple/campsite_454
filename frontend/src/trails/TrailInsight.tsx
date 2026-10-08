@@ -37,6 +37,7 @@ import {
 import TrailPanel, { type DetailState, type Finder } from "./TrailPanel";
 import AlongMarkers from "./AlongMarkers";
 import { candidatesPath, type Candidate } from "./candidates";
+import { connectionTarget, type Junction } from "./connections";
 import ThreeDControls from "./ThreeDControls";
 import { CAMERA, easeBearing, rigFor } from "./camera";
 import { disable3D, enable3D, prefersReducedMotion } from "./terrain3d";
@@ -105,6 +106,20 @@ export default function TrailInsight({
   // candidate search runs, until the hiker asks for it.
   const [finding, setFinding] = useState<{ key: string; finder: Finder } | null>(null);
   const [openCandidate, setOpenCandidate] = useState<Candidate | null>(null);
+  // TM05-101: the junctions of the connecting trail under the pointer.
+  const [hoveredJunctions, setHoveredJunctions] = useState<Junction[] | null>(null);
+  useEffect(() => {
+    if (!map || !hoveredJunctions) return;
+    const markers = hoveredJunctions.map((junction) => {
+      const element = document.createElement("div");
+      element.className = "junction-marker";
+      element.setAttribute("aria-hidden", "true");
+      return new maplibregl.Marker({ element, anchor: "center" })
+        .setLngLat([junction.lon, junction.lat])
+        .addTo(map);
+    });
+    return () => markers.forEach((marker) => marker.remove());
+  }, [map, hoveredJunctions]);
 
   // --- TM05-100: open a saved trail or plan, once ------------------------------------
   const requestHandled = useRef(false);
@@ -506,6 +521,14 @@ export default function TrailInsight({
       }
       finder={finder}
       onFind={() => trailKey && setFinding({ key: trailKey, finder: { status: "loading" } })}
+      onConnection={(connection) => {
+        const target = connectionTarget(connection);
+        if (!target) return;
+        setHoveredJunctions(null);
+        setState({ status: "loading", name: connection.name });
+        setSelected(target);
+      }}
+      onConnectionHover={(connection) => setHoveredJunctions(connection?.junctions ?? null)}
       onCandidate={(candidate) => {
         setCursorM(candidate.distance_along_m);
         setOpenCandidate(candidate);
