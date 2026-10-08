@@ -555,6 +555,13 @@ Unknown `osm_id` → 404.
   from 3DEP (≈4–6 s); later requests read it (ms). If 3DEP is unavailable, `status` is
   `"unavailable"`, `reason` says why, `stats` and the series are absent, and **the rest of
   the response is still returned**.
+- **`difficulty`** (TM05-82): `{rating, label, shenandoah, formula, length_m, climb_m}`.
+  `label` is Easy, Moderate or Hard, from Shenandoah's rating on the profile. It is `null`
+  when the profile is unavailable. docs/routes.md has the bands.
+- **`route_type`** (TM05-82): `{type, label, estimated, basis}`, where `type` is `loop`,
+  `out_and_back` or `point_to_point`. A loop is measured (`estimated: false`). Every other
+  type is estimated from what each end meets, and `basis` gives `ends_apart_m`, `start`
+  and `end`. docs/routes.md explains it.
 - **`campsites.items`** are ordered by `distance_along_m`, from
   `ST_LineLocatePoint(line, site) × length(line)`. `distance_from_route_m` is the
   perpendicular distance to the nearest route member. Both are metres in EPSG:5070
