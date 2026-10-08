@@ -188,3 +188,55 @@ join.
 | `way/661913584` (Rail Trail, another section) | 17 | 12.0 km | 4.7 s | Moderate | Out & back (est.) |
 
 The Lake Clear section lists 13 campsites along it.
+
+## Bridging short unnamed connectors (TM05-98)
+
+Mappers often split a named trail with a short way that has no name: a bridge, a
+boardwalk, a road crossing, a junction stub. Same-name assembly (above) stops at such a
+way, so the trail opens in pieces. Assembly now bridges the gap, under these rules:
+
+- **Only through unnamed ways.** A gap is never bridged through another named trail.
+- **Joined by shared OSM nodes.** Each connector shares an `osm_node_ids` entry with the
+  piece before it and the piece after it.
+- **Short.** The connectors' combined length is at most `assembly.connector_max_m` in
+  `backend/geodata/routes.yml`, which is **300 m**. Setting it to 0 turns bridging off.
+- **Same from either side.** The search takes the shortest connector path, with ties
+  broken by way id. So whichever piece is clicked, the trail, and its cached profile, is
+  the same.
+
+The connectors become part of the assembled trail's geometry, so its line, profile and
+campsites run through the gap.
+
+### Measured over every named way outside a route (dev DB, 2026-10-08)
+
+The dev DB has 5,855 named ways outside any route, across both regions.
+
+| | Connector bridging off | On (300 m) |
+|---|---|---|
+| Assembled trails | 4,043 | 4,017 |
+| Names split into more than one assembled trail | 296 | 286 |
+| Unnamed connectors used | 0 | 34 |
+| Assembled trails that draw as one continuous line | 3,904 | 3,872 |
+
+**Effect on fragmented trails.**
+- 25 assembled trails now use connectors, merging 26 previously separate pieces.
+- **16 of those 25 now draw as one continuous line.** Examples: S86A, Rim Walk Trail and
+  Snowmobile Route S82.
+- The other 9 have gaps that are still too long, or not node-connected.
+
+**Why the continuous count falls slightly (3,904 to 3,872).** Some trails that were
+continuous on their own are now merged with another piece. The merged trail still has a
+gap of its own elsewhere. Count the merged pieces separately and the number of continuous
+pieces doesn't fall.
+
+**Most splits are not connector gaps.** Most of the 286 names still split are common names
+for unrelated trails far apart ("private", "Multi-Use Trail"), or gaps with no unnamed
+way in them.
+
+**Cheney Pond-Irishtown** (`way/1089777523`) is already one continuous 12.8 km way here,
+so it needed no bridging. Its only touching way is an unnamed 3.5 km track at its north
+end. That is far over the 300 m limit, so it is correctly **not** joined. It shows the
+limit doing its job: a long unnamed track is a different route, not a connector.
+
+**Cost.** Assembling all 4,000 trails took 119 s with bridging and 117 s without, so a
+single click pays about 0.5 ms more.
