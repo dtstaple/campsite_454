@@ -7,6 +7,7 @@
 #   make data      rebuild all Adirondacks data from the sources (slow data path)
 #   make dev       run the backend (:8000) and frontend (:5173) together
 #   make dev-phone the same over HTTPS on the LAN, to test on a phone (TM05-103)
+#   make prewarm   cache the campsite search for the demo trails (TRAILS="A,B")
 #   make dump      write a dump of your database to dumps/
 
 # .env supplies POSTGRES_*, DB_CONTAINER_NAME and COMPOSE_PROJECT_NAME. Missing on the
@@ -34,10 +35,10 @@ PYTHON312 := $(shell command -v python3.12 2>/dev/null)
 PERSONAL_TABLES := auth_user auth_user_groups auth_user_user_permissions authtoken_token \
 	'accounts_*' django_session django_admin_log
 
-.PHONY: help setup doctor dev backend frontend data restore dump dev-phone
+.PHONY: help setup doctor dev backend frontend data restore dump dev-phone prewarm
 
 help:
-	@sed -n '4,11p' Makefile | sed 's/^# //'
+	@sed -n '4,12p' Makefile | sed 's/^# //'
 
 setup:
 	@if [ -z "$(PYTHON312)" ]; then \
@@ -90,6 +91,15 @@ dev-phone:
 		DEV_LAN_ORIGIN=https://$(LAN_IP):5173 $(VPY) backend/manage.py runserver 127.0.0.1:8000 & \
 		(cd frontend && PHONE=1 VITE_API_BASE_URL= npm run dev) & \
 		wait
+
+# TM05-104: run and cache "Find campsites along this trail" (and the elevation profile)
+# for the trails a demo will open, so the first click is instant. Comma-separated names;
+# prints the time each took. docs/setup.md, "Before a demo".
+DEMO_TRAILS = Van Hoevenberg,Phelps Trail,Deer Pond Trail,Cheney Pond-Irishtown
+TRAILS ?= $(DEMO_TRAILS)
+
+prewarm:
+	$(VPY) backend/manage.py prewarm_candidates "$(TRAILS)"
 
 backend:
 	$(VPY) backend/manage.py runserver

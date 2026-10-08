@@ -350,3 +350,22 @@ def test_a_malformed_candidate_id_is_rejected(route):
     )
     assert response.status_code == 400
     assert "not a potential campsite id" in response.json()["error"]
+
+
+def test_a_candidate_with_no_mapped_trail_nearby_still_reads_cleanly(terrain):
+    """A route whose ways are not in the trail table (here, none at all): the trail check
+    has no nearest distance to quote, and must say so rather than fail."""
+    geom = MultiLineString(line(0, 0, LENGTH, 0), srid=METRIC_SRID).transform(4326, clone=True)
+    TrailRoute.objects.create(
+        source=TrailRoute.Source.OSM,
+        source_id="relation/1",
+        osm_id=1,
+        name="Test Trail",
+        geom=geom,
+        length_m=LENGTH,
+        member_way_ids=[1],
+    )
+    land()
+    found = find()["candidates"]
+    assert found
+    assert found[0]["checks"][1]["label"] == "At least 150 ft from any mapped trail."
