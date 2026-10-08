@@ -35,3 +35,10 @@ along:
   # a route's first or last segment is rarely straight, so a site off the end projects a
   # few metres onto the line, not exactly onto the end vertex.
   end_zone_m: 50
+
+assembly:
+  # TM05-98. When a named trail is assembled from its mapped segments (TM05-97), two pieces
+  # with the same name are joined through unnamed ways -- a bridge, a road crossing, a
+  # junction stub -- whose combined length is at most this. The connectors must share OSM
+  # nodes with both pieces; a gap is never bridged through a named way. 0 turns it off.
+  connector_max_m: 300
