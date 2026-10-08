@@ -38,6 +38,8 @@ import "./waypoints.css";
 interface Props {
   map: maplibregl.Map | null;
   session: Session | null;
+  /** TM05-100: a waypoint to fly to and open once, from the Profile page. */
+  focus?: { id: number; lon: number; lat: number } | null;
 }
 
 interface Draft {
@@ -71,13 +73,39 @@ function markerElement(kind: WaypointKind, name: string, draft = false): HTMLBut
   return element;
 }
 
-export default function Waypoints({ map, session }: Props) {
+export default function Waypoints({ map, session, focus }: Props) {
   const [waypoints, setWaypoints] = useState<Waypoint[]>([]);
   const [placing, setPlacing] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const open = useCallback((waypoint: Waypoint) => {
+    setPlacing(false);
+    setConfirmDelete(false);
+    setError(null);
+    setDraft({
+      id: waypoint.id,
+      name: waypoint.name,
+      kind: waypoint.kind,
+      note: waypoint.note,
+      lon: waypoint.lon,
+      lat: waypoint.lat,
+    });
+  }, []);
+
+  const focusRef = useRef(focus ?? null);
+  const mapRef = useRef(map);
+  const flyWhenReady = useRef<Waypoint | null>(null);
+  useEffect(() => {
+    mapRef.current = map;
+    const target = flyWhenReady.current;
+    if (map && target) {
+      flyWhenReady.current = null;
+      map.jumpTo({ center: [target.lon, target.lat], zoom: Math.max(map.getZoom(), 14) });
+    }
+  }, [map]);
 
   // --- load ------------------------------------------------------------------------------
   useEffect(() => {
@@ -86,12 +114,28 @@ export default function Waypoints({ map, session }: Props) {
     if (!session) return;
     let cancelled = false;
     listWaypoints(session)
-      .then((list) => !cancelled && setWaypoints(list))
+      .then((list) => {
+        if (cancelled) return;
+        setWaypoints(list);
+        // TM05-100: opened from the Profile page. If the map isn't up yet, it flies there
+        // when it is.
+        const target = focusRef.current && list.find((w) => w.id === focusRef.current?.id);
+        focusRef.current = null;
+        if (target) {
+          const current = mapRef.current;
+          if (current) {
+            current.jumpTo({ center: [target.lon, target.lat], zoom: Math.max(current.getZoom(), 14) });
+          } else {
+            flyWhenReady.current = target;
+          }
+          open(target);
+        }
+      })
       .catch((err: Error) => !cancelled && setError(err.message));
     return () => {
       cancelled = true;
     };
-  }, [session]);
+  }, [session, open]);
 
   // --- placement ---------------------------------------------------------------------------
   const waypointsRef = useRef(waypoints);
@@ -133,19 +177,6 @@ export default function Waypoints({ map, session }: Props) {
   }, [map, placing]);
 
   // --- markers -----------------------------------------------------------------------------
-  const open = useCallback((waypoint: Waypoint) => {
-    setPlacing(false);
-    setConfirmDelete(false);
-    setError(null);
-    setDraft({
-      id: waypoint.id,
-      name: waypoint.name,
-      kind: waypoint.kind,
-      note: waypoint.note,
-      lon: waypoint.lon,
-      lat: waypoint.lat,
-    });
-  }, []);
 
   useEffect(() => {
     if (!map) return;

@@ -23,6 +23,7 @@ import {
 } from "./format";
 import { alongResults, searchSummary, type Candidate, type CandidateSearch } from "./candidates";
 import { gpxFilename, gpxPath } from "./gpx";
+import SaveTrail from "./SaveTrail";
 import { gradeAt, nearestIndex } from "./profile";
 
 export type DetailState =
@@ -337,6 +338,7 @@ function GpxDownload({ detail, withinM }: { detail: RouteDetail; withinM: number
     <div className="trail-actions">
       {/* Signed out, a plain link: the API answers with Content-Disposition: attachment, so
           the browser saves the file (the download attribute is ignored across origins). */}
+      <SaveTrail detail={detail} />
       <a className="trail-3d-button trail-gpx" href={url} download onClick={download}>
         Download GPX
       </a>

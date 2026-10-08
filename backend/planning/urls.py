@@ -2,11 +2,14 @@ from django.urls import path
 
 from .candidate_views import route_candidates_view, way_candidates_view
 from .plan_views import plan_gpx_view, plan_preview_view, plan_view, plans_view
+from .saved_trail_views import saved_trail_view, saved_trails_view
 from .views import waypoint_view, waypoints_view
 
 urlpatterns = [
     path("waypoints/", waypoints_view, name="waypoints"),
     path("waypoints/<int:pk>/", waypoint_view, name="waypoint"),
+    path("saved-trails/", saved_trails_view, name="saved-trails"),
+    path("saved-trails/<int:pk>/", saved_trail_view, name="saved-trail"),
     path("plans/", plans_view, name="plans"),
     path("plans/preview/", plan_preview_view, name="plan-preview"),
     path("plans/<int:pk>/", plan_view, name="plan"),

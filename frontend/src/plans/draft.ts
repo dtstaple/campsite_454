@@ -48,3 +48,13 @@ export function planFilename(name: string): string {
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
   return `${slug || "plan"}.gpx`;
 }
+
+/** The saved-trail row for a trail (TM05-100), if this trail is saved. */
+export function savedRowFor<T extends { osm_id: number | null; from_way: string | null }>(
+  saved: readonly T[],
+  trail: { osm_id: number } | { from_way: string } | null,
+): T | null {
+  if (!trail) return null;
+  if ("osm_id" in trail) return saved.find((row) => row.osm_id === trail.osm_id) ?? null;
+  return saved.find((row) => row.osm_id === null && row.from_way === trail.from_way) ?? null;
+}

@@ -23,6 +23,7 @@ import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Discover from "./pages/Discover";
+import Profile from "./pages/Profile";
 import { SessionProvider } from "./session";
 
 export default function App() {
@@ -37,6 +38,7 @@ export default function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/discover" element={<Discover />} />
+              <Route path="/profile" element={<Profile />} />
               {/* Anything else is a typo, not a page. Send it to the front door rather
                   than showing a blank shell. */}
               <Route path="*" element={<Navigate to="/" replace />} />

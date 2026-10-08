@@ -911,6 +911,38 @@ for a trail can take 15–35 s (3DEP), and later ones about 5 ms.
 - an `unknown` legality labelled the same
 - the unverified-stop `warning`
 
+## Saved trails (TM05-100)
+
+| Method and path | What it does | Success |
+|---|---|---|
+| `GET /api/saved-trails/` | The user's saved trails, newest first: `{id, osm_id, from_way, name, length_m, created_at}` | 200 |
+| `POST /api/saved-trails/` | Save one: `{"osm_id": 6619234}` for a route, or `{"from_way": "way/…"}` for an assembled trail (TM05-97) | **201**; saving the same trail again returns **200** with the existing row |
+| `DELETE /api/saved-trails/<id>/` | Unsave it | 204 |
+
+**How it works:**
+- **Authentication and isolation** work as for waypoints and plans: a token is required
+  (**401** without one), and another user's id returns **404**.
+- **Resolving the trail.** The trail is resolved when saved, so the Profile view lists its
+  name and length without opening every trail. A way that belongs to a route is saved as
+  that route.
+- **Bad and unknown trails.** **400** for a body that names no trail or a bad `osm_id`.
+  **404** for an unknown route or way.
+
+The trail panel's **Save trail** button uses these endpoints. The **Profile** view
+(`/profile`, linked from the header when signed in) lists saved campsites, saved trails,
+waypoints and overnight plans in tabs. It replaces the floating Saved panel.
+
+- **Opening an item.** Clicking an item goes to the map, flies there, and opens its panel:
+  - a campsite: the campsite panel, with the raised pin
+  - a trail: the trail panel
+  - a waypoint: its editor
+  - a plan: its trail, with the plan loaded
+
+  This works whatever layers are on.
+- **Campsite names.** Saved campsites show the campsite detail endpoint's
+  `display_name`, so derived names appear too. The saved-campsites list endpoint is
+  unchanged (TM05-87).
+
 ## Not included yet
 
 **Scored campsites in the map layers.** The layer endpoints above return raw ingested
