@@ -10,6 +10,7 @@ import { useState, type ReactNode } from "react";
 import type { CampsiteDetail } from "./api";
 import {
   AMENITY_LABELS,
+  provenance,
   coordinates,
   distance,
   elevation,
@@ -147,6 +148,16 @@ function Body({
             <a href={website} target="_blank" rel="noopener noreferrer">
               {website.replace(/^https?:\/\//, "")}
             </a>
+          </Row>
+        )}
+        {detail.confidence && (
+          <Row label="Data">
+            <span className={`campsite-confidence is-${detail.confidence.level}`} title={detail.confidence.reason}>
+              {detail.confidence.label}
+            </span>
+            <span className="campsite-sub">
+              {provenance(detail.confidence.source_label, detail.confidence.last_updated)}
+            </span>
           </Row>
         )}
         <Row label="Coordinates">

@@ -328,3 +328,23 @@
   font-size: var(--text-xs);
   font-weight: var(--weight-bold);
 }
+
+/* --- data confidence (TM05-77) --------------------------------------------------------
+ * The level as a word, coloured only to reinforce it: official is the success green,
+ * community-mapped is plain text, limited info steps back. The reason is the tooltip. */
+
+.campsite-confidence {
+  font-weight: var(--weight-semibold);
+}
+
+.campsite-confidence.is-official {
+  color: var(--success);
+}
+
+.campsite-confidence.is-community_mapped {
+  color: var(--text-primary);
+}
+
+.campsite-confidence.is-limited_info {
+  color: var(--text-secondary);
+}
