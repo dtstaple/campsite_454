@@ -18,7 +18,9 @@ import {
   fetchTrailForWay,
   RouteApiError,
   type CampsiteAlong,
+  type RouteHit,
 } from "./api";
+import TrailSearch from "./TrailSearch";
 import { locate, measure, pointAt, type LngLat, type MeasuredLine } from "./geometry";
 import {
   addRouteLayers,
@@ -382,9 +384,23 @@ export default function TrailInsight({ map, onOpenCampsite, onHoverCampsite }: P
     [map, onOpenCampsite],
   );
 
-  if (!state) return null;
+  // TM05-74: picking a search result opens its trail like a map click does; the framing
+  // effect above fits the map to it once it loads.
+  const pick = (hit: RouteHit) => {
+    setState((previous) =>
+      previous?.status === "ready" && previous.detail.osm_id === hit.osm_id
+        ? previous
+        : { status: "loading", name: hit.name },
+    );
+    setSelected({ osmId: hit.osm_id, name: hit.name });
+  };
+  const search = <TrailSearch map={map} onPick={pick} />;
+
+  if (!state) return search;
   return (
-    <TrailPanel
+    <>
+      {search}
+      <TrailPanel
       state={state}
       cursorM={cursorM}
       withinM={withinM}
@@ -405,5 +421,6 @@ export default function TrailInsight({ map, onOpenCampsite, onHoverCampsite }: P
         />
       }
     />
+    </>
   );
 }

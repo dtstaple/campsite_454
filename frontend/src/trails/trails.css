@@ -350,3 +350,111 @@
 .trail-assembled {
   font-style: italic;
 }
+
+/* --- trail search and the Discover list (TM05-74) ----------------------------------------
+ * Top centre over the map, clear of the layer panel (left) and the trail panel (right). */
+
+.trail-search {
+  position: absolute;
+  top: var(--space-md);
+  left: 50%;
+  z-index: 2;
+  width: min(var(--trail-search-width), calc(100% - 2 * var(--space-md)));
+  transform: translateX(-50%);
+  background: var(--bg-floating);
+  backdrop-filter: blur(var(--blur-floating));
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-panel);
+}
+
+.trail-search-bar {
+  display: flex;
+  gap: var(--space-xs);
+  padding: var(--space-xs);
+}
+
+.trail-search-input {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--bg-base);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: var(--text-md);
+}
+
+.trail-search-input:focus-visible,
+.trail-search-toggle:focus-visible,
+.trail-search-hit:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: calc(var(--focus-offset) * -1);
+}
+
+.trail-search-toggle {
+  padding: var(--space-xs) var(--space-sm);
+  background: none;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.trail-search-results {
+  max-height: var(--trail-search-list-height);
+  overflow-y: auto;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.trail-search-heading {
+  padding: var(--space-sm) var(--space-md) var(--space-xs);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.trail-search-note {
+  padding: var(--space-xs) var(--space-md) var(--space-sm);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.trail-search-list {
+  margin: 0;
+  padding: 0 0 var(--space-xs);
+  list-style: none;
+}
+
+.trail-search-hit {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: var(--space-xs) var(--space-md);
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.trail-search-hit:hover {
+  background: var(--bg-raised);
+}
+
+.trail-search-name {
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+}
+
+.trail-search-meta {
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
