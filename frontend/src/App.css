@@ -167,6 +167,15 @@
   background: linear-gradient(135deg, var(--text-secondary), var(--bg-base));
 }
 
+/* Concentric rings, in the contour index colour (TM05-83). */
+.swatch-contours {
+  background: repeating-radial-gradient(
+    circle,
+    var(--map-contour-index) 0 1px,
+    transparent 1px 3px
+  );
+}
+
 /* Campsite markers are coloured by grade (TM05-48), so their swatch shows the grades. */
 .swatch-score {
   background: conic-gradient(

@@ -192,7 +192,7 @@ export function addMapLayers(map: maplibregl.Map): void {
 export const TERRAIN_SOURCE_ID = "terrain-dem";
 export const HILLSHADE_LAYER_ID = "terrain-hillshade";
 
-const TERRAIN_TILES = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png";
+export const TERRAIN_TILES = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png";
 
 const TERRAIN_ATTRIBUTION =
   '<a href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md" ' +

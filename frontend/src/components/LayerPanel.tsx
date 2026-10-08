@@ -16,6 +16,7 @@ import {
 import { orderedLayers } from "../map/layers";
 import { primaryLayer, type ActivityMode } from "../modes/modes";
 import { REGIONS, type Region } from "../regions";
+import { CONTOUR_MIN_ZOOM } from "../map/contourConfig";
 import { bandLabel, GRADES, gradeToken } from "../score/grade";
 
 interface Props {
@@ -29,6 +30,9 @@ interface Props {
   onToggle: (layer: LayerName, on: boolean) => void;
   terrain: boolean;
   onTerrain: (on: boolean) => void;
+  /** TM05-83: contour lines, drawn from zoom CONTOUR_MIN_ZOOM. */
+  contours: boolean;
+  onContours: (on: boolean) => void;
   onRegion: (region: Region) => void;
 }
 
@@ -68,6 +72,8 @@ export default function LayerPanel({
   onToggle,
   terrain,
   onTerrain,
+  contours,
+  onContours,
   onRegion,
 }: Props) {
   const [open, setOpen] = useState(true);
@@ -137,6 +143,18 @@ export default function LayerPanel({
             />
             <span className="swatch swatch-terrain" />
             Terrain shading
+          </label>
+          <label className={`row${contours ? "" : " off"}`}>
+            <input
+              type="checkbox"
+              checked={contours}
+              onChange={(event) => onContours(event.target.checked)}
+            />
+            <span className="swatch swatch-contours" />
+            Contours
+            <span className="count">
+              {contours && zoom < CONTOUR_MIN_ZOOM ? `zoom ${CONTOUR_MIN_ZOOM}+` : contours ? "ft" : ""}
+            </span>
           </label>
 
           {/* Data sits in a few regions hundreds of miles apart, so free panning mostly

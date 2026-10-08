@@ -62,7 +62,8 @@ deployed beyond the course.
 
 - **Layer order.** The imagery is a raster layer placed **beneath the basemap's first label
   layer**. It covers the vector basemap's fills and roads, keeps its place names on top, and
-  sits below every CampSite data layer.
+  sits below every CampSite data layer. Once contour lines exist (TM05-83), the imagery goes beneath them
+  instead, so the contours draw over it. See docs/terrain.md.
 - **No hillshade over imagery.** Imagery already contains real shadows, and shading on top
   reads as mud. With satellite on, the hillshade is hidden. Turning satellite off restores
   whatever the Terrain shading toggle says.
