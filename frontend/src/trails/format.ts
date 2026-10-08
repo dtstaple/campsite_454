@@ -39,3 +39,30 @@ export function duration(minutes: number): string {
   if (h === 0) return `${m} min`;
   return m ? `${h} h ${m} min` : `${h} h`;
 }
+
+const END_WORDS: Record<string, string> = {
+  summit: "a summit",
+  pond: "a pond",
+  connects: "other trails",
+  dead_end: "a dead end",
+};
+
+/** "Out & back (est.)", and the hover text saying what the guess rests on (TM05-82). */
+export function routeTypeText(routeType: {
+  label: string;
+  estimated: boolean;
+  basis: { ends_apart_m: number; start?: string; end?: string };
+}): { value: string; hint: string } {
+  if (!routeType.estimated) {
+    return {
+      value: routeType.label,
+      hint: `Start and end are ${Math.round(routeType.basis.ends_apart_m)} m apart`,
+    };
+  }
+  const start = END_WORDS[routeType.basis.start ?? ""] ?? "unknown";
+  const end = END_WORDS[routeType.basis.end ?? ""] ?? "unknown";
+  return {
+    value: `${routeType.label} (est.)`,
+    hint: `Estimated from its ends: one meets ${start}, the other ${end}. Roads are not mapped, so a trailhead can read as a dead end.`,
+  };
+}

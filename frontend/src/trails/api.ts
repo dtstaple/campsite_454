@@ -61,6 +61,24 @@ export interface CampsiteAlong {
   score_breakdown: ScoreSummary;
 }
 
+/** TM05-82: Shenandoah-rated difficulty, from the profile. Null when there is no profile. */
+export interface Difficulty {
+  rating: "easy" | "moderate" | "hard";
+  label: string;
+  shenandoah: number;
+  formula: string;
+  length_m: number;
+  climb_m: number;
+}
+
+/** TM05-82: loop is measured; out & back and point to point are estimated from the ends. */
+export interface RouteType {
+  type: "loop" | "out_and_back" | "point_to_point";
+  label: string;
+  estimated: boolean;
+  basis: { ends_apart_m: number; start?: string; end?: string };
+}
+
 export interface RouteDetail extends RouteSummary {
   source_id: string;
   geometry: MultiLineString;
@@ -69,6 +87,9 @@ export interface RouteDetail extends RouteSummary {
   path: { parts: number; parts_used: number; parts_left_out: number; left_out_m: number };
   profile: Profile;
   campsites: { within_m: number; count: number; truncated: boolean; items: CampsiteAlong[] };
+  /** Optional so an older backend without TM05-82 still renders. */
+  difficulty?: Difficulty | null;
+  route_type?: RouteType;
 }
 
 export class RouteApiError extends Error {}

@@ -25,6 +25,7 @@ from api.bbox import InvalidBbox, parse_bbox
 from api.layers import COORDINATE_PRECISION, SimplifyPreserveTopology, envelope
 from api.views import InvalidParameter, _bad_request, _int_param, _simplify_param
 from geodata.models import Campsite, TrailRoute
+from geodata.route_rating import difficulty, route_type
 from scoring.config import load as load_scoring_config
 from scoring.engine import score_campsite
 
@@ -165,6 +166,8 @@ def route_detail_view(request, osm_id: int):
             }
         )
 
+    profile = _profile_payload(route)
+    profiled = profile["status"] == "ok"
     return Response(
         {
             "osm_id": route.osm_id,
@@ -181,7 +184,18 @@ def route_detail_view(request, osm_id: int):
                 "length_m": round(line_m.length, 1),
             },
             "path": path,
-            "profile": _profile_payload(route),
+            "profile": profile,
+            # TM05-82: difficulty needs the profile's gain; route type works without it.
+            "difficulty": (
+                difficulty(
+                    profile["stats"]["length_m"],
+                    profile["stats"]["gain_m"],
+                    profile["stats"]["loss_m"],
+                )
+                if profiled
+                else None
+            ),
+            "route_type": route_type(route, line_m, profile["elevation_m"] if profiled else None),
             "campsites": {
                 "within_m": within,
                 "count": len(campsites),
