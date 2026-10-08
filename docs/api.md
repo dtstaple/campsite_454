@@ -595,6 +595,23 @@ Most of a cached detail request is scoring the campsites, about 10 ms each.
 
 ---
 
+## Trail for a clicked way (TM05-97)
+
+### `GET /api/trails/<source_id>/trail/[?campsites_within_m=500]`
+
+`source_id` is a trail way's id, for example `way/20074658`. The response has the same
+shape as `GET /api/routes/<osm_id>/`, plus `assembled` and `assembly`:
+
+- The way is a **route member**: that route's detail, with `assembled: false` and
+  `assembly: null`.
+- It is a **named way outside any route**: a trail assembled from the connected same-name
+  ways (shared OSM nodes, or ends within 15 m). It comes with `assembled: true`,
+  `osm_id: null`, `source_id: "assembled/way/<lowest member id>"` and
+  `assembly: {from_way, ways, note}`.
+- An **unnamed** or unknown way returns **404**.
+
+docs/routes.md has the rules and the measurements.
+
 ## Not included yet
 
 **Scored campsites in the map layers.** The layer endpoints above return raw ingested

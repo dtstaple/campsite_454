@@ -99,3 +99,10 @@ export function campsiteName(site: {
   if (site.display_name) return { text: site.display_name, derived: Boolean(site.display_name_derived) };
   return { text: site.name ?? "Unnamed campsite", derived: false };
 }
+
+/** A trail way that can open the trail panel (TM05-97): one with a name. Unnamed segments
+ * keep the small popup. */
+export function isNamedTrail(properties: Record<string, unknown> | null | undefined): boolean {
+  const name = properties?.name;
+  return typeof name === "string" && name.trim() !== "";
+}

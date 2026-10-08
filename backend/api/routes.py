@@ -15,6 +15,7 @@ import json
 from django.contrib.gis.db.models.functions import AsGeoJSON
 from django.db import connection
 from django.db.models import Value
+from django.http import Http404
 from django.shortcuts import get_object_or_404
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -25,7 +26,8 @@ from api.bbox import InvalidBbox, parse_bbox
 from api.layers import COORDINATE_PRECISION, SimplifyPreserveTopology, envelope
 from api.views import InvalidParameter, _bad_request, _int_param, _simplify_param
 from enrichment.models import CampsiteFacts
-from geodata.models import Campsite, TrailRoute
+from geodata.assembly import assembled_route, route_for_way
+from geodata.models import Campsite, Trail, TrailRoute
 from geodata.route_rating import config as route_config
 from geodata.route_rating import difficulty, position_along, route_type
 from scoring.config import load as load_scoring_config
@@ -159,6 +161,41 @@ def route_detail_view(request, osm_id: int):
         return _bad_request(exc)
 
     route = get_object_or_404(TrailRoute, osm_id=osm_id)
+    return Response(route_detail(route, within))
+
+
+@api_view(["GET"])
+def way_trail_view(request, source_id: str):
+    """The trail panel's detail for a clicked trail way (TM05-97): its named route when it
+    is a member of one, otherwise a trail assembled from the connected ways that share its
+    name. An unnamed way has no trail to open: 404, and the map keeps its small popup."""
+    try:
+        within = _int_param(request, "campsites_within_m", DEFAULT_WITHIN_M, MAX_WITHIN_M)
+    except InvalidParameter as exc:
+        return _bad_request(exc)
+
+    way = Trail.objects.filter(source_id=source_id).first()
+    if way is None:
+        raise Http404(f"No trail way with source_id {source_id!r}")
+    if not (way.name or "").strip():
+        raise Http404(f"{source_id} has no name, so there is no trail to assemble")
+
+    route = route_for_way(way)
+    if route is not None:
+        return Response({**route_detail(route, within), "assembled": False, "assembly": None})
+    route = assembled_route(way)
+    detail = route_detail(route, within)
+    detail["assembled"] = True
+    detail["assembly"] = {
+        "from_way": way.source_id,
+        "ways": len(route.member_way_ids),
+        "note": "Assembled from mapped segments",
+    }
+    return Response(detail)
+
+
+def route_detail(route: TrailRoute, within: int) -> dict:
+    """The route detail payload, for a stored route or an assembled one (TM05-97)."""
     line_m, path = stitch(route.geom)
     line = line_m.transform(4326, clone=True)
 
@@ -199,39 +236,37 @@ def route_detail_view(request, osm_id: int):
 
     profile = _profile_payload(route)
     profiled = profile["status"] == "ok"
-    return Response(
-        {
-            "osm_id": route.osm_id,
-            "source_id": route.source_id,
-            "name": route.name,
-            "ref": route.ref or None,
-            "network": route.network or None,
-            "operator": route.operator or None,
-            "length_m": round(route.length_m or 0, 1),
-            "geometry": json.loads(route.geom.geojson),
-            "line": {
-                "type": "LineString",
-                "coordinates": [[round(x, 6), round(y, 6)] for x, y in line.coords],
-                "length_m": round(line_m.length, 1),
-            },
-            "path": path,
-            "profile": profile,
-            # TM05-82: difficulty needs the profile's gain; route type works without it.
-            "difficulty": (
-                difficulty(
-                    profile["stats"]["length_m"],
-                    profile["stats"]["gain_m"],
-                    profile["stats"]["loss_m"],
-                )
-                if profiled
-                else None
-            ),
-            "route_type": route_type(route, line_m, profile["elevation_m"] if profiled else None),
-            "campsites": {
-                "within_m": within,
-                "count": len(campsites),
-                "truncated": truncated,
-                "items": campsites,
-            },
-        }
-    )
+    return {
+        "osm_id": route.osm_id,
+        "source_id": route.source_id,
+        "name": route.name,
+        "ref": route.ref or None,
+        "network": route.network or None,
+        "operator": route.operator or None,
+        "length_m": round(route.length_m or 0, 1),
+        "geometry": json.loads(route.geom.geojson),
+        "line": {
+            "type": "LineString",
+            "coordinates": [[round(x, 6), round(y, 6)] for x, y in line.coords],
+            "length_m": round(line_m.length, 1),
+        },
+        "path": path,
+        "profile": profile,
+        # TM05-82: difficulty needs the profile's gain; route type works without it.
+        "difficulty": (
+            difficulty(
+                profile["stats"]["length_m"],
+                profile["stats"]["gain_m"],
+                profile["stats"]["loss_m"],
+            )
+            if profiled
+            else None
+        ),
+        "route_type": route_type(route, line_m, profile["elevation_m"] if profiled else None),
+        "campsites": {
+            "within_m": within,
+            "count": len(campsites),
+            "truncated": truncated,
+            "items": campsites,
+        },
+    }

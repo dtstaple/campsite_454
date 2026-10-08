@@ -132,3 +132,59 @@ Over all 452 named routes at the default 500 m, 869 sites are listed:
 Sites past an end appear on **67** routes. On Preston Ponds Trail (at 1 km), the site
 763 m off and Henderson Lean-to (226 m off) both read "near the trailhead" now. The two
 Duck Hole lean-tos keep miles 4.3 and 4.4.
+
+## Named trails that are not route relations (TM05-97)
+
+### The bug and its cause
+In Hiking mode, clicking the **Adirondack Rail Trail** opened the old segment popup ("Type:
+Path, Length 2.4 km") instead of the trail panel.
+
+- **Not click priority, and not layer visibility.** The route click layer is
+  `named-routes-hit`, and routes load from zoom 9, the same zoom trail linework appears.
+  There was simply no route under the click.
+- **The cause is route membership.**
+  - The way (`way/20074658`) is `highway=path`, named "Adirondack Rail Trail", and none of
+    its 55 ways is a member of any ingested TrailRoute.
+  - In OpenStreetMap, its only relation is 1376439 "Adirondack Branch", which is
+    `route=railway` (the old rail line). The route ingest correctly reads only
+    `route=hiking`.
+- **It is the common case, not an edge case.** In the Adirondacks, **3,652 of 4,494 named
+  trail ways (81%) belong to no TrailRoute**: 2,153 distinct names, about 3,760 km.
+
+### The fix: assemble a trail from mapped segments
+`GET /api/trails/<way source_id>/trail/` (`backend/geodata/assembly.py`) returns the trail
+panel's detail for a clicked way:
+
+1. **A route member** returns its route: the longest named TrailRoute with that way as a
+   member. `assembled: false`.
+2. **A named way outside any route** returns a trail **assembled** from every way with the
+   same name (case-insensitive) connected to it, through:
+   - **shared OSM node ids** (`Trail.osm_node_ids`, preserved by the ingest for exactly
+     this), or
+   - **ends within 15 m** (`ENDPOINT_JOIN_M`).
+3. **An unnamed way** returns 404. The map keeps its small popup.
+
+Members are ordered by OSM id, so clicking any segment gives the same trail, the same
+geometry and therefore the same **cached** elevation profile. The response is the route
+detail's shape (profile, stats, difficulty, route type, campsites along), plus:
+`assembled: true`, `osm_id: null`, `source_id: "assembled/way/<lowest id>"` and
+`assembly: {from_way, ways, note: "Assembled from mapped segments"}`. The trail panel shows
+that note under the name.
+
+**Why the 15 m end join.** On shared nodes alone, the Rail Trail's 55 ways form **19**
+groups. Mappers stopped ways a few metres short at road crossings and bridges, leaving gaps
+of 4.7–12.7 m. With the 15 m join they form **7** groups. That is still well under the
+50 m the profile stitching tolerates, and same-name only.
+
+The remaining splits are real gaps in the data: 17 m, 23 m and 189 m. The 189 m gap
+separates the 20.8 km and 16.9 km sections. They were left split rather than widening the
+join.
+
+### Measured (dev DB, 2026-10-07)
+
+| Click | Ways | Length | Profile | Difficulty | Type |
+|---|---|---|---|---|---|
+| `way/20074658` (Rail Trail, Lake Clear section) | 7 | 20.8 km | first request 17 s (3DEP), then 0.5–0.9 s cached | Moderate | Point to point (est.) |
+| `way/661913584` (Rail Trail, another section) | 17 | 12.0 km | 4.7 s | Moderate | Out & back (est.) |
+
+The Lake Clear section lists 13 campsites along it.
