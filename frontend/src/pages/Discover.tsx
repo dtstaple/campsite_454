@@ -46,6 +46,7 @@ import BasemapToggle from "../basemap/BasemapToggle";
 import SatelliteLayers from "../basemap/SatelliteLayers";
 import { useBasemap } from "../basemap/useBasemap";
 import { isRouteHit } from "../trails/mapLayers";
+import { isNamedTrail } from "../trails/format";
 import { selectionFromFeature, type CampsiteSelection } from "../campsite/selection";
 import { useCampsiteHover } from "../campsite/useCampsiteHover";
 import { DEFAULT_MODE_ID, modeById, type ModeId } from "../modes/modes";
@@ -347,6 +348,10 @@ export default function Discover() {
         return;
       }
       const { layer, feature } = hit;
+
+      // A named trail segment opens the trail panel (TrailInsight, TM05-97); only an
+      // unnamed segment keeps the small popup.
+      if (layer === "trails" && isNamedTrail(feature.properties)) return;
 
       // A campsite opens its detail panel (TM05-66) instead of a popup.
       if (layer === "campsites" && sourceIdOf(feature)) {

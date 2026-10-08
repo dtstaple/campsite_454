@@ -344,3 +344,9 @@
   font-style: italic;
   color: var(--text-secondary);
 }
+
+/* A trail assembled from same-name mapped segments rather than a route relation (TM05-97):
+ * said quietly, in the meta line's place. */
+.trail-assembled {
+  font-style: italic;
+}

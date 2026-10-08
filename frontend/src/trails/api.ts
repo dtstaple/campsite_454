@@ -85,7 +85,10 @@ export interface RouteType {
   basis: { ends_apart_m: number; start?: string; end?: string };
 }
 
-export interface RouteDetail extends RouteSummary {
+export interface RouteDetail extends Omit<RouteSummary, "osm_id"> {
+  /** Null for a trail assembled from mapped segments (TM05-97), which has no relation. */
+  osm_id: number | null;
+  /** "relation/123", or "assembled/way/456" for an assembled trail: the trail's identity. */
   source_id: string;
   geometry: MultiLineString;
   /** The route as one ordered path; every "distance along" is measured on this. */
@@ -93,6 +96,9 @@ export interface RouteDetail extends RouteSummary {
   path: { parts: number; parts_used: number; parts_left_out: number; left_out_m: number };
   profile: Profile;
   campsites: { within_m: number; count: number; truncated: boolean; items: CampsiteAlong[] };
+  /** TM05-97: true when built from same-name mapped segments rather than a route relation. */
+  assembled?: boolean;
+  assembly?: { from_way: string; ways: number; note: string } | null;
   /** Optional so an older backend without TM05-82 still renders. */
   difficulty?: Difficulty | null;
   route_type?: RouteType;
@@ -128,6 +134,16 @@ export function fetchRoutes(bbox: Bbox, signal?: AbortSignal) {
     `${API_BASE_URL}/api/routes/?${params}`,
     signal,
   );
+}
+
+/**
+ * The trail for a clicked trail way (TM05-97): its route if it belongs to one, otherwise a
+ * trail assembled from the connected ways with its name. Same shape as a route detail.
+ */
+export function fetchTrailForWay(sourceId: string, withinM: number, signal?: AbortSignal) {
+  const params = new URLSearchParams({ campsites_within_m: String(withinM) });
+  const path = sourceId.split("/").map(encodeURIComponent).join("/");
+  return getJson<RouteDetail>(`${API_BASE_URL}/api/trails/${path}/trail/?${params}`, signal);
 }
 
 /** One route in detail. The first request for a route can take seconds (profile). */

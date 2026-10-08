@@ -12,12 +12,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as maplibregl from "maplibre-gl";
 import type { Feature, FeatureCollection, Point } from "geojson";
 import { clampBbox, type Bbox } from "../api";
-import { fetchRouteDetail, fetchRoutes, RouteApiError, type CampsiteAlong } from "./api";
+import {
+  fetchRouteDetail,
+  fetchRoutes,
+  fetchTrailForWay,
+  RouteApiError,
+  type CampsiteAlong,
+} from "./api";
 import { locate, measure, pointAt, type LngLat, type MeasuredLine } from "./geometry";
 import {
   addRouteLayers,
   ALONG_SOURCE,
   EMPTY,
+  isRouteHit,
   removeRouteLayers,
   ROUTES_HIT,
   ROUTES_SOURCE,
@@ -29,7 +36,12 @@ import ThreeDControls from "./ThreeDControls";
 import { CAMERA, easeBearing, rigFor } from "./camera";
 import { disable3D, enable3D, prefersReducedMotion } from "./terrain3d";
 import type { CampsiteSelection } from "../campsite/selection";
-import { isAlong } from "./format";
+import { isAlong, isNamedTrail } from "./format";
+import { sourceIdOf } from "../map/featureIds";
+
+/** Trail segments' click layer (map/layers.ts) and the campsite layer that outranks it. */
+const TRAIL_SEGMENTS_HIT = "trails-hit";
+const CAMPSITES_POINT = "campsites-point";
 import "./trails.css";
 
 /** Below this zoom a route list would be most of a region; skip the request. */
@@ -54,7 +66,11 @@ interface Props {
 }
 
 export default function TrailInsight({ map, onOpenCampsite, onHoverCampsite }: Props) {
-  const [selected, setSelected] = useState<{ osmId: number; name: string } | null>(null);
+  // A named route by relation id, or (TM05-97) a named trail way, which the API resolves to
+  // its route or to a trail assembled from the connected same-name ways.
+  const [selected, setSelected] = useState<
+    { osmId: number; name: string } | { wayId: string; name: string } | null
+  >(null);
   const [state, setState] = useState<DetailState | null>(null);
   const [cursorM, setCursorM] = useState<number | null>(null);
   const [withinM, setWithinM] = useState(DEFAULT_WITHIN_M);
@@ -204,6 +220,25 @@ export default function TrailInsight({ map, onOpenCampsite, onHoverCampsite }: P
       );
       setSelected({ osmId, name });
     };
+    // TM05-97: a named trail segment that is not under a route opens the trail panel too.
+    // The route handler wins where a route is drawn, and the page's handler (Discover)
+    // wins where a campsite is: those clicks are left alone here.
+    const onWayClick = (event: maplibregl.MapLayerMouseEvent) => {
+      if (isRouteHit(map, event.point)) return;
+      if (
+        map.getLayer(CAMPSITES_POINT) &&
+        map.queryRenderedFeatures(event.point, { layers: [CAMPSITES_POINT] }).length
+      ) {
+        return;
+      }
+      const feature = event.features?.[0];
+      if (!feature || !isNamedTrail(feature.properties)) return;
+      const wayId = sourceIdOf(feature);
+      if (!wayId) return;
+      const name = String(feature.properties?.name);
+      setState({ status: "loading", name });
+      setSelected({ wayId, name });
+    };
     const onRouteHover = () => {
       map.getCanvas().style.cursor = "pointer";
     };
@@ -215,6 +250,7 @@ export default function TrailInsight({ map, onOpenCampsite, onHoverCampsite }: P
 
     map.on("moveend", onMove);
     map.on("click", ROUTES_HIT, onRouteClick);
+    map.on("click", TRAIL_SEGMENTS_HIT, onWayClick);
     map.on("mousemove", ROUTES_HIT, onRouteHover);
     map.on("mousemove", SELECTED_HIT, onSelectedHover);
     map.on("mouseleave", SELECTED_HIT, onSelectedLeave);
@@ -225,6 +261,7 @@ export default function TrailInsight({ map, onOpenCampsite, onHoverCampsite }: P
       controller?.abort();
       map.off("moveend", onMove);
       map.off("click", ROUTES_HIT, onRouteClick);
+      map.off("click", TRAIL_SEGMENTS_HIT, onWayClick);
       map.off("mousemove", ROUTES_HIT, onRouteHover);
       map.off("mousemove", SELECTED_HIT, onSelectedHover);
       map.off("mouseleave", SELECTED_HIT, onSelectedLeave);
@@ -242,7 +279,11 @@ export default function TrailInsight({ map, onOpenCampsite, onHoverCampsite }: P
   useEffect(() => {
     if (!selected) return;
     const controller = new AbortController();
-    fetchRouteDetail(selected.osmId, withinM, controller.signal)
+    const request =
+      "osmId" in selected
+        ? fetchRouteDetail(selected.osmId, withinM, controller.signal)
+        : fetchTrailForWay(selected.wayId, withinM, controller.signal);
+    request
       .then((detail) => setState({ status: "ready", detail }))
       .catch((error) => {
         if (controller.signal.aborted) return;
@@ -256,7 +297,7 @@ export default function TrailInsight({ map, onOpenCampsite, onHoverCampsite }: P
   }, [selected, withinM]);
 
   // Frame the route once when it first loads, leaving room for the panel on the right.
-  const framed = useRef<number | null>(null);
+  const framed = useRef<string | null>(null);
   useEffect(() => {
     if (!map || state?.status !== "ready") return;
     const { detail } = state;
@@ -274,8 +315,8 @@ export default function TrailInsight({ map, onOpenCampsite, onHoverCampsite }: P
       type: "FeatureCollection",
       features: points,
     });
-    if (framed.current !== detail.osm_id) {
-      framed.current = detail.osm_id;
+    if (framed.current !== detail.source_id) {
+      framed.current = detail.source_id;
       const bounds = new maplibregl.LngLatBounds();
       for (const coordinate of detail.line.coordinates) bounds.extend(coordinate as LngLat);
       map.fitBounds(bounds, { padding: { top: 60, bottom: 60, left: 280, right: 400 }, maxZoom: 14 });

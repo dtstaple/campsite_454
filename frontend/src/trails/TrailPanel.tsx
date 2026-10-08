@@ -69,6 +69,14 @@ export default function TrailPanel({
         <div>
           <div className="panel-subtitle trail-eyebrow">Trail</div>
           <h2 className="trail-name">{name}</h2>
+          {state.status === "ready" && state.detail.assembled && state.detail.assembly && (
+            <div
+              className="trail-meta trail-assembled"
+              title={`Not a mapped route: ${state.detail.assembly.ways} segments named "${name}", joined where they meet`}
+            >
+              {state.detail.assembly.note}
+            </div>
+          )}
           {state.status === "ready" && state.detail.operator && (
             <div className="trail-meta">{state.detail.operator}</div>
           )}
