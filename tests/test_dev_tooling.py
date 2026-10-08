@@ -67,7 +67,9 @@ def test_ensure_env_never_overwrites(ensure_env):
 def test_build_data_runs_steps_in_dependency_order():
     names = [name for name, _ in load_script("build_data").steps("adirondacks")]
     assert names.index("osm-routes") < names.index("route-profiles") < names.index("enrich")
-    assert names[-1] == "enrich"  # enrichment reads every other layer
+    # Enrichment reads every other layer; route facts read the profiles.
+    assert names.index("route-profiles") < names.index("route-facts")
+    assert names[-2:] == ["enrich", "route-facts"]
 
 
 @pytest.mark.unit
