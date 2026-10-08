@@ -21,6 +21,18 @@ export interface CampsiteFactsPayload {
   computed_at: string;
 }
 
+/** How far to trust the record, and where and when it came from (TM05-77). */
+export interface CampsiteConfidence {
+  level: "official" | "community_mapped" | "limited_info";
+  label: string;
+  reason: string;
+  source: string;
+  source_label: string;
+  operator: string | null;
+  /** ISO 8601: when the ingest that last confirmed this record finished. */
+  last_updated: string | null;
+}
+
 export interface CampsiteDetail {
   id: string;
   source: string;
@@ -32,6 +44,8 @@ export interface CampsiteDetail {
   lon: number;
   lat: number;
   facts: CampsiteFactsPayload | null;
+  /** Absent from an older backend; the panel then simply omits the row. */
+  confidence?: CampsiteConfidence | null;
 }
 
 export class CampsiteApiError extends Error {}

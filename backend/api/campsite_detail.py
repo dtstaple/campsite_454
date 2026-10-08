@@ -20,6 +20,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
 from enrichment.models import CampsiteFacts
+from geodata.confidence import confidence_payload
 from geodata.models import Campsite
 from scoring.engine import ScoringError, score_campsite
 
@@ -84,7 +85,10 @@ def _score(site: Campsite, facts: CampsiteFacts | None) -> tuple[str, dict | Non
 @api_view(["GET"])
 def campsite_detail_view(request, source_id: str):
     site = (
-        Campsite.objects.filter(source_id=source_id).select_related("facts").order_by("pk").first()
+        Campsite.objects.filter(source_id=source_id)
+        .select_related("facts", "last_run")
+        .order_by("pk")
+        .first()
     )
     if site is None:
         raise Http404(f"No campsite with source_id {source_id!r}")
@@ -110,5 +114,7 @@ def campsite_detail_view(request, source_id: str):
             "score": result["score"] if result else None,
             "score_status": score_status,
             "score_breakdown": result,
+            # How far to trust this record, and when it was last ingested (TM05-77).
+            "confidence": confidence_payload(site),
         }
     )

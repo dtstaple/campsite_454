@@ -58,3 +58,12 @@ export function shelterLabel(kind: string | null): string | null {
   if (kind === "tent site") return "Tent site";
   return null;
 }
+
+/** "Recreation.gov (RIDB) · updated Oct 7, 2026": where the record came from, and when. */
+export function provenance(sourceLabel: string, lastUpdated: string | null): string {
+  if (!lastUpdated) return sourceLabel;
+  const date = new Date(lastUpdated);
+  if (Number.isNaN(date.getTime())) return sourceLabel;
+  const day = date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return `${sourceLabel} · updated ${day}`;
+}

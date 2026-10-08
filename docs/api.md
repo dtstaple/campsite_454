@@ -426,7 +426,9 @@ campsite's score (TM05-45). The map layers are unaffected.
 |---|---|---|
 | `score` | int 0–100, or `null` | The overall score, the same as `score_breakdown.score`. `null` unless `score_status` is `scored`. |
 | `score_status` | string | `scored`: computed from stored values. `pending`: the campsite has not been enriched yet, so there is nothing stored to score it from. `not_available`: enriched, but no weighted factor could be evaluated from stored values. |
-| `score_breakdown` | object or `null` | The scoring engine's contract-1 result, with `contract`, `model_version`, `config_digest`, `location`, `score`, `factors` (each with `key`, `label`, `status`, `score`, `weight`, `effective_weight`, `contribution`, `measurement`, `explanation`) and `caps`. docs/scoring.md defines every field. `null` when `score` is `null`. |
+| `score_breakdown` | object or `null` | The scoring engine's contract-1 result, with `contract`, `model_version`, `config_digest`, `location`, `score`, `factors` (each with `key`, `label`, `status`, `score`, `weight`, `effective_weight`, `contribution`, `measurement`, `explanation`) and `caps`, plus `suitability_score` and `legal_status` since contract revision 1.1 (TM05-76). docs/scoring.md defines every field. `null` when `score` is `null`. |
+
+| `confidence` | object | *TM05-77.* How far to trust the record: `level` (`official`, `community_mapped`, `limited_info`), `label`, `reason`, `source`, `source_label`, `operator` (the source's operator tag, or `null`), and `last_updated` (ISO 8601: when the ingest that last confirmed the record finished). docs/confidence.md has the rules. |
 
 `score`/`score_breakdown` are the same fields the route detail returns for each campsite.
 The difference is that the route detail fetches missing slope and weather live, and this
