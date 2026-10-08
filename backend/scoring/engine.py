@@ -24,6 +24,7 @@ from __future__ import annotations
 from scoring.config import ScoringConfig, ScoringConfigError, load
 from scoring.factors import FACTORS, NOT_AVAILABLE, FactorResult
 from scoring.legal_gate import legal_status
+from scoring.verdict import DESIGNATED_NEAR_TRAIL_NOTE, designation
 
 CONTRACT_VERSION = 1
 
@@ -58,8 +59,19 @@ def score_campsite(
     campsite, config: ScoringConfig | None = None, stored_only: bool = False
 ) -> dict:
     """Score a Campsite by its location. Nothing about the record itself is a factor --
-    capacity in particular is not (571 of 660 RIDB sites report the same 8)."""
-    return score_location(campsite.geom.x, campsite.geom.y, config, stored_only)
+    capacity in particular is not (571 of 660 RIDB sites report the same 8).
+
+    One thing about the record does change the *wording*: a designated site close to a
+    trail says that is normal for a designated site (TM05-76 follow-up), since the 150 ft
+    rule does not apply to it. The sub-score is unchanged."""
+    result = score_location(campsite.geom.x, campsite.geom.y, config, stored_only)
+    if designation(campsite):
+        for factor in result["factors"]:
+            measurement = factor["measurement"] or {}
+            distance, ideal = measurement.get("distance_m"), measurement.get("ideal_m")
+            if factor["key"] == "trail" and distance is not None and ideal and distance < ideal:
+                factor["explanation"] += DESIGNATED_NEAR_TRAIL_NOTE
+    return result
 
 
 def combine(results: list[FactorResult], config: ScoringConfig, lon: float, lat: float) -> dict:

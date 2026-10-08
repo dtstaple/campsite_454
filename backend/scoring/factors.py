@@ -340,7 +340,7 @@ class WeatherFactor(Factor):
 class PlaceholderFactor(Factor):
     """A factor whose data source is not built yet.
 
-    Structured exactly like a real factor so Sprint 5 can replace the class without
+    Structured exactly like a real factor so a later story can replace the class without
     touching the engine or the output contract. Always not_available, so it is excluded
     from the total and the other weights are renormalised.
     """

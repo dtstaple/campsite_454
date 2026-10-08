@@ -4,6 +4,7 @@
  */
 
 import { API_BASE_URL } from "../api";
+import type { Legality } from "./legality";
 
 export interface CampsiteFactsPayload {
   public_land: {
@@ -46,6 +47,8 @@ export interface CampsiteDetail {
   facts: CampsiteFactsPayload | null;
   /** Absent from an older backend; the panel then simply omits the row. */
   confidence?: CampsiteConfidence | null;
+  /** The legality verdict shown above the score (TM05-76 follow-up). */
+  legality?: Legality | null;
 }
 
 export class CampsiteApiError extends Error {}
