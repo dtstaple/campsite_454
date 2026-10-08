@@ -29,6 +29,7 @@ import ThreeDControls from "./ThreeDControls";
 import { CAMERA, easeBearing, rigFor } from "./camera";
 import { disable3D, enable3D, prefersReducedMotion } from "./terrain3d";
 import type { CampsiteSelection } from "../campsite/selection";
+import { isAlong } from "./format";
 import "./trails.css";
 
 /** Below this zoom a route list would be most of a region; skip the request. */
@@ -323,7 +324,8 @@ export default function TrailInsight({ map, onOpenCampsite, onHoverCampsite }: P
 
   const showCampsite = useCallback(
     (site: CampsiteAlong) => {
-      setCursorM(site.distance_along_m);
+      // A site past either end has no place on the profile (TM05-73).
+      setCursorM(isAlong(site) ? site.distance_along_m : null);
       if (onOpenCampsite) {
         onOpenCampsite({
           id: site.id,

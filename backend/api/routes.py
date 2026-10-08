@@ -25,7 +25,8 @@ from api.bbox import InvalidBbox, parse_bbox
 from api.layers import COORDINATE_PRECISION, SimplifyPreserveTopology, envelope
 from api.views import InvalidParameter, _bad_request, _int_param, _simplify_param
 from geodata.models import Campsite, TrailRoute
-from geodata.route_rating import difficulty, route_type
+from geodata.route_rating import config as route_config
+from geodata.route_rating import difficulty, position_along, route_type
 from scoring.config import load as load_scoring_config
 from scoring.engine import score_campsite
 
@@ -93,7 +94,8 @@ CAMPSITES_ALONG_SQL = """
 WITH route AS (SELECT %s::geometry AS members, %s::geometry AS line)
 SELECT c.id,
        ST_Distance(c.geom_m, route.members) AS from_route_m,
-       ST_LineLocatePoint(route.line, c.geom_m) * ST_Length(route.line) AS along_m
+       ST_LineLocatePoint(route.line, c.geom_m) * ST_Length(route.line) AS along_m,
+       ST_Distance(c.geom_m, route.line) AS from_line_m
 FROM geodata_campsite c, route
 WHERE ST_DWithin(c.geom_m, route.members, %s)
 ORDER BY along_m, from_route_m
@@ -147,8 +149,9 @@ def route_detail_view(request, osm_id: int):
     sites = Campsite.objects.in_bulk([row[0] for row in located])
 
     config = load_scoring_config()
+    along_settings = route_config()["along"]
     campsites = []
-    for site_id, from_route, along in located:
+    for site_id, from_route, along, from_line in located:
         site = sites[site_id]
         result = score_campsite(site, config)
         campsites.append(
@@ -161,6 +164,7 @@ def route_detail_view(request, osm_id: int):
                 "lat": round(site.geom.y, 6),
                 "distance_along_m": round(along, 1),
                 "distance_from_route_m": round(from_route, 1),
+                **position_along(along, line_m.length, from_line, along_settings),
                 "score": result["score"],
                 "score_breakdown": result,
             }

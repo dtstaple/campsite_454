@@ -6,7 +6,17 @@
 import type { ReactNode } from "react";
 import type { CampsiteAlong, RouteDetail } from "./api";
 import ElevationChart from "./ElevationChart";
-import { WITHIN_OPTIONS, duration, feet, miles, naismithMinutes, percent, routeTypeText } from "./format";
+import {
+  WITHIN_OPTIONS,
+  campsitePlace,
+  duration,
+  feet,
+  isAlong,
+  miles,
+  naismithMinutes,
+  percent,
+  routeTypeText,
+} from "./format";
 import { gradeAt, nearestIndex } from "./profile";
 
 export type DetailState =
@@ -137,7 +147,7 @@ function Ready({
             distances={profile.distance_m}
             elevations={profile.elevation_m}
             cursorM={cursorM}
-            markers={campsites.items.map((site) => ({
+            markers={campsites.items.filter(isAlong).map((site) => ({
               distance: site.distance_along_m,
               label: site.name ?? "Campsite",
             }))}
@@ -184,17 +194,20 @@ function Ready({
                   className="trail-campsite"
                   onClick={() => onCampsite(site)}
                   onMouseEnter={() => {
-                    onCursor(site.distance_along_m);
+                    // Past either end there is no point on the profile to show (TM05-73).
+                    onCursor(isAlong(site) ? site.distance_along_m : null);
                     onCampsiteHover?.(site);
                   }}
                   onMouseLeave={() => onCampsiteHover?.(null)}
                   onFocus={() => onCampsiteHover?.(site)}
                   onBlur={() => onCampsiteHover?.(null)}
                 >
-                  <span className="trail-mile">mi {(site.distance_along_m / 1609.344).toFixed(1)}</span>
+                  <span className="trail-mile" title={site.position_label ?? undefined}>
+                    {campsitePlace(site).mile}
+                  </span>
                   <span className="trail-campsite-name">
                     {site.name ?? "Unnamed campsite"}
-                    <span className="trail-campsite-off">{Math.round(site.distance_from_route_m)} m off trail</span>
+                    <span className="trail-campsite-off">{campsitePlace(site).off}</span>
                   </span>
                   {site.score !== null && (
                     <span

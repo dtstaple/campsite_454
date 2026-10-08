@@ -555,6 +555,10 @@ Unknown `osm_id` → 404.
   from 3DEP (≈4–6 s); later requests read it (ms). If 3DEP is unavailable, `status` is
   `"unavailable"`, `reason` says why, `stats` and the series are absent, and **the rest of
   the response is still returned**.
+- **`campsites.items[].position`** (TM05-73): `along`, `near_start` or `near_end`, with
+  `position_label` "near the trailhead" or "near the trail's end", or `null` when along.
+  A site past either end has no honest `distance_along_m`: it is 0 or the line's length.
+  Show the label instead (docs/routes.md).
 - **`difficulty`** (TM05-82): `{rating, label, shenandoah, formula, length_m, climb_m}`.
   `label` is Easy, Moderate or Hard, from Shenandoah's rating on the profile. It is `null`
   when the profile is unavailable. docs/routes.md has the bands.

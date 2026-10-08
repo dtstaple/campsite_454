@@ -1,4 +1,4 @@
-# Route difficulty and route type (TM05-82)
+# Route difficulty, route type and campsites past the ends (TM05-82, TM05-73)
 
 The trail panel and `GET /api/routes/<osm_id>/` describe each named route with a
 **difficulty** and a **route type**.
@@ -90,3 +90,45 @@ connects + pond (20).
 
 21 routes had a cached profile at measurement time: 14 Moderate, 5 Hard, 2 Easy. The rest
 compute their profile, and so their difficulty, the first time the trail panel opens them.
+
+## Campsites past a route's ends (TM05-73)
+
+"Campsites along this trail" lists every site within the chosen distance of the route,
+ordered by its nearest point on the stitched line. A site beyond either end has its
+nearest point at the end itself. That used to read as "mi 0.0" for a site 763 m away
+from the start, which is not a place on the trail.
+
+### The rule
+
+A site is **past an end** when both of these hold:
+
+1. Its nearest point on the line is within `end_zone_m` (**50 m**) of the start or the
+   end. A route's first segment is rarely straight, so a site off the end projects a few
+   metres onto the line rather than exactly onto the end vertex: the Preston Ponds site
+   lands 18 m along.
+2. It is farther than `off_end_m` (**100 m**) from the line.
+
+A site that is past an end gets `position` `near_start` or `near_end`, and
+`position_label` "near the trailhead" or "near the trail's end". The trail list shows
+"—" instead of a mile, with "near the trailhead · 763 m away" underneath. The profile
+shows no marker for it, and hovering it moves no cursor.
+
+Everything else is `along` and keeps its mile, including a site 60 m off the very start
+of the trail. Both thresholds are under `along` in `routes.yml`.
+
+The labels follow the line's direction: "trailhead" is the start of the stitched line,
+which is not always the end hikers start from.
+
+### Measured (dev DB, 2026-10-07)
+
+Over all 452 named routes at the default 500 m, 869 sites are listed:
+
+| Position | Sites |
+|---|---|
+| Along the trail (mile shown) | 574 |
+| Near the trailhead | 140 |
+| Near the trail's end | 155 |
+
+Sites past an end appear on **67** routes. On Preston Ponds Trail (at 1 km), the site
+763 m off and Henderson Lean-to (226 m off) both read "near the trailhead" now. The two
+Duck Hole lean-tos keep miles 4.3 and 4.4.
