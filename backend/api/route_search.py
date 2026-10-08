@@ -17,6 +17,18 @@ that refreshes on every pan never waits on 3DEP.
 
 Matching is done in Python on normalised names rather than with Postgres' `unaccent`:
 the route table holds hundreds of rows, and that avoids a database extension.
+
+Filters (TM05-85) narrow either list, and all of them combine:
+
+    min_length_m, max_length_m       the route's length
+    min_gain_m, max_gain_m           its climb (stored facts: needs a computed profile)
+    difficulty=easy,moderate,hard    any of these
+    route_type=loop,out_and_back,point_to_point
+    campsites_within_m=500           a campsite within this distance of the route
+
+They read the stored RouteFacts (enrichment/route_facts.py). A route whose facts cannot
+answer an active filter -- usually no profile yet, so no gain or difficulty -- is left out
+and counted in `unknown`, so the UI can say so rather than pretend it does not exist.
 """
 
 from __future__ import annotations
@@ -32,7 +44,11 @@ from analysis.analyses.elevation import RouteProfile
 from api.bbox import InvalidBbox, parse_bbox
 from api.layers import envelope
 from api.views import InvalidParameter, _bad_request, _int_param
+from enrichment.models import RouteFacts
 from geodata.models import METRIC_SRID, TrailRoute
+
+DIFFICULTIES = ("easy", "moderate", "hard")
+ROUTE_TYPES = ("loop", "out_and_back", "point_to_point")
 
 DEFAULT_LIMIT = 25
 MAX_LIMIT = 100
@@ -69,7 +85,90 @@ def parse_point(raw: str | None) -> Point | None:
     return Point(lon, lat, srid=4326)
 
 
+def float_param(request, name: str) -> float | None:
+    raw = request.query_params.get(name)
+    if raw in (None, ""):
+        return None
+    try:
+        value = float(raw)
+    except ValueError:
+        raise InvalidParameter(f"{name} must be a number, got {raw!r}") from None
+    if value < 0:
+        raise InvalidParameter(f"{name} must be zero or more, got {raw!r}")
+    return value
+
+
+def choice_param(request, name: str, allowed: tuple[str, ...]) -> set[str]:
+    raw = request.query_params.get(name)
+    if not raw:
+        return set()
+    chosen = {part.strip() for part in raw.split(",") if part.strip()}
+    unknown = chosen - set(allowed)
+    if unknown:
+        raise InvalidParameter(
+            f"{name} values must be among {', '.join(allowed)}; got {', '.join(sorted(unknown))}"
+        )
+    return chosen
+
+
+def parse_filters(request) -> dict:
+    return {
+        "min_length_m": float_param(request, "min_length_m"),
+        "max_length_m": float_param(request, "max_length_m"),
+        "min_gain_m": float_param(request, "min_gain_m"),
+        "max_gain_m": float_param(request, "max_gain_m"),
+        "difficulty": choice_param(request, "difficulty", DIFFICULTIES),
+        "route_type": choice_param(request, "route_type", ROUTE_TYPES),
+        "campsites_within_m": float_param(request, "campsites_within_m"),
+    }
+
+
+def passes(route: TrailRoute, filters: dict) -> bool | None:
+    """True or False if the route's facts answer every active filter, None if they cannot
+    (unknown) -- for example a gain filter on a route with no profile yet."""
+    length = route.length_m or 0
+    if filters["min_length_m"] is not None and length < filters["min_length_m"]:
+        return False
+    if filters["max_length_m"] is not None and length > filters["max_length_m"]:
+        return False
+    needs_facts = any(
+        filters[key] not in (None, set())
+        for key in ("min_gain_m", "max_gain_m", "difficulty", "route_type", "campsites_within_m")
+    )
+    if not needs_facts:
+        return True
+    try:
+        facts = route.facts
+    except RouteFacts.DoesNotExist:
+        facts = None
+    if facts is None:
+        return None
+    gain_filtered = filters["min_gain_m"] is not None or filters["max_gain_m"] is not None
+    if gain_filtered or filters["difficulty"]:
+        if facts.gain_m is None:
+            return None
+    if filters["min_gain_m"] is not None and facts.gain_m < filters["min_gain_m"]:
+        return False
+    if filters["max_gain_m"] is not None and facts.gain_m > filters["max_gain_m"]:
+        return False
+    if filters["difficulty"] and facts.difficulty not in filters["difficulty"]:
+        return False
+    if filters["route_type"] and facts.route_type not in filters["route_type"]:
+        return False
+    within = filters["campsites_within_m"]
+    if within is not None and (
+        facts.nearest_campsite_m is None or facts.nearest_campsite_m > within
+    ):
+        return False
+    return True
+
+
 def gain_of(route: TrailRoute) -> float | None:
+    try:
+        if route.facts.gain_m is not None:
+            return route.facts.gain_m
+    except RouteFacts.DoesNotExist:
+        pass
     outcome = RouteProfile().lookup(route.geom, {})
     return outcome.value["stats"]["gain_m"] if outcome else None
 
@@ -81,6 +180,7 @@ def route_search_view(request):
         centre = parse_point(request.query_params.get("near"))
         raw_bbox = request.query_params.get("bbox")
         bbox = parse_bbox(raw_bbox) if raw_bbox else None
+        filters = parse_filters(request)
     except (InvalidBbox, InvalidParameter) as exc:
         return _bad_request(exc)
 
@@ -96,7 +196,10 @@ def route_search_view(request):
     if centre is not None:
         metric_centre = centre.transform(METRIC_SRID, clone=True)
         routes = routes.annotate(distance=Distance("geom_m", metric_centre))
-    candidates = [route for route in routes.defer("raw") if matches(route.name, words)]
+    named = [r for r in routes.select_related("facts").defer("raw") if matches(r.name, words)]
+    verdicts = [(route, passes(route, filters)) for route in named]
+    candidates = [route for route, ok in verdicts if ok]
+    unknown = sum(1 for _, ok in verdicts if ok is None)
     if centre is not None:
         candidates.sort(key=lambda route: (route.distance.m, normalise(route.name)))
     else:
@@ -121,6 +224,8 @@ def route_search_view(request):
             "query": query,
             "count": len(results),
             "truncated": len(candidates) > limit,
+            # Routes the active filters could not judge (no profile yet, say): left out.
+            "unknown": unknown,
             "results": results,
         }
     )
