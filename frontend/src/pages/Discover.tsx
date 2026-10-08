@@ -63,6 +63,12 @@ import type { FeatureCollection as GeoJsonFeatureCollection } from "geojson";
 import { addContourLayers, setContourBasemap, setContoursVisible } from "../map/contours";
 import StartLocation from "../location/StartLocation";
 import {
+  addSlopeLayer,
+  defaultSlopeOpacity,
+  setSlopeOpacity as applySlopeOpacity,
+  setSlopeVisible,
+} from "../slope/slopeLayer";
+import {
   ApiError,
   fetchMapData,
   layerVisibleAtZoom,
@@ -130,6 +136,18 @@ export default function Discover() {
       setContourBasemap(map.current, basemap);
     }
   }, [contours, basemap]);
+
+  // Slope-angle shading (TM05-84): off until asked for, with its own opacity.
+  const [slope, setSlope] = useState(false);
+  const [slopeOpacity, setSlopeOpacity] = useState(defaultSlopeOpacity);
+  const slopeRef = useRef({ on: slope, opacity: slopeOpacity });
+  useEffect(() => {
+    slopeRef.current = { on: slope, opacity: slopeOpacity };
+    if (map.current && styleReady.current) {
+      setSlopeVisible(map.current, slope);
+      applySlopeOpacity(map.current, slopeOpacity);
+    }
+  }, [slope, slopeOpacity]);
 
   const switchMode = useCallback((id: ModeId) => {
     const next = modeById(id);
@@ -321,6 +339,7 @@ export default function Discover() {
       // First, so it lands under the basemap labels and under every data layer.
       addTerrainLayers(instance, terrainRef.current);
       addContourLayers(instance, contoursRef.current, basemapRef.current);
+      addSlopeLayer(instance, slopeRef.current.on, slopeRef.current.opacity);
       addMapSources(instance);
       addMapLayers(instance);
 
@@ -446,6 +465,10 @@ export default function Discover() {
           onTerrain={setTerrain}
           contours={contours}
           onContours={setContours}
+          slope={slope}
+          onSlope={setSlope}
+          slopeOpacity={slopeOpacity}
+          onSlopeOpacity={setSlopeOpacity}
           onRegion={flyToRegion}
         />
         {/* Keyed by session: signing in or out starts the waypoints afresh. */}

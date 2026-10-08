@@ -167,6 +167,56 @@
   background: linear-gradient(135deg, var(--text-secondary), var(--bg-base));
 }
 
+/* The four slope bands side by side (TM05-84). */
+.swatch-slope {
+  background: linear-gradient(
+    90deg,
+    var(--slope-27) 0 25%,
+    var(--slope-30) 25% 50%,
+    var(--slope-35) 50% 75%,
+    var(--slope-45) 75%
+  );
+}
+
+.slope-legend {
+  margin: 0 0 var(--space-xs) var(--space-xl);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.slope-legend ul {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px var(--space-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.slope-legend li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.slope-note {
+  margin: var(--space-xs) 0;
+  color: var(--text-primary);
+  font-weight: var(--weight-semibold);
+}
+
+.slope-opacity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.slope-opacity input {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--accent);
+}
+
 /* Concentric rings, in the contour index colour (TM05-83). */
 .swatch-contours {
   background: repeating-radial-gradient(

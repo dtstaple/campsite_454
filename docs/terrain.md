@@ -1,4 +1,4 @@
-# Terrain overlays: contours (TM05-83)
+# Terrain overlays: contours (TM05-83) and slope angle (TM05-84)
 
 The map draws its terrain overlays in the browser, from the DEM tiles it already loads
 for the hillshade and 3D terrain: AWS Terrain Tiles in Terrarium encoding
@@ -45,3 +45,98 @@ both.
 - Labels only on index lines (2,800, 3,600, 4,200 ft …).
 - No console errors.
 - Screenshots are in artifacts/tm05-83/.
+
+## Slope-angle shading (TM05-84)
+
+This colours terrain by steepness, in the bands backcountry maps use:
+
+| Band | Colour (theme.css) |
+|---|---|
+| under 27° | clear |
+| 27–30° | yellow, `--slope-27` |
+| 30–35° | orange, `--slope-30` |
+| 35–45° | red, `--slope-35` |
+| 45° and over | purple, `--slope-45` |
+
+The layer panel's **Slope angle** toggle is off by default. When it is on, it shows:
+- a legend of the bands
+- the note **"Terrain information, not an avalanche forecast."**
+- an **opacity** slider, 10–100%, which starts at `--slope-default-opacity` (55%)
+
+**How it is computed.** Everything runs in the browser, with no new tile source and no
+server work:
+1. A custom MapLibre protocol (`campsite-slope://z/x/y`, in
+   frontend/src/slope/slopeLayer.ts) sends each tile request to a **web worker**
+   (`slope.worker.ts`).
+2. The worker fetches the **same Terrarium DEM tile** as the hillshade (`TERRAIN_TILES`).
+   It decodes it without colour management, so the pixels stay elevations:
+   `R×256 + G + B/256 − 32768` metres.
+3. It smooths the elevations with two passes of a 3×3 mean (see the limits below).
+4. It computes slope by **Horn's method**, the 3×3 finite difference that GDAL's
+   `gdaldem slope` uses. The ground size of a pixel is taken at **each row's own
+   latitude**. Web Mercator pixels are `cos(latitude)` narrower on the ground, and at 44°N
+   ignoring that would understate every slope.
+5. It bands the slopes and returns a PNG.
+
+All the maths is in `slope.ts`, which is pure, and the tests run that same code. At a
+tile's edge, missing neighbours are replaced by one-sided differences, so no seams appear
+along tile boundaries.
+
+**Cost.** Measured in headless Chrome: 4–11 ms of worker time per 256 px tile, plus the
+DEM fetch, which is often already cached from the hillshade.
+
+**Effective resolution and accuracy limits.**
+- **Source.** In the US, Terrarium is resampled from USGS 3DEP, mostly 1/3 arc-second
+  (about 10 m).
+- **Pixel size.** Slope tiles are computed from the DEM at the view's own zoom, to a
+  maximum of zoom 14. At 44°N a zoom-14 DEM pixel is **6.9 m**, and zoom 13 is 13.7 m.
+  Beyond zoom 14, the zoom-14 tiles are stretched.
+- **Smoothing.** The two 3×3 smoothing passes average each slope over about **5 pixels,
+  roughly 35 m at zoom 14**. They are there because Terrarium tiles are quantised and
+  resampled: without them, flat ground showed one-pixel "terraces" read as 27–30°, which
+  drew false streaks across the map. A smoothing mean leaves a true plane's slope exactly
+  unchanged (tested). Real terrain features **narrower than about 30 m**, such as a short
+  cliff band, a gully wall or a roll-over, are averaged with their surroundings and
+  **read less steep than they are**.
+- **Starts at zoom 13.** Below that, a tile's DEM pixels are too coarse. For one
+  High Peaks zoom-12 tile (12/1206/1487, Colden and Avalanche Pass), measured on the same
+  ground from DEMs of each zoom:
+
+  | DEM zoom | m/pixel at 44°N | Terrain ≥30° | Steepest pixel |
+  |---|---|---|---|
+  | 12 | 27.4 | 9.8% | 58.5° |
+  | 13 | 13.7 | 13.4% | 64.0° |
+  | 14 | 6.9 | 15.4% | 71.4° |
+  | 15 | 3.4 | 16.2% | 75.4° |
+
+  At zoom 12, the map would show only 64% of the steep terrain that zoom 14 finds. At
+  zoom 13 it shows 87%, and zoom 15 adds only about 5% over zoom 14. So the layer starts
+  at zoom 13, and the panel says "zoom 13+" below that.
+- **Not survey data.** The colours are a picture of a smoothed ~10 m DEM. Slope angle is
+  one input to avalanche terrain, alongside aspect, elevation, terrain traps,
+  connectivity, snowpack and weather. Hence the legend's note. The layer is **terrain
+  information, not an avalanche forecast**.
+
+**Order.** Over the hillshade and satellite imagery, and under the contours, the basemap's
+labels and every data layer.
+
+**Tests** (`frontend/tests/slope.test.ts`), on synthetic tiles with known slopes:
+- Terrarium decoding round-trips.
+- The band edges are exact (26.9 → none, 27 → 27–30, … 45 → 45+).
+- A plane's slope is recovered to 0.001° at every pixel, including the edges, whatever
+  way it faces.
+- **Known test tiles** at the Adirondacks' zoom-14 tile row, Terrarium-encoded planes of
+  10°, 28.5°, 32.5°, 40° and 52°, land entirely in none, 27–30, 30–35, 35–45 and 45+.
+- Flat ground beside a 60° wall shades only the wall.
+- Smoothing leaves a plane's slope unchanged, and removes a one-pixel terrace that the raw
+  method put in the 27–30 band.
+- The latitude scaling is checked: 6.87 m/pixel at zoom 14 and 44.1°N.
+
+**Measured in the browser (2026-10-08).**
+- Marcy, Colden and Avalanche Lake at z13.5: the Colden slides and the Avalanche Lake
+  cliffs show red and purple, and the valley floors are clear.
+- The opacity slider sets `raster-opacity`, for example to 0.9.
+- On satellite, the imagery sits beneath the slope layer.
+- At z11 the panel says "zoom 13+".
+- No console errors.
+- Screenshots are in artifacts/tm05-84/.
