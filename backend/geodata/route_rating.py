@@ -156,3 +156,31 @@ def route_type(
 
 def _type(kind: str, estimated: bool, basis: dict) -> dict:
     return {"type": kind, "label": TYPE_LABELS[kind], "estimated": estimated, "basis": basis}
+
+
+# --- position along (TM05-73) ------------------------------------------------------------
+
+ALONG, NEAR_START, NEAR_END = "along", "near_start", "near_end"
+POSITION_LABELS = {NEAR_START: "near the trailhead", NEAR_END: "near the trail's end"}
+
+
+def position_along(
+    along_m: float, line_length_m: float, from_line_m: float, settings: dict | None = None
+) -> dict:
+    """Where a campsite is relative to the route's line.
+
+    `along_m` is the site's nearest point on the stitched line, measured from its start. If
+    that point is within `end_zone_m` of an end and the site is farther than `off_end_m`
+    from the line, the site lies past the end: "mile 0" would be false, so it is labelled
+    near the trailhead or the trail's end instead. Anything else is along the trail and
+    keeps its mile.
+    """
+    settings = settings or config()["along"]
+    off_end = from_line_m > settings["off_end_m"]
+    if off_end and along_m <= settings["end_zone_m"]:
+        position = NEAR_START
+    elif off_end and line_length_m - along_m <= settings["end_zone_m"]:
+        position = NEAR_END
+    else:
+        position = ALONG
+    return {"position": position, "position_label": POSITION_LABELS.get(position)}

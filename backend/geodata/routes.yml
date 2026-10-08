@@ -25,3 +25,13 @@ route_type:
   # route's ends are not "summits".
   summit_within_m: 15
   summit_min_relief_m: 100
+
+along:
+  # TM05-73. A campsite whose nearest point on the route is one of its ends, and that is
+  # farther than this from it, is past the end: it is labelled "near the trailhead" or
+  # "near the trail's end" rather than given mile 0 or the last mile, which it is not at.
+  off_end_m: 100
+  # The nearest point counts as "at the end" within this many metres of it along the line:
+  # a route's first or last segment is rarely straight, so a site off the end projects a
+  # few metres onto the line, not exactly onto the end vertex.
+  end_zone_m: 50
