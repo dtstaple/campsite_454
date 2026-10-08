@@ -1,0 +1,23 @@
+/* TM05-78: the user's location and the outside-coverage notice. Tokens from theme.css. */
+
+.user-location-dot {
+  width: var(--user-location-size);
+  height: var(--user-location-size);
+  background: var(--user-location);
+  border: 2px solid var(--user-location-ring);
+  border-radius: var(--radius-pill);
+  box-shadow: 0 0 0 6px var(--user-location-halo);
+}
+
+/* Bottom centre: the top centre belongs to the trail search. Above the warn banner's
+ * slot, so the two never stack. */
+.banner.location-notice {
+  bottom: calc(var(--space-xl) * 6);
+  border: 1px solid var(--accent);
+  color: var(--text-primary);
+}
+
+.location-dismiss {
+  margin-left: var(--space-xs);
+  color: var(--text-secondary);
+}

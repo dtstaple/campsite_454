@@ -313,3 +313,12 @@
   --map-contour-index-width: 1.4;
   --map-contour-label-size: 10;
 }
+
+/* --- The user's location (TM05-78) ------------------------------------------------------
+ * The familiar blue dot: a colour no data layer uses, with a white ring for both basemaps. */
+:root {
+  --user-location: #3b82f6;
+  --user-location-ring: #ffffff;
+  --user-location-halo: rgba(59, 130, 246, 0.25);
+  --user-location-size: 16px;
+}
