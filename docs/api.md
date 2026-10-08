@@ -595,6 +595,43 @@ Most of a cached detail request is scoring the campsites, about 10 ms each.
 
 ---
 
+## Trail search and the Discover list (TM05-74)
+
+### `GET /api/routes/search/?q=&near=lon,lat&bbox=west,south,east,north&limit=25`
+
+Code: `backend/api/route_search.py`. Give `q`, `bbox`, or both. Without either, the response
+is **400**.
+
+- **`q`** finds named routes whose name contains every word of the query, ignoring case
+  and accents: `lac clair` finds "Lac Clâir Trail". It searches every named route, not just
+  those in view.
+- **`bbox`** without `q` is the Discover list: named routes in or near the view. "Near"
+  means the bbox grown by 50% of its width and height on every side.
+- **`near`** is the view centre. Results are ordered by distance from it, to each route's
+  nearest point in metres, then by name. Without it they are ordered by name.
+- **`limit`** defaults to 25, with a maximum of 100. `truncated` says there were more.
+
+```json
+{
+  "query": "marcy",
+  "count": 3,
+  "truncated": false,
+  "results": [
+    {"osm_id": 7340133, "name": "Mount Marcy Trail", "length_m": 6593.6, "gain_m": 797.7,
+     "centroid": [-73.9466, 44.1180], "distance_m": 3.1}
+  ]
+}
+```
+
+- **`gain_m`** comes from the route's cached elevation profile. It is `null` until the
+  profile has been computed once, by opening the trail or by `build_route_profiles`. A
+  search never calls 3DEP, so the list stays fast as the map moves.
+- **An empty result** is `200` with `results: []`. The UI says "No named trails match …"
+  or "No named trails in or near this view".
+
+Measured on the dev DB: 70–150 ms warm; the first request of a process is slower, about
+1.6 s.
+
 ## Trail for a clicked way (TM05-97)
 
 ### `GET /api/trails/<source_id>/trail/[?campsites_within_m=500]`
