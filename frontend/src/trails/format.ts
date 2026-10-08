@@ -66,3 +66,25 @@ export function routeTypeText(routeType: {
     hint: `Estimated from its ends: one meets ${start}, the other ${end}. Roads are not mapped, so a trailhead can read as a dead end.`,
   };
 }
+
+/** True when a listed campsite has a real place along the route (TM05-73). */
+export function isAlong(site: { position?: string }): boolean {
+  return !site.position || site.position === "along";
+}
+
+/**
+ * The trail list's mile column and the line under the name. A site past either end gets
+ * no mile: "—", and "near the trailhead · 763 m away" instead of "mi 0.0 … 763 m off trail".
+ */
+export function campsitePlace(site: {
+  distance_along_m: number;
+  distance_from_route_m: number;
+  position?: string;
+  position_label?: string | null;
+}): { mile: string; off: string } {
+  const off = Math.round(site.distance_from_route_m);
+  if (!isAlong(site) && site.position_label) {
+    return { mile: "—", off: `${site.position_label} · ${off} m away` };
+  }
+  return { mile: `mi ${(site.distance_along_m / 1609.344).toFixed(1)}`, off: `${off} m off trail` };
+}

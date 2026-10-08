@@ -57,6 +57,9 @@ export interface CampsiteAlong {
   lat: number;
   distance_along_m: number;
   distance_from_route_m: number;
+  /** TM05-73: past either end of the route there is no honest mile. Optional for older APIs. */
+  position?: "along" | "near_start" | "near_end";
+  position_label?: string | null;
   score: number | null;
   score_breakdown: ScoreSummary;
 }
