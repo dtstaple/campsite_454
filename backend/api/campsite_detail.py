@@ -23,6 +23,7 @@ from enrichment.models import CampsiteFacts
 from geodata.confidence import confidence_payload
 from geodata.models import Campsite
 from scoring.engine import ScoringError, score_campsite
+from scoring.verdict import legality_verdict
 
 SCORED = "scored"
 PENDING = "pending"
@@ -116,5 +117,7 @@ def campsite_detail_view(request, source_id: str):
             "score_breakdown": result,
             # How far to trust this record, and when it was last ingested (TM05-77).
             "confidence": confidence_payload(site),
+            # The legality verdict shown above the score (TM05-76 follow-up).
+            "legality": legality_verdict(site, facts, result["legal_status"] if result else None),
         }
     )

@@ -20,6 +20,8 @@ import {
 } from "./format";
 import SatelliteInset from "./SatelliteInset";
 import ScoreBreakdown from "./ScoreBreakdown";
+import LegalityVerdict from "./LegalityVerdict";
+import { withoutLegalFactor } from "./legality";
 
 export type CampsiteState =
   | { status: "loading" }
@@ -108,7 +110,9 @@ function Body({
 
       <div className="campsite-actions">{saveButton}</div>
 
-      <ScoreBreakdown breakdown={score.breakdown} total={score.total} />
+      {detail.legality && <LegalityVerdict legality={detail.legality} />}
+
+      <ScoreBreakdown breakdown={withoutLegalFactor(score.breakdown)} total={score.total} />
 
       <dl className="campsite-facts">
         {shelter && <Row label="Site">{shelter}</Row>}

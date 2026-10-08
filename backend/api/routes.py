@@ -30,6 +30,7 @@ from geodata.route_rating import config as route_config
 from geodata.route_rating import difficulty, position_along, route_type
 from scoring.config import load as load_scoring_config
 from scoring.engine import score_campsite
+from scoring.verdict import legality_verdict
 
 DEFAULT_ROUTE_LIMIT = 200
 MAX_ROUTE_LIMIT = 1000
@@ -128,6 +129,13 @@ def _profile_payload(route):
     }
 
 
+def facts_of(site: Campsite) -> CampsiteFacts | None:
+    try:
+        return site.facts
+    except CampsiteFacts.DoesNotExist:
+        return None
+
+
 def display_name(site: Campsite) -> dict:
     """`display_name` and `display_name_derived`, exactly as the campsite detail endpoint
     gives them, so the trail list and the panel always agree on a site's name."""
@@ -185,6 +193,7 @@ def route_detail_view(request, osm_id: int):
                 **position_along(along, line_m.length, from_line, along_settings),
                 "score": result["score"],
                 "score_breakdown": result,
+                "legality": legality_verdict(site, facts_of(site), result["legal_status"]),
             }
         )
 

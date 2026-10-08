@@ -56,7 +56,7 @@ empty, it is `null` or `[]` instead, so a consumer never has to test for a missi
       "effective_weight": 0.0,
       "contribution": 0.0,
       "measurement": null,
-      "explanation": "Land cover is not measured yet (planned: Sentinel-2, Sprint 5)."
+      "explanation": "Land cover isn't measured yet."
     }
   ],
   "caps": [],
@@ -165,6 +165,88 @@ marked **closed** to public access caps the score at 0.
   for. If weather is `not_available` (Open-Meteo down) the score is still valid, it simply
   excludes weather.
 - Scores from different `model_version` or `config_digest` values are not comparable.
+
+### The legality verdict (TM05-76 follow-up)
+
+`legal_status` answers "is camping allowed on this **land**?" from PAD-US. The campsite
+panel shows a **verdict** for the **site** instead: `legality` on
+`GET /api/campsites/<id>/detail/` and on each campsite in a route's detail. It sits
+**above** the score, and the panel's factor list no longer shows the legal factor.
+
+Code: `backend/scoring/verdict.py`.
+
+| Verdict | Label |
+|---|---|
+| `permitted` | Permitted · designated site |
+| `not_permitted` | Not permitted |
+| `unknown` | Unknown: check current rules |
+
+**Rules**, quoted from official NYS DEC pages (fetched 2026-10-07):
+
+- "Except in an emergency, camping is prohibited above an elevation of **4,000 feet** in
+  the Adirondacks." Source:
+  [State Land Camping Rules](https://dec.ny.gov/things-to-do/camping/state-land-rules)
+- "No camping above **3,500 feet** (except at lean-to)." This applies in the High Peaks
+  Wilderness. Source:
+  [High Peaks Wilderness Complex](https://dec.ny.gov/places/high-peaks-wilderness-complex)
+- "Camping is prohibited within **150 feet** of any road, trail, spring, stream, pond or
+  other body of water except at areas designated by a 'Camp Here' disk." Source:
+  [State Land Camping Rules](https://dec.ny.gov/things-to-do/camping/state-land-rules)
+
+**Designated** means one of:
+- a Recreation.gov (RIDB) listing
+- a lean-to
+- an OSM record described as "designated", or tagged with a DEC operator
+
+The last two are contributors' claims, not DEC's own list.
+
+**How the verdict is decided:**
+
+1. **Land closed** (PAD-US): **Not permitted**. A "designated" site on closed land is
+   **Unknown**, because the data disagree.
+2. **Elevation limits** apply only inside the Adirondacks: 4,000 ft everywhere there, and
+   3,500 ft in the High Peaks Wilderness except at lean-tos. The elevation is the site's
+   stored 3DEP value.
+   - **Within 50 ft of a limit**, or above one for a designated site: **Unknown**. A
+     point elevation is not exact, and the designation evidence is not DEC's list.
+   - An undesignated site **more than 50 ft above** a limit: **Not permitted**.
+3. **Designated**, and clear of every limit: **Permitted · designated site**. A designated
+   Adirondack site with no stored elevation is Unknown, since its limits cannot be checked.
+4. **Designation not confirmed**: **Unknown**. At-large camping is legal on open Forest
+   Preserve land 150 ft from roads, trails and water, but roads are not in our data, so we
+   never call it permitted.
+
+The verdict is never "Permitted" or "Not permitted" on a rule we could not verify from an
+official source.
+
+**Sno-bird** (`node/4252860218`, High Peaks Wilderness) is tagged "NYSDEC designated
+campsite" and has a stored elevation of **4,028 ft**. That is 28 ft above the Adirondack
+limit, within the 50 ft margin. Verdict: **Unknown: check current rules**, with the 4,000 ft
+rule cited.
+
+**Trail access wording.** A designated site closer to a trail than the trail factor's
+ideal distance adds: "Designated sites are often this close to a trail; that is normal for
+a designated site." The 150 ft rule does not apply to designated sites. The sub-score is
+unchanged; 354 sites carry the note.
+
+**Measured** (dev DB, 1,500 sites, 2026-10-07):
+
+| Verdict | Sites |
+|---|---|
+| Permitted · designated site | 968 |
+| Unknown: check current rules | 526 |
+| Not permitted | 6 (closed land) |
+
+**483 sites changed** from the land-only gate:
+- 411 went from permitted to unknown: undesignated OSM sites on open land, which are no
+  longer called legal without a designation.
+- 70 went from unknown to permitted: mostly RIDB campgrounds outside PAD-US parcels.
+- 2 designated sites on closed land went from not permitted to unknown.
+
+No undesignated site lies clearly above an elevation limit today.
+
+Designation evidence: RIDB 660, lean-to 180, OSM "designated" 75, OSM DEC operator 58, none
+527.
 
 ### Stability promise
 
@@ -328,7 +410,7 @@ Explanation, e.g. "Ground is gently sloping: 6° (10%) across 20 m."
 ### Placeholder: land cover
 
 `LandCoverFactor` is a real factor class with a weight in the config, returning
-`not_available` with an explanation. Sprint 5 replaces its `evaluate()` with a real
+`not_available` with an explanation. A later story replaces its `evaluate()` with a real
 measurement; the engine, the config shape and the output contract stay as they are.
 
 ### What is deliberately *not* a factor

@@ -109,4 +109,4 @@ factors:
       - [20, 0]
 
   land_cover:
-    placeholder: "Land cover is not measured yet (planned: Sentinel-2, Sprint 5)."
+    placeholder: "Land cover isn't measured yet."
