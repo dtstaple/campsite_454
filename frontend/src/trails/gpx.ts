@@ -19,3 +19,12 @@ export function gpxPath(detail: GpxTarget, withinM: number): string | null {
   const path = way.split("/").map(encodeURIComponent).join("/");
   return `/api/trails/${path}/gpx/${query}`;
 }
+
+/** The same file name the API gives the download (api/gpx.py `filename`). */
+export function gpxFilename(name: string): string {
+  const slug = (name || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return `${slug || "trail"}.gpx`;
+}

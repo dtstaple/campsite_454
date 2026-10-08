@@ -1,0 +1,242 @@
+/* Custom waypoints (TM05-80). Colours and sizes from theme.css. */
+
+.waypoint-marker {
+  display: grid;
+  place-items: center;
+  width: var(--waypoint-size);
+  height: var(--waypoint-size);
+  padding: 0;
+  background: var(--waypoint-color);
+  border: 2px solid var(--waypoint-ring);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--pin-shadow);
+  color: var(--waypoint-glyph);
+  cursor: pointer;
+}
+
+.waypoint-marker svg {
+  width: 60%;
+  height: 60%;
+  fill: currentColor;
+}
+
+.waypoint-marker:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.waypoint-marker.is-draft {
+  opacity: var(--waypoint-draft-opacity);
+  border-style: dashed;
+}
+
+.is-placing-waypoint .maplibregl-canvas {
+  cursor: crosshair !important;
+}
+
+/* --- panel ------------------------------------------------------------------------- */
+
+.waypoint-panel {
+  max-width: 260px;
+}
+
+.waypoint-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.waypoint-panel-head .panel-title {
+  margin-bottom: 0;
+}
+
+.waypoint-add {
+  padding: 2px var(--space-sm);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+}
+
+.waypoint-add:hover,
+.waypoint-add.is-active {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.waypoint-hint,
+.waypoint-empty {
+  margin-top: var(--space-xs);
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+}
+
+.waypoint-hint {
+  color: var(--accent);
+}
+
+.waypoint-list {
+  max-height: 160px;
+  margin: var(--space-xs) 0 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.waypoint-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: 3px 0;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  text-align: left;
+  cursor: pointer;
+}
+
+.waypoint-row:hover .waypoint-row-name {
+  color: var(--accent);
+}
+
+.waypoint-row-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.waypoint-row-kind {
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+}
+
+.waypoint-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-pill);
+}
+
+.waypoint-error {
+  margin-top: var(--space-xs);
+  color: var(--danger);
+  font-size: var(--text-sm);
+}
+
+/* --- editor popup ----------------------------------------------------------------- */
+
+/* Above the floating search and panels (z-index 2) while it is open: it is the one thing
+ * the user is working in. */
+.maplibregl-popup.waypoint-popup {
+  z-index: 3;
+}
+
+.waypoint-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  width: 250px;
+}
+
+.waypoint-editor .panel-title {
+  margin-bottom: 0;
+}
+
+.waypoint-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+.waypoint-field input,
+.waypoint-field textarea {
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  resize: vertical;
+}
+
+.waypoint-kinds {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.waypoint-kinds legend {
+  margin-bottom: 2px;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+.waypoint-kinds label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 3px var(--space-sm);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.waypoint-kinds label.is-active {
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.waypoint-kinds input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.waypoint-kinds label:has(input:focus-visible) {
+  outline: var(--focus-ring);
+}
+
+.waypoint-coords {
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.waypoint-actions {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.waypoint-delete {
+  padding: var(--space-xs) var(--space-md);
+  background: none;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.waypoint-delete:hover,
+.waypoint-delete.is-confirming {
+  color: var(--danger);
+  border-color: var(--danger);
+}

@@ -17,7 +17,9 @@ from django.db import connection
 from django.db.models import Value
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404
-from rest_framework.decorators import api_view
+from rest_framework.authentication import TokenAuthentication
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from analysis.analyses.elevation import RouteProfile, stitch
@@ -33,6 +35,7 @@ from geodata.assembly import assembled_route, route_for_way
 from geodata.models import Campsite, Trail, TrailRoute
 from geodata.route_rating import config as route_config
 from geodata.route_rating import difficulty, position_along, route_type
+from planning.queries import as_gpx, waypoints_near
 from scoring.config import load as load_scoring_config
 from scoring.engine import score_campsite
 from scoring.verdict import legality_verdict
@@ -298,6 +301,8 @@ def route_detail(route: TrailRoute, within: int) -> dict:
 
 
 @api_view(["GET"])
+@authentication_classes([TokenAuthentication])
+@permission_classes([AllowAny])
 def route_gpx_view(request, osm_id: int):
     """A named route as a GPX 1.1 download (TM05-79): track plus campsite waypoints."""
     try:
@@ -305,10 +310,12 @@ def route_gpx_view(request, osm_id: int):
     except InvalidParameter as exc:
         return _bad_request(exc)
     route = get_object_or_404(TrailRoute, osm_id=osm_id)
-    return gpx_response(route.name, route_gpx(route, within))
+    return gpx_response(route.name, route_gpx(route, within, request.user))
 
 
 @api_view(["GET"])
+@authentication_classes([TokenAuthentication])
+@permission_classes([AllowAny])
 def way_gpx_view(request, source_id: str):
     """A clicked way's trail (TM05-97) as a GPX 1.1 download."""
     try:
@@ -316,12 +323,15 @@ def way_gpx_view(request, source_id: str):
     except InvalidParameter as exc:
         return _bad_request(exc)
     _, route, _ = trail_for_way(source_id)
-    return gpx_response(route.name, route_gpx(route, within))
+    return gpx_response(route.name, route_gpx(route, within, request.user))
 
 
-def route_gpx(route, within: int, extra_waypoints: list[Waypoint] | None = None) -> bytes:
+def route_gpx(
+    route, within: int, user=None, extra_waypoints: list[Waypoint] | None = None
+) -> bytes:
     """The GPX for a stored or assembled route, built from the trail panel's payload so the
-    download matches what the user was looking at (api/gpx.py)."""
+    download matches what the user was looking at (api/gpx.py). A signed-in user's own
+    waypoints within the same distance of the route are added (TM05-80)."""
     detail = route_detail(route, within)
     line_m, _ = stitch(route.geom)
     profile = detail["profile"]
@@ -331,7 +341,11 @@ def route_gpx(route, within: int, extra_waypoints: list[Waypoint] | None = None)
         profile["distance_m"] if profiled else None,
         profile["elevation_m"] if profiled else None,
     )
-    waypoints = campsite_waypoints(detail["campsites"]["items"]) + list(extra_waypoints or [])
+    waypoints = (
+        campsite_waypoints(detail["campsites"]["items"])
+        + as_gpx(waypoints_near(user, line_m, within))
+        + list(extra_waypoints or [])
+    )
     desc = f"{line_m.length / 1000:.1f} km. Campsites within {within} m of the trail."
     if not profiled:
         desc += " Elevation unavailable."

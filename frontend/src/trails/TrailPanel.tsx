@@ -3,8 +3,10 @@
  * campsites along it. Presentational -- TrailInsight owns the data and the map.
  */
 
-import type { ReactNode } from "react";
+import { useState, type MouseEvent, type ReactNode } from "react";
 import { API_BASE_URL } from "../api";
+import { authHeaders } from "../auth";
+import { useSession } from "../session";
 import type { CampsiteAlong, RouteDetail } from "./api";
 import ElevationChart from "./ElevationChart";
 import {
@@ -19,7 +21,7 @@ import {
   percent,
   routeTypeText,
 } from "./format";
-import { gpxPath } from "./gpx";
+import { gpxFilename, gpxPath } from "./gpx";
 import { gradeAt, nearestIndex } from "./profile";
 
 export type DetailState =
@@ -272,18 +274,50 @@ function Readout({
   );
 }
 
-/** TM05-79: the trail as a GPX file, with the campsites currently listed as waypoints. */
+/**
+ * TM05-79: the trail as a GPX file, with the campsites currently listed as waypoints.
+ * Signed in, the file also carries the user's own waypoints near the trail (TM05-80); the
+ * API authenticates with a token header, which a plain link cannot send, so that download
+ * is fetched and saved from a blob instead.
+ */
 function GpxDownload({ detail, withinM }: { detail: RouteDetail; withinM: number }) {
+  const { session } = useSession();
+  const [failed, setFailed] = useState<string | null>(null);
   const path = gpxPath(detail, withinM);
   if (!path) return null;
+  const url = `${API_BASE_URL}${path}`;
+
+  const download = async (event: MouseEvent<HTMLAnchorElement>) => {
+    if (!session) return; // the plain link does it
+    event.preventDefault();
+    setFailed(null);
+    try {
+      const response = await fetch(url, { headers: authHeaders(session) });
+      if (!response.ok) throw new Error(`The server answered ${response.status}.`);
+      const blob = await response.blob();
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = gpxFilename(detail.name);
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    } catch (error) {
+      setFailed(`Download failed: ${(error as Error).message}`);
+    }
+  };
+
+  const within = withinM < 1000 ? `${withinM} m` : `${withinM / 1000} km`;
   return (
     <div className="trail-actions">
-      {/* A plain link: the API answers with Content-Disposition: attachment, so the browser
-          saves the file (the download attribute is ignored across origins). */}
-      <a className="trail-3d-button trail-gpx" href={`${API_BASE_URL}${path}`} download>
+      {/* Signed out, a plain link: the API answers with Content-Disposition: attachment, so
+          the browser saves the file (the download attribute is ignored across origins). */}
+      <a className="trail-3d-button trail-gpx" href={url} download onClick={download}>
         Download GPX
       </a>
-      <span className="trail-3d-hint">Track and campsites within {withinM < 1000 ? `${withinM} m` : `${withinM / 1000} km`}</span>
+      <span className="trail-3d-hint">
+        Track and campsites within {within}
+        {session ? ", plus your waypoints" : ""}
+      </span>
+      {failed && <span className="trail-gpx-error">{failed}</span>}
     </div>
   );
 }
