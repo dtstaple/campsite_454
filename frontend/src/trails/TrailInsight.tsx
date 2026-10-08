@@ -45,6 +45,10 @@ import { sourceIdOf } from "../map/featureIds";
 const TRAIL_SEGMENTS_HIT = "trails-hit";
 const CAMPSITES_POINT = "campsites-point";
 import { placement } from "../waypoints/placement";
+import PlanBuilder from "../plans/PlanBuilder";
+import type { WorkedPlan } from "../plans/api";
+import { draftFor, toggleStop, type PlanDraft } from "../plans/draft";
+import { useSession } from "../session";
 import "./trails.css";
 
 /** Below this zoom a route list would be most of a region; skip the request. */
@@ -77,6 +81,13 @@ export default function TrailInsight({ map, onOpenCampsite, onHoverCampsite }: P
   const [state, setState] = useState<DetailState | null>(null);
   const [cursorM, setCursorM] = useState<number | null>(null);
   const [withinM, setWithinM] = useState(DEFAULT_WITHIN_M);
+
+  // TM05-81: the overnight plan being built for the open trail. Kept here so the Night
+  // buttons in the campsite list and the plan section share it; keyed by trail, so
+  // opening another trail starts empty (plans/draft.ts).
+  const { session } = useSession();
+  const [planDraft, setPlanDraft] = useState<PlanDraft | null>(null);
+  const [worked, setWorked] = useState<WorkedPlan | null>(null);
 
   const line = useMemo<MeasuredLine | null>(
     () =>
@@ -399,6 +410,13 @@ export default function TrailInsight({ map, onOpenCampsite, onHoverCampsite }: P
   };
   const search = <TrailSearch map={map} onPick={pick} />;
 
+  const trailKey = state?.status === "ready" ? state.detail.source_id : null;
+  const draft = trailKey ? draftFor(planDraft, trailKey) : null;
+  const nightOf: Record<string, number> = {};
+  if (draft && worked && worked.trail.source_id === draft.trailKey) {
+    for (const stop of worked.stops) if (draft.stopIds.includes(stop.id)) nightOf[stop.id] = stop.night;
+  }
+
   if (!state) return search;
   return (
     <>
@@ -413,6 +431,26 @@ export default function TrailInsight({ map, onOpenCampsite, onHoverCampsite }: P
       onCampsite={showCampsite}
       onCampsiteHover={(site) => onHoverCampsite?.(site ? site.id : null)}
       onClose={close}
+      planner={
+        state.status === "ready" && draft ? (
+          <PlanBuilder
+            detail={state.detail}
+            session={session}
+            draft={draft}
+            onDraft={setPlanDraft}
+            onWorked={setWorked}
+          />
+        ) : null
+      }
+      stops={
+        session && draft
+          ? {
+              ids: draft.stopIds,
+              nightOf,
+              onToggle: (site) => setPlanDraft(toggleStop(draft, site.id)),
+            }
+          : undefined
+      }
       controls={
         <ThreeDControls
           is3D={is3D}
