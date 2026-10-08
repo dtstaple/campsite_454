@@ -671,6 +671,46 @@ shape as `GET /api/routes/<osm_id>/`, plus `assembled` and `assembly`:
 
 docs/routes.md has the rules and the measurements.
 
+## GPX export (TM05-79)
+
+### `GET /api/routes/<osm_id>/gpx/[?campsites_within_m=500]`
+### `GET /api/trails/<source_id>/gpx/[?campsites_within_m=500]`
+
+These return a trail as a **GPX 1.1** file, for a GPS unit or a phone app. The response
+headers are `Content-Type: application/gpx+xml` and
+`Content-Disposition: attachment; filename="<trail-name>.gpx"`. The second form exports a
+clicked way's trail, the same one `/trail/` returns, so assembled trails can be downloaded
+too. The trail panel's **Download GPX** link uses whichever form fits the open trail.
+
+The file is built from the same payload as the route detail, so it always matches the
+panel. It holds three things, in the element order the schema requires:
+
+| Element | Content |
+|---|---|
+| `<metadata>` | The trail name, a description (length, campsite distance, and "Elevation unavailable" when there is no profile), the export time (UTC), and the bounds. |
+| `<wpt>` (one per campsite) | One for each campsite within `campsites_within_m` (default 500, maximum 5000), in order along the trail. Each has `lat`/`lon`, the campsite's display name as `<name>`, its score, legality verdict and position as `<desc>`, `<sym>Campground</sym>` and `<type>campsite</type>`. |
+| `<trk>` | One `<trkseg>` holding the stitched route line. The points are the line's vertices plus the elevation profile's sample points, merged in order along the trail. |
+
+The `<trk>` points carry `<ele>` (metres, NAVD88, from 3DEP), linearly interpolated from
+the stored profile. When the profile is unavailable, `<ele>` is left out, which GPX allows.
+
+**Coordinate order.** GPX writes latitude first, as `lat="44.18" lon="-73.96"` attributes.
+GeoJSON, used everywhere else in this API, writes longitude first. tests/test_gpx.py checks
+the order against known points.
+
+**Validation.** Every document in tests/test_gpx.py is validated against the official GPX
+1.1 schema. A copy is vendored at tests/fixtures/gpx-1.1.xsd, unchanged from
+topografix.com (sha256 `9e4d1988…f34d6`). The validator is the test-only `xmlschema`
+package; writing GPX uses only the standard library.
+
+**Measured (2026-10-08).** For the Van Hoevenberg Trail (`/api/routes/6619234/gpx/`, 11.4
+km, with a stored profile), the export took 0.5 s and produced 69 KB: 862 track points,
+all with elevation, and 8 campsite waypoints. It passed schema validation.
+
+Errors:
+- **400** for a bad `campsites_within_m`.
+- **404** for an unknown route, or an unnamed or unknown way.
+
 ## Not included yet
 
 **Scored campsites in the map layers.** The layer endpoints above return raw ingested
