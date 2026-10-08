@@ -82,7 +82,7 @@ automatically. An unknown name lists what is available instead of failing obscur
 | `nhd-flowlines` | `WaterFeature` | Streams and rivers from USGS NHD |
 | `nhd-waterbodies` | `WaterFeature` | Lakes, ponds, reservoirs and wetlands from USGS NHD |
 | `ridb` | `Campsite` | Federal campsites from Recreation.gov |
-| `osm-campsites` | `Campsite` | Backcountry campsites from OpenStreetMap |
+| `osm-campsites` | `Campsite` | Backcountry campsites and lean-to shelters from OpenStreetMap |
 
 Naming follows one rule: a source that yields a single dataset gets its bare name
 (`padus`, `ridb`), and a source yielding several gets `source-dataset` (`osm-trails`,
@@ -100,7 +100,7 @@ roughly these numbers, it worked; if it returns a fraction of them, something is
 | `ingest nhd-flowlines adirondacks` | 46,589 | 0 | success |
 | `ingest nhd-waterbodies adirondacks` | 16,818 | 3 | partial |
 | `ingest ridb white-mountains-nh` | 660 | 64 | partial |
-| `ingest osm-campsites adirondacks` | 563 | 0 | success |
+| `ingest osm-campsites adirondacks` | 743 (563 before lean-tos, TM05-75) | 0 | success |
 
 Two things worth noticing. Three of the five finish *partial*, and that is the normal
 outcome — see section 4. And `ridb` is run against the White Mountains rather than the
@@ -380,6 +380,25 @@ becomes `primitive`, `group_only=yes` becomes `group`, a lean-to shelter becomes
 and **everything else stays `unknown`**. `tourism=camp_site` on its own says somebody
 mapped a camping spot, not that it is a developed campground, so promoting the residual to
 `designated` would assert something the source never said.
+
+**Lean-tos (TM05-75).** Most Adirondack lean-tos are mapped as `amenity=shelter` +
+`shelter_type=lean_to`, without `tourism=camp_site`, so the adapter asks for both tag sets
+in one Overpass union. Each run's `parameters.tag_filters` records them.
+
+- **Dedupe.** An element that matches both filters is one row, with site_type `lean_to`.
+  Separate elements a few metres apart (a lean-to and a tent pad, or a numbered pair of
+  lean-tos) are **kept, not merged**. The 2026-10-07 run found 1 lean-to within 15 m of a
+  separately mapped campsite (Panther Gorge Leanto and `node/5042026592`, 12.4 m) and 9
+  lean-to pairs within 15 m of each other.
+- **Effect** (Adirondacks, 2026-10-07): 563 → **743** campsites, all 180 new ones
+  `lean_to`. After `enrich_campsites adirondacks` (137 s), all 743 have elevation and slope,
+  and lean-tos score like any site (median 80). Sites within 500 m of three named routes:
+
+  | Route | Before | After | Of which lean-tos |
+  |---|---|---|---|
+  | Northville-Placid Trail | 28 | 61 | 33 |
+  | Phelps Trail | 14 | 22 | 8 |
+  | Van Hoevenberg Trail | 4 | 8 | 4 |
 
 **RIDB is federal-only.** It covers Forest Service and Park Service land and knows nothing
 about state land. Adirondack Park is New York state land, so running `ingest ridb
