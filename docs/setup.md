@@ -241,6 +241,49 @@ use `make backend` and `make frontend`.
 Open **http://localhost:5173** (see [Troubleshooting](#the-basemap-is-blank) for why
 `localhost`).
 
+### Before a demo: `make prewarm`
+
+The first **Find campsites along this trail** on a trail samples terrain from USGS 3DEP,
+and takes 15–35 s (docs/candidates.md). After that it is cached for 30 days, and comes
+back in milliseconds. To make the first click in a demo instant, warm the trails you will
+show beforehand:
+
+```
+make prewarm                                             # the four demo trails
+make prewarm TRAILS="Van Hoevenberg,Phelps Trail"        # or your own, comma-separated
+.venv/bin/python backend/manage.py prewarm_candidates "Deer Pond Trail" --within 1000
+```
+
+**What it warms.** For each trail it runs the campsite search for the panel's default
+corridor (500 m; use `--within` for another), and computes the trail's elevation profile,
+so opening the panel is instant too. It prints the time each took, and whether it was
+computed now or already cached.
+
+**How names are matched**, the same way the trail panel would open them:
+1. **A named route**, by exact name. Otherwise the longest route whose name starts with
+   it ("Van Hoevenberg" → Van Hoevenberg Trail), otherwise the longest that contains it.
+2. **Otherwise, named trail ways** with exactly that name, opened as assembled trails. Ways
+   of one name that don't connect are separate trails, and each is warmed: "Deer Pond
+   Trail" is two.
+
+An unknown name is reported, the rest are still warmed, and the command then exits with
+an error. Run it with the backend's database up. Run it again any time: cached trails take
+no time.
+
+**Measured (2026-10-08):**
+
+| Trail | First run | Second run |
+|---|---|---|
+| Van Hoevenberg → Van Hoevenberg Trail | already cached | 0.0 s |
+| Phelps Trail | 34.9 s (5 potential spots) | 0.0 s |
+| Deer Pond Trail (3.5 mi piece) | 8.7 s (5) | 0.0 s |
+| Deer Pond Trail (0.5 mi piece) | 3.7 s, plus a 1.5 s profile (1) | 0.0 s |
+| Cheney Pond-Irishtown | 9.4 s (8) | 0.0 s |
+| **Total** | **59.4 s** | **0.6 s** |
+
+Times vary with 3DEP. A 502 from it is retried automatically. If it still fails, that
+trail says "unavailable"; run `make prewarm` again later.
+
 ### Testing on a phone (iPhone or Android)
 
 Location (the GPS dot, **Follow me**, "mi X.X along" a trail) only works over **HTTPS**.

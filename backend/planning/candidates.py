@@ -385,6 +385,8 @@ def find_candidates(route_geom: GEOSGeometry, within_m: float, settings: dict) -
                         "passed": True,
                         "label": (
                             f"At least 150 ft from any mapped trail (nearest {trail_m:.0f} m)."
+                            if trail_m is not None
+                            else "At least 150 ft from any mapped trail."
                         ),
                     },
                     {
