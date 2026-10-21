@@ -86,6 +86,36 @@ def check_python() -> None:
         report("WARN", "python", "not running inside .venv", "make setup (creates .venv)")
 
 
+def check_requirements() -> None:
+    """Every pin in requirements.txt is installed at that version in the running Python."""
+    if sys.prefix == sys.base_prefix:
+        return  # check_python already warns; the system Python is not ours to judge
+    from importlib.metadata import PackageNotFoundError, version
+
+    stale = []
+    for line in (ROOT / "requirements.txt").read_text().splitlines():
+        line = line.split("#", 1)[0].strip()
+        if "==" not in line:
+            continue
+        name, wanted = (part.strip() for part in line.split("==", 1))
+        try:
+            installed = version(name)
+        except PackageNotFoundError:
+            stale.append(f"{name} missing")
+            continue
+        if installed != wanted:
+            stale.append(f"{name} {installed} (want {wanted})")
+    if stale:
+        report(
+            "FAIL",
+            "requirements",
+            ", ".join(stale),
+            ".venv/bin/pip install -r requirements.txt",
+        )
+    else:
+        report("PASS", "requirements", "requirements.txt pins all installed")
+
+
 def check_node() -> None:
     wanted = (ROOT / ".nvmrc").read_text().strip() if (ROOT / ".nvmrc").exists() else "22"
     result = run(["node", "--version"])
@@ -140,8 +170,19 @@ def check_env(env: dict[str, str]) -> None:
             "CORS_ALLOWED_ORIGINS does not include port 5173 (Vite)",
             "CORS_ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173",
         )
+    # Since TM05-113, settings.py only falls back to the dev key when DEBUG=True; with DEBUG
+    # unset (off) and no SECRET_KEY, Django refuses to start.
     if not env.get("SECRET_KEY"):
-        report("WARN", ".env", "SECRET_KEY unset -- settings.py falls back to a dev-only key")
+        if env.get("DEBUG") == "True":
+            report("WARN", ".env", "SECRET_KEY unset -- DEBUG=True, so a dev-only key is used")
+        else:
+            report(
+                "FAIL",
+                ".env",
+                "SECRET_KEY unset and DEBUG is not True -- Django will refuse to start",
+                "add DEBUG=True and SECRET_KEY=<any long random string> to .env "
+                "(see .env.example)",
+            )
     if not env.get("RIDB_API_KEY"):
         report("WARN", ".env", "RIDB_API_KEY empty -- fine; only the optional ridb ingest needs it")
 
@@ -357,6 +398,7 @@ def main() -> int:
     print(f"CampSite doctor -- {platform.system()} {platform.machine()}, repo {ROOT}\n")
     env = read_env()
     check_python()
+    check_requirements()
     check_node()
     check_env(env)
     db_up = check_docker(env)
