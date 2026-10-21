@@ -1,9 +1,119 @@
 # Deployment
 
-This document explains what it would take to host CampSite somewhere other than a
-developer's laptop. **CampSite is not deployed anywhere today.** Nothing here has been run
-against a real hosting provider. The last section lists exactly what was tested and what
-wasn't, so read that before relying on any single claim.
+This document explains how CampSite is hosted. **Since TM05-113 (Oct 20, 2026) it runs on
+Render**, with all three pieces on Render's free tier. The next section covers the live
+deployment, what it costs, and how to redeploy it. The rest explains the reasoning, and the
+last sections list exactly what was tested.
+
+## The live deployment (TM05-113)
+
+| Piece | Where | Render plan |
+|---|---|---|
+| Frontend | https://campsite-web-tt5e.onrender.com | Static site, free |
+| Backend API | https://campsite-api-70v0.onrender.com (`/api/health/`) | Docker web service, free |
+| Database | `campsite-db`, PostgreSQL 16 + PostGIS, Oregon | Postgres, free (1 GB) |
+
+Everything is defined in **`render.yaml`** at the repo root (a Render Blueprint):
+
+- the backend image is built from `backend/Dockerfile`, and
+- the frontend from `frontend/` with `npm ci && npm run build`.
+
+The services are deployed from Bleron Balidemaj's fork, `BleronBalidem/campsite_454`,
+because Render can only connect to repositories its GitHub user can grant access to.
+Render redeploys on every push to the branch the Blueprint tracks.
+
+**What was done.**
+
+1. **Production image.** The `backend/Dockerfile` uses the CI recipe for GDAL/GEOS.
+   - At build time it runs `collectstatic`, so whitenoise serves the admin's files.
+   - On every start it runs `migrate` and then gunicorn, because the free tier has no
+     pre-deploy step.
+2. **Production settings that fail closed** (`backend/config/settings.py`).
+   - `DEBUG` defaults to off.
+   - A missing `SECRET_KEY` with DEBUG off stops Django.
+   - `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS` and `CSRF_TRUSTED_ORIGINS` come from the
+     environment, and Render's own hostname is added automatically.
+   - `BEHIND_TLS_PROXY=True` turns on `SECURE_PROXY_SSL_HEADER`, the HTTPS redirect, secure
+     cookies and HSTS.
+   - These are covered by `tests/test_production_settings.py`.
+3. **Data.** The database was filled from the `dev-data-2026-10-13` GitHub Release snapshot
+   (1,501 campsites, 25,663 trails, 76,551 water features, 2,488 public-land areas;
+   329 MB of the 1 GB). See "Restoring the snapshot" below.
+4. **Basemap.** Stadia Maps (`alidade_smooth_dark`) on a free Stadia property.
+   - It uses **domain authentication**: the frontend domain is registered with the
+     property, so no API key appears in the public bundle.
+   - Tile requests from the site return 200, and the same request without the domain
+     returns 401.
+5. **Smoke test.** `scripts/smoke_test.sh <backend-url> <frontend-url>` checks:
+   - health,
+   - DEBUG off,
+   - the frontend and a client-side route,
+   - CORS,
+   - map data,
+   - register and login,
+   - save, list and unsave,
+   - logout.
+
+   It passed 13/13 against the live URLs.
+
+**Cost: $0 a month today.** The limits that matter:
+
+- **The free database expires 30 days after creation (around Nov 19, 2026).** Render then
+  gives a 14-day grace period before deleting it. To keep the deployment, upgrade
+  `campsite-db` to a paid plan before then, or create a new free database and restore the
+  snapshot into it again.
+- The free backend **sleeps after 15 minutes without traffic**. The next request takes
+  about a minute while it wakes, so open the site a minute before a demo.
+- Free web services share 750 instance hours a month per workspace, which covers one
+  always-on service.
+- There are no backups on the free database. The data can always be restored from the
+  GitHub Release snapshot, but accounts and saved campsites cannot.
+
+### Redeploying
+
+- **Code changes.** Push to the tracked branch. Render rebuilds both services, and the
+  backend migrates on start.
+  - Without auto-deploy, use **Manual Deploy → Deploy latest commit** on each service.
+- **Changing an environment variable.**
+  - On `campsite-api`: **Environment**, then **Save, rebuild, and deploy**.
+  - On `campsite-web`, the `VITE_*` values are baked into the bundle at build time, so it
+    must be rebuilt: **Manual Deploy → Clear build cache & deploy**.
+- **A new backend or frontend URL.** These four values must all agree:
+
+  | Service | Variable | Value |
+  |---|---|---|
+  | `campsite-api` | `CORS_ALLOWED_ORIGINS` | the frontend origin |
+  | `campsite-api` | `CSRF_TRUSTED_ORIGINS` | the frontend origin |
+  | `campsite-web` | `VITE_API_BASE_URL` | the backend URL, with no trailing slash |
+  | Stadia property | domain list | the frontend domain |
+
+- **Checking a deploy.**
+  `scripts/smoke_test.sh https://campsite-api-70v0.onrender.com https://campsite-web-tt5e.onrender.com`
+
+### Restoring the snapshot
+
+Restoring is how a fresh database gets its data (and how to rebuild it after the free
+database expires).
+
+**Use PostgreSQL 16 client tools.** The snapshot is a PG16 custom-format dump, which older
+`pg_restore` versions (Homebrew's 14, for example) cannot read. Running the tools from the
+`postgis/postgis:16-3.4` image avoids that.
+
+**Use the External Database URL** from **campsite-db → Connect → External**.
+
+1. Enable PostGIS:
+   `psql "$URL" -c 'CREATE EXTENSION IF NOT EXISTS postgis;'`
+2. **If the backend has already started**, it has migrated the empty database. Some of
+   those tables (for example `planning_hike`) are newer than the snapshot and block
+   `pg_restore --clean`. Drop every table in `public` except `spatial_ref_sys` first.
+3. Restore with the same table-of-contents filter that `make restore` uses, also skipping
+   `COMMENT - EXTENSION`, which only a superuser may run:
+   ```
+   pg_restore -l campsite-2026-10-13.dump | grep -v -e " SCHEMA - public " -e "COMMENT - EXTENSION" > list
+   pg_restore -d "$URL" --no-owner --no-acl -L list campsite-2026-10-13.dump
+   ```
+4. Restart `campsite-api` (**Manual Deploy → Restart service**). Its start-up `migrate`
+   adds the migrations the snapshot predates.
 
 ## The three pieces
 
@@ -127,14 +237,19 @@ into the frontend build.
 | Variable | Production | Notes |
 |---|---|---|
 | `DATABASE_URL` | **Required** | The only database setting. Django refuses to start without it. Add `?sslmode=require` for hosted databases. |
-| `SECRET_KEY` | **Required** | Must be a long random value. If unset, settings fall back to an insecure dev key **without complaining**, so a missing value in production would go unnoticed. |
-| `DEBUG` | **Must be `False`** | If unset it defaults to `True`, so production must set it explicitly. With `DEBUG=True`, error pages leak settings and code. |
-| `ALLOWED_HOSTS` | **Required** | Comma-separated hostnames the API is served on, e.g. `api.example.com`. The default only allows localhost. |
+| `SECRET_KEY` | **Required** | Must be a long random value; on Render it is generated by the Blueprint. With `DEBUG` off, Django refuses to start without it. Only `DEBUG=True` falls back to a dev key. |
+| `DEBUG` | **`False`** | Defaults to `False` (TM05-113), so production fails closed. Development sets `True` in `.env`. With `DEBUG=True`, error pages leak settings and code. |
+| `ALLOWED_HOSTS` | **Required** | Comma-separated hostnames the API is served on, e.g. `api.example.com`. The default only allows localhost. On Render, `RENDER_EXTERNAL_HOSTNAME` is added automatically. |
 | `CORS_ALLOWED_ORIGINS` | **Required** | The frontend's exact origin, e.g. `https://campsite.example.com`. Without it the browser blocks every API call from the deployed frontend. |
+| `CSRF_TRUSTED_ORIGINS` | **Required** | The frontend's origin again, for the Django admin's login form. |
+| `BEHIND_TLS_PROXY` | **`True`** | Behind a TLS-terminating proxy (Render). Turns on `SECURE_PROXY_SSL_HEADER`, the HTTPS redirect (except `/api/health/`), secure cookies and HSTS (`SECURE_HSTS_SECONDS`, default 3600). Leave unset locally. |
+| `THROTTLE_NUM_PROXIES` | `1` on Render | How many proxies sit in front of Django, so login and register throttle on the real client IP. |
+| `PORT`, `WEB_CONCURRENCY` | Optional | Read by the Docker image's start command: the port gunicorn binds (Render sets it) and the worker count (default 2, sized for 512 MB). |
 | `RIDB_API_KEY` | Ingestion only | Needed where `manage.py ingest ridb` runs. The web server never uses it. |
 | `GDAL_LIBRARY_PATH`, `GEOS_LIBRARY_PATH` | **Do not set** | Development-only macOS paths; see above. |
 | `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_PORT` | Not used | Only read by `docker-compose.yml` to create the local dev database. |
 | `VITE_API_BASE_URL` | **Build-time** | Read by the frontend build, not by any server. See the next section. |
+| `VITE_MAP_STYLE_URL` | **Build-time** | The basemap style. Production uses Stadia's `alidade_smooth_dark` with domain authentication, so no key is in the URL. |
 
 Secrets belong in the host's secret or environment configuration, never in a committed
 file. Only `.env.example` files with placeholders are in git.
@@ -158,17 +273,25 @@ follow from that:
 - The value is **public**. Anyone can read it in the bundle, so no `VITE_*` variable may
   ever hold a secret.
 
-As of this story the app only logs `VITE_API_BASE_URL`; it doesn't fetch map data yet.
-The build also warns that the JS bundle is ~1.2 MB (343 KB gzipped), almost all of it
-MapLibre. That's acceptable, but it could be split later. The basemap style comes from
-`demotiles.maplibre.org`, a demo service that isn't meant for production traffic. A real
-deployment needs a proper tile provider.
+The build warns that the JS bundle is about 1.5 MB (427 KB gzipped), almost all of it
+MapLibre. That is acceptable for now, but it could be split later.
 
-## What is still missing for a real deployment
+## The original gap list, and how TM05-113 closed it
 
-The app is portable across databases today, but it isn't production-ready. Running
-`manage.py check --deploy` with `DEBUG=False` and a real `SECRET_KEY` reports four
-warnings, and several more gaps exist beyond those:
+This section was written before the app was deployed, and the list below is kept for its
+reasoning. TM05-113 closed most of it:
+
+- HTTPS comes from Render, with the hardening flags set when `BEHIND_TLS_PROXY=True`.
+- gunicorn serves the API.
+- `DEBUG`, `SECRET_KEY`, `ALLOWED_HOSTS`, CORS and CSRF now fail closed.
+- `STATIC_ROOT` and whitenoise are set up.
+- `migrate` runs on every start.
+- The demo basemap is replaced by Stadia.
+
+**Still open: backups and monitoring.** The free database has no backups, and there is no
+error reporting or uptime monitoring.
+
+The original list follows.
 
 - **HTTPS.** Nothing terminates TLS. That is usually done by the platform's load balancer
   or a reverse proxy. Once HTTPS is in place, `SECURE_SSL_REDIRECT`, `SECURE_HSTS_SECONDS`,
@@ -229,6 +352,20 @@ large White Mountain National Forest parcel is still skipped as invalid, so the 
 public-land units may be missing from the full database.
 
 ## What was tested and what wasn't
+
+**TM05-113 (Oct 20, 2026).**
+
+- The `backend/Dockerfile` image was built locally and run against the restored snapshot:
+  - migrations ran on start;
+  - `/api/health/` returned 200 over plain HTTP, and other paths redirected to HTTPS;
+  - the admin's CSS was served by whitenoise;
+  - the smoke test passed all its backend checks;
+  - the full pytest suite passed inside the image (964 tests, 94.6% coverage).
+- The restore, including dropping the tables an early `migrate` had created, was rehearsed
+  on a throwaway PostGIS container before it was run against Render.
+- On Render, `scripts/smoke_test.sh` passed 13/13 against the live URLs.
+
+The notes below are from the earlier, pre-deployment story.
 
 Tested for this story on macOS (Apple Silicon), with the backend running in the Debian
 image above:
