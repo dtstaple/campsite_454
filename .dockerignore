@@ -1,0 +1,19 @@
+# Keep secrets, dumps and local build output out of the Docker build context (TM05-113).
+.env
+.env.*
+!.env.example
+**/.env
+dumps/
+*.dump
+*.sql
+*.sql.gz
+.git/
+.venv/
+**/__pycache__/
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+frontend/
+artifacts/
+docs/
