@@ -10,6 +10,7 @@ from api.routes import (
     way_gpx_view,
     way_trail_view,
 )
+from api.tiles import tile_view
 from api.views import layer_view, map_data_view
 
 urlpatterns = [
@@ -22,6 +23,8 @@ urlpatterns = [
     path("public-land/", layer_view, {"layer": "public-land"}, name="public-land"),
     path("peaks/", layer_view, {"layer": "peaks"}, name="peaks"),
     path("trailheads/", layer_view, {"layer": "trailheads"}, name="trailheads"),
+    # TM05-140: trails, water and public land as vector tiles (api/tiles.py).
+    path("tiles/<slug:layer>/<int:z>/<int:x>/<int:y>.mvt", tile_view, name="tile"),
     path("routes/", routes_view, name="routes"),
     path("routes/search/", route_search_view, name="route-search"),
     path("regions/", regions_view, name="regions"),

@@ -16,6 +16,7 @@
 import type * as maplibregl from "maplibre-gl";
 import { CONTOUR_LINE_LAYER } from "../map/contours";
 import { SLOPE_LAYER } from "../slope/slopeLayer";
+import { IMAGERY_ONLY } from "../map/tileLayers";
 import { numericToken, token } from "../theme";
 
 export const IMAGERY_SOURCE = "esri-world-imagery";
@@ -76,6 +77,8 @@ export function addImageryLayers(map: maplibregl.Map): void {
         id: TRAILS_CASING,
         type: "line",
         source: "trails",
+        "source-layer": "trails",
+        metadata: { [IMAGERY_ONLY]: true },
         layout: { visibility: "none", "line-cap": "round", "line-join": "round" },
         paint: {
           "line-color": casing,
@@ -92,6 +95,8 @@ export function addImageryLayers(map: maplibregl.Map): void {
         id: WATER_CASING,
         type: "line",
         source: "water",
+        "source-layer": "water",
+        metadata: { [IMAGERY_ONLY]: true },
         filter: ["==", ["geometry-type"], "LineString"],
         layout: { visibility: "none" },
         paint: {
@@ -106,8 +111,16 @@ export function addImageryLayers(map: maplibregl.Map): void {
 }
 
 export function setImageryVisible(map: maplibregl.Map, visible: boolean): void {
-  const value = visible ? "visible" : "none";
-  for (const id of [IMAGERY_LAYER, TRAILS_CASING, WATER_CASING]) {
-    if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", value);
+  if (map.getLayer(IMAGERY_LAYER)) {
+    map.setLayoutProperty(IMAGERY_LAYER, "visibility", visible ? "visible" : "none");
+  }
+  // A casing shows only while the line it edges does: trails or water may be toggled off.
+  for (const [casing, line] of [
+    [TRAILS_CASING, "trails-line"],
+    [WATER_CASING, "water-line"],
+  ]) {
+    if (!map.getLayer(casing)) continue;
+    const lineOn = map.getLayoutProperty(line, "visibility") !== "none";
+    map.setLayoutProperty(casing, "visibility", visible && lineOn ? "visible" : "none");
   }
 }

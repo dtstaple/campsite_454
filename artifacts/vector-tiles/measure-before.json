@@ -1,0 +1,95 @@
+{
+  "label": "before",
+  "results": [
+    {
+      "session": "Adirondacks overview (z8)",
+      "notice": "Zoom in to see all features — showing 1,000 of 1,742 public land.",
+      "requests": 1,
+      "kb": 502.4,
+      "final_requests": 1,
+      "final_kb": 502.4,
+      "load_ms": 2492,
+      "round": 1
+    },
+    {
+      "session": "High Peaks (z12)",
+      "notice": "",
+      "requests": 1,
+      "kb": 97.8,
+      "final_requests": 0,
+      "final_kb": 0,
+      "load_ms": 756,
+      "round": 1
+    },
+    {
+      "session": "Marcy Dam (z15)",
+      "notice": "",
+      "requests": 2,
+      "kb": 173.3,
+      "final_requests": 1,
+      "final_kb": 18.3,
+      "load_ms": 457,
+      "round": 1
+    },
+    {
+      "session": "Adirondacks overview (z8)",
+      "notice": "Zoom in to see all features — showing 1,000 of 1,742 public land.",
+      "requests": 2,
+      "kb": 650.7,
+      "final_requests": 1,
+      "final_kb": 502.2,
+      "load_ms": 1574,
+      "round": 2
+    },
+    {
+      "session": "High Peaks (z12)",
+      "notice": "",
+      "requests": 1,
+      "kb": 97.9,
+      "final_requests": 0,
+      "final_kb": 0,
+      "load_ms": 1233,
+      "round": 2
+    },
+    {
+      "session": "Marcy Dam (z15)",
+      "notice": "",
+      "requests": 2,
+      "kb": 173.2,
+      "final_requests": 1,
+      "final_kb": 18.3,
+      "load_ms": 441,
+      "round": 2
+    },
+    {
+      "session": "Adirondacks overview (z8)",
+      "notice": "Zoom in to see all features — showing 1,000 of 1,742 public land.",
+      "requests": 2,
+      "kb": 650.8,
+      "final_requests": 1,
+      "final_kb": 502.3,
+      "load_ms": 1680,
+      "round": 3
+    },
+    {
+      "session": "High Peaks (z12)",
+      "notice": "",
+      "requests": 1,
+      "kb": 97.8,
+      "final_requests": 0,
+      "final_kb": 0,
+      "load_ms": 1316,
+      "round": 3
+    },
+    {
+      "session": "Marcy Dam (z15)",
+      "notice": "",
+      "requests": 2,
+      "kb": 173.3,
+      "final_requests": 1,
+      "final_kb": 18.3,
+      "load_ms": 455,
+      "round": 3
+    }
+  ]
+}

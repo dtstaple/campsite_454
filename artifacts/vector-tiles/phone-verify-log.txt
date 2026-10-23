@@ -1,0 +1,7 @@
+tile responses: {"public-land 200":6,"water 200":6,"trails 200":6}
+"showing X of Y" notices: 0
+water popup: WATER Marcy Brook Type Stream or river Flow Year-round ×
+trail panel: Van Hoevenberg Trail
+3D pressed: true
+layer panel collapsed on this size; toggle skipped
+after: {"public-land 200":21,"water 200":21,"trails 200":21}

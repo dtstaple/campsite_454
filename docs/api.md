@@ -1,6 +1,6 @@
 # Map data API
 
-Written for the frontend. Everything here returns GeoJSON you can hand straight to
+Written for the frontend. Everything here except the vector tiles returns GeoJSON you can hand straight to
 MapLibre as a source — no reshaping needed.
 
 The server runs at `http://localhost:8000` by default (`python manage.py runserver` from
@@ -22,6 +22,7 @@ weights ([Scoring weights](#scoring-weights-tm05-46)).
 | `GET /api/peaks/` | Peaks, with elevation — points (TM05-89) |
 | `GET /api/trailheads/` | Trailheads — points (TM05-89) |
 | `GET /api/map-data/` | The first four at once, for the initial load; peaks and trailheads on request with `layers=` |
+| `GET /api/tiles/<layer>/<z>/<x>/<y>.mvt` | Trails, water and public land as Mapbox Vector Tiles, which is what the map draws them from. See [Vector tiles](#vector-tiles-tm05-140) |
 | `GET /api/campsites/<id>/detail/` | One campsite with its derived facts — see [Campsite detail](#campsite-detail-tm05-64) |
 | `GET /api/routes/` | Named hiking routes in a bbox — see [Named routes](#named-routes-tm05-60) |
 | `GET /api/routes/<osm_id>/` | One route: stats, elevation profile, campsites along it with scores |
@@ -306,6 +307,12 @@ so it costs nothing on normal requests.
 
 On `/api/map-data/` each layer reports its own `metadata`, and the top-level `metadata`
 has a `truncated` flag that is `true` if *any* layer truncated.
+
+**The map no longer meets the cap for trails, water or public land.** Since TM05-140 it
+draws those three layers from [vector tiles](#vector-tiles-tm05-140), which are never
+capped. Only campsites still come from `/api/map-data/`, so a "showing X of Y" notice
+can now only be about campsites. The GeoJSON endpoints keep their cap for any other
+caller.
 
 ---
 
@@ -1230,6 +1237,96 @@ the request can't be routed:
 - there is no graph built for the region yet
 
 **404** for a path that isn't a route id.
+
+## Vector tiles (TM05-140)
+
+### `GET /api/tiles/<layer>/<z>/<x>/<y>.mvt`
+
+Trails, water and public land as [Mapbox Vector Tiles](https://github.com/mapbox/vector-tile-spec)
+2.1, built per request by PostGIS `ST_AsMVT` (code: `backend/api/tiles.py`).
+
+- **Layers.** `layer` is `trails`, `water` or `public-land`. Each tile holds one MVT
+  layer of that name, so a MapLibre layer's `source-layer` is the same string.
+- **Zooms.** `z` runs from 0 to 14. Beyond 14 the endpoint returns **404**, and MapLibre
+  overzooms the z14 tile (the source's `maxzoom` is 14). At 4,096 units across, a z14
+  tile already resolves under a metre in the Adirondacks.
+- **Empty tiles.** A tile with nothing in it, or one below the layer's minimum zoom, is a
+  **204** with no body. MapLibre treats that as an empty tile.
+- **Other errors.** An unknown layer, `x` or `y` outside 0…2^z−1, or `z > 14` is a 404.
+- **Headers.** `Content-Type: application/vnd.mapbox-vector-tile` and
+  `Cache-Control: public, max-age=3600, stale-while-revalidate=86400`. Tiles change only
+  when an ingest runs. Responses are gzipped when the browser accepts it.
+- **No authentication.** Nothing in a tile depends on the user. Campsites stay on
+  `/api/map-data/` because their colours come from the signed-in user's weights.
+- **Feature ids.** Each feature's id is the row's integer primary key; MVT ids must be
+  integers. The string id the trail panel fetches by (`"way/123"`) is the `source_id`
+  attribute, where `sourceIdOf()` already reads it.
+
+#### What each layer carries, by zoom
+
+| Layer | From zoom | Rows | Attributes |
+|---|---|---|---|
+| `trails` | 9 | all | `source_id`, `name`, `trail_type`, `length_m` at every zoom: a trail is clickable wherever it is drawn |
+| `water` | 9 | Zooms 9–10: lakes, wetlands and perennial streams. From 11: every intermittent or unknown-flow stream too. | `source_id`, `name`, `feature_type`, and from zoom 12 `perennial` |
+| `public-land` | 0 | all | `source_id`, `name`, `public_access`, and from zoom 10 `manager`, `designation`, `gap_status` |
+
+**Geometry handling.**
+
+- **Simplified at low zoom.** Below zoom 13 (12 for public land), geometry is simplified
+  to half a tile pixel. From there up, the only loss is ST_AsMVTGeom's snap to the
+  4,096 grid.
+- **Clipped before reprojecting.** Each geometry is cut to the tile, with a 64-unit
+  buffer, before it is transformed. A PAD-US parcel that spans the country costs one
+  tile's worth of work.
+- **No seams.** The same buffer keeps lines and polygon edges continuous where tiles
+  meet.
+
+#### Adding a layer
+
+1. Add a `TileLayer` to `TILE_LAYERS` in `backend/api/tiles.py`:
+
+   ```python
+   "peaks": TileLayer(
+       name="peaks",
+       model=Landmark,
+       minzoom=10,
+       attributes=((0, ("source_id", "name")), (12, ("elevation_m",))),
+       thin=((12, "elevation_m > 1200"),),  # optional: below zoom 12, only the high ones
+   ),
+   ```
+
+   The model needs an SRID 4326 `geom` with a spatial index; every model in `geodata`
+   has one. `thin` conditions are constant SQL on the model's columns.
+2. On the frontend, add the layer and its minzoom to `TILED` in
+   `frontend/src/map/tileLayers.ts`, plus a `LAYERS` entry and draw layers in
+   `map/layers.ts`. Give each draw layer `"source-layer": "<name>"`.
+3. Add a test beside `tests/test_api_tiles.py`'s attribute-per-zoom tests.
+
+#### Measured: before and after (2026-10-23)
+
+The method:
+
+- Local dev servers, headless Chrome at 1440×900, with a fresh browser profile per
+  session, so nothing is cached.
+- Each session opens the app located at its centre (zoom 12) and zooms with the keyboard
+  to its target. It ends when no layer request has been in flight for 3 s.
+- **Data** is the on-the-wire (gzipped) bytes of layer-data responses for the whole
+  session: `/api/map-data/` before, `/api/tiles/` after.
+- **Load** is from the last zoom step (for High Peaks, from the first layer request) to
+  the last layer response.
+- Each session ran three times. The medians are below, with the range in brackets.
+
+| Session | Before: data | Before: load | After: data | After: load | What the map shows |
+|---|---|---|---|---|---|
+| Adirondacks overview, z8 | 651 KB (502–651), 1–2 requests | 1.68 s (1.57–2.49) | 442 KB (366–541), 26–53 tiles | 0.46 s (0.41–1.98) | Before: 1,000 of 1,742 public-land parcels, with a notice. After: all 1,742. |
+| High Peaks, z12 | 98 KB, 1 request | 1.23 s (0.76–1.32) | 119 KB, 36 tiles | 1.02 s (0.65–1.06) | The same features. |
+| Marcy Dam, z15 | 173 KB, 2 requests | 0.46 s (0.44–0.46) | 87 KB, 42 tiles | 0.06 s (0.03–0.75) | The same features. Zooming from 12 to 15 reuses the z12–14 tiles already loaded. |
+
+Tiles also revisit for free: a pan back, or a zoom back out, is served from the browser
+cache with no request at all. The GeoJSON path re-requested any viewport that missed its
+40-entry cache. A cold tile costs 1–10 ms of database time from zoom 11 up, and
+50–160 ms for the densest zoom 9 tiles (`tests/test_api_tiles.py` covers correctness,
+not timing).
 
 ## Not included yet
 
