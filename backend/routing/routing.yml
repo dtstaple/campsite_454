@@ -1,0 +1,31 @@
+# Routing settings (TM05-119, TM05-137). docs/routing.md explains each one.
+#
+# Changing a build setting takes effect on the next `build_trail_graph`; changing a
+# snapping setting takes effect on the next request.
+
+build:
+  # Elevation sample spacing along every edge, metres.
+  sample_spacing_m: 50
+  # Near-miss gaps: a trail's loose end this close to another trail (or two trails that
+  # cross) is joined with a "bridged" edge, though OSM gives them no shared node.
+  bridge_tolerance_m: 15
+  # Ways tagged like this are never joined where they cross: they pass over or under.
+  no_crossing_tags: [bridge, tunnel, layer]
+
+connectors:
+  # Roads and sidewalks (geodata.Connector) are kept only this far, by road, from the
+  # trail network, so a road walk between two trails is at most about twice this.
+  max_from_trail_m: 1000
+  # Cost multiplier on a road walk: a route leaves trail only when that saves enough.
+  cost_factor: 1.5
+
+snapping:
+  # How far a click may be from a trail, metres.
+  radius_m: 1000
+  # Nearby edges considered per click when choosing the connected piece of the network.
+  candidates: 40
+  # A piece of the network with less trail than this is a fragment (a few paths round a
+  # lodge, say). Snapping to one costs this many extra metres, so a main-network trail
+  # nearby wins.
+  fragment_max_km: 2
+  fragment_penalty_m: 300

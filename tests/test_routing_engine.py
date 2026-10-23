@@ -117,3 +117,22 @@ def test_a_copy_takes_new_nodes_without_changing_the_original():
 def test_an_edge_needs_both_nodes():
     with pytest.raises(RoutingError, match="no coordinates"):
         Graph({A: (0, 0)}, [Edge(1, A, B, 10)])
+
+
+def test_a_cost_factor_makes_an_edge_dearer_for_both_costs():
+    # T sits 943 m from both A and B, so each 1,400 m trail edge is longer than its chord.
+    road = Graph(
+        {A: (0, 0), B: (1000, 0), T: (500, 800)},
+        [Edge(1, A, B, 1000, factor=1.5), Edge(2, A, T, 1400), Edge(3, T, B, 1400)],
+    )
+    # 1,000 m of road at 1.5x costs 1,500; 2,800 m of trail costs 2,800: the road still wins.
+    assert route(road, A, B, cost="distance").nodes == [A, B]
+    road.remove_edge(1)
+    road.add_edge(Edge(4, A, B, 1000, factor=3.0))  # 3,000 > 2,800: now the trail wins
+    assert route(road, A, B, cost="distance").nodes == [A, T, B]
+    assert route(road, A, B, cost="naismith").nodes == [A, T, B]
+
+
+def test_a_cost_factor_below_one_is_refused():
+    with pytest.raises(RoutingError, match="must be >= 1"):
+        Edge(1, A, B, 10, factor=0.5)
