@@ -84,6 +84,7 @@ automatically. An unknown name lists what is available instead of failing obscur
 | `ridb` | `Campsite` | Federal campsites from Recreation.gov |
 | `osm-campsites` | `Campsite` | Backcountry campsites and lean-to shelters from OpenStreetMap |
 | `osm-landmarks` | `Landmark` | Peaks (name, elevation) and trailheads (name) from OpenStreetMap |
+| `osm-connectors` | `Connector` | Roads and sidewalks between trails, for the routing graph's road walks (TM05-137) |
 
 Naming follows one rule: a source that yields a single dataset gets its bare name
 (`padus`, `ridb`), and a source yielding several gets `source-dataset` (`osm-trails`,
@@ -436,6 +437,32 @@ point.
 - **Measured (2026-10-13).** `ingest osm-landmarks adirondacks` loaded 1,839 rows in
   40 s with status success: 1,748 peaks, 1,707 of them with a usable elevation, and 91
   trailheads. Overpass answered 504 twice and the retries recovered.
+
+### osm-connectors (TM05-137)
+
+The roads and sidewalks a hiker walks between trails, written to `geodata.Connector`. The
+routing graph (`docs/routing.md`, "Forgiving connections") uses the stretches within
+1 km of a trail as road walks. Connectors are never drawn or searched.
+
+```
+.venv/bin/python backend/manage.py ingest osm-connectors adirondacks
+```
+
+- **What it fetches:**
+  - secondary, tertiary, unclassified, residential, living_street and service roads
+  - footways tagged `footway=sidewalk|crossing`, which the trail ingest excludes
+- **What it leaves out:**
+  - primary, trunk and motorway roads
+  - `access=private|no` or `foot=no`
+  - parking aisles and drive-throughs
+- **Driveways** (`service=driveway`) are fetched, but the graph keeps one only where it
+  meets a trail.
+- **Same node-id contract as Trail:** ordered `osm_node_ids`, one per vertex.
+- **Tiles:** 0.5°, since roads are denser than trails around towns.
+- **Measured (2026-10-23):** `ingest osm-connectors adirondacks` loaded 70,773 rows in
+  14.2 min with status success.
+- **After it, run `build_trail_graph <region>`.** `make data` runs both (the
+  `osm-connectors` and `trail-graph` steps).
 
 ### osm-routes (TM05-58)
 

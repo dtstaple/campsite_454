@@ -1180,12 +1180,14 @@ the user's own waypoints, as for a trail.
 ```
 
 - `points`: `[lon, lat]`, start first and end last, 2 to 10 of them. Stops between are
-  visited in order. Each snaps to the nearest trail vertex within 400 m.
+  visited in order. Each snaps to the nearest point on a trail segment within 1 km, all
+  on one connected piece of the network (TM05-137, `docs/routing.md`).
 - `cost`: `naismith` (default: quickest by Naismith's rule) or `distance` (shortest).
 
-**Route id**: `<region>:<cost>:<node>,<node>,...`, the OSM node ids the points snapped to,
-e.g. `adirondacks:naismith:2306094170,4252860218,2306094170`. It re-solves to the same
-route while the trails are unchanged.
+**Route id**: `<region>:<cost>:<stop>,<stop>,...`. A stop is `w<way>-<decimetres>` (a
+point that far along OSM trail way `<way>`), or an OSM node id at a junction. For
+example: `adirondacks:naismith:w1509987586-4120,2306094170`. It re-solves to the same
+route while the trails are unchanged. TM05-119's all-node ids still work.
 
 **Response**: the route detail of [`GET /api/routes/<osm_id>/`](#get-apiroutesosm_id),
 with `osm_id: null`, `source_id: "planned/<digest>"` and `name: "Route via …"`, plus:
@@ -1195,9 +1197,11 @@ with `osm_id: null`, `source_id: "planned/<digest>"` and `name: "Route via …"`
   "id": "adirondacks:naismith:2306094170,4252860218,2306094170",
   "region": "adirondacks",
   "cost": "naismith",
-  "stops": [{"node_id": 2306094170, "lon": -73.958, "lat": 44.183, "trail_name": "Van Hoevenberg Trail", "snapped_m": 12.4}, …],
+  "stops": [{"token": "w1509987586-4120", "node_id": null, "lon": -73.958, "lat": 44.183, "trail_name": "Van Hoevenberg Trail", "snapped_m": 12.4}, …],
   "legs": [{"from": "…", "to": "…", "length_m": 11372.9, "ascent_m": 1051.2, "descent_m": 61.0, "naismith_s": 14495}, …],
-  "trails": [{"name": "Van Hoevenberg Trail", "length_m": 11372.9}, …],
+  "trails": [{"name": "Van Hoevenberg Trail", "kind": "trail", "length_m": 11372.9},
+             {"name": "Blue Ridge Road", "kind": "road walk", "length_m": 67.2}, …],
+  "off_trail": {"road_walk_m": 67.2, "track_m": 0.0, "bridged_m": 3.1},
   "graph_totals": {"length_m": …, "ascent_m": …, "descent_m": …, "naismith_s": …},
   "timing_ms": {"snap": 31.2, "graph_load": 0.4, "graph_was_cached": true, "search": 18.9,
                 "assemble": 6.1, "nodes_settled": 4210, "total": 512.0}
@@ -1205,15 +1209,23 @@ with `osm_id: null`, `source_id: "planned/<digest>"` and `name: "Route via …"`
 ```
 
 - `snapped_m` is click to vertex, and `null` when the route was opened from its id.
-- `trails` lists every trail the route uses, in the order it first reaches it, with the
-  distance on each ("Unnamed path" for ways without a name).
+- `trails` lists everything the route uses, in the order it first reaches it, with the
+  distance on each. `kind` is `trail`, `track`, `road walk` (a road or sidewalk between
+  trails), or `gap bridged` (a few metres the map leaves between two trails that meet).
+  Unnamed ones read "Unnamed path", "Unnamed track", "Unnamed road" or "Gap between mapped
+  trails".
+- `off_trail` totals how much of the route leaves trail (TM05-137).
+- `stops[].node_id` is `null` for a stop between junctions.
 - `graph_totals` are the graph's own (50 m samples). The panel's stats are the profile's,
   as for any trail.
 
 **Errors**: **400** for a bad `campsites_within_m`. **422** with `{"error": "…"}` when
 the request can't be routed:
-- a point is more than 400 m from any trail
-- consecutive stops aren't connected ("The trails don't connect A to B …")
+- a point is more than 1 km from any trail
+- the points aren't on one connected network. The error names the nearest point where a
+  connected route is possible, and the body adds
+  `"suggestion": {"lon", "lat", "trail_name", "distance_m", "instead_of": "start" | "stop"}`.
+- consecutive stops of a route id aren't connected ("The trails don't connect A to B …")
 - a route id names a node no longer on the graph
 - there is no graph built for the region yet
 
