@@ -17,6 +17,7 @@ To add a source: create a module here, subclass SourceAdapter, decorate it with
 from pipeline.adapters import (  # noqa: E402,F401  (order deliberate)
     nhd,
     osm_campsites,
+    osm_connectors,
     osm_landmarks,
     osm_routes,
     osm_trails,

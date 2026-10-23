@@ -217,6 +217,28 @@ class Landmark(SourceRecord):
         indexes = [models.Index(fields=["kind"])]
 
 
+class Connector(SourceRecord):
+    """
+    A road or sidewalk a hiker may walk between two trails (TM05-137): minor and
+    secondary roads, service roads, and the footways the trail filter leaves out (Trail
+    excludes sidewalks and crossings). Never drawn and never searched; the routing graph
+    uses the stretches near trails, at a higher cost, so a route crosses from one trail to
+    the next the way a hiker would rather than failing. Same node-id contract as Trail.
+    """
+
+    geom = gis_models.MultiLineStringField(srid=4326, spatial_index=True)
+    geom_m = metric_geom(gis_models.MultiLineStringField)
+    highway = models.CharField(max_length=32, help_text="OSM highway value, e.g. residential.")
+    length_m = models.FloatField(null=True, blank=True)
+    osm_node_ids = models.JSONField(default=list, blank=True, help_text="Ordered OSM node IDs.")
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["source", "source_id"], name="unique_connector_source")
+        ]
+        indexes = [GistIndex(fields=["geom_m"], name="connector_geom_m_gist")]
+
+
 class WaterFeature(SourceRecord):
     """
     Water. Generic GeometryField because NHD gives flowlines as lines (streams,
