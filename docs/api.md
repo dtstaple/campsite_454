@@ -837,7 +837,9 @@ one user. Authentication and isolation work exactly as for waypoints: every endp
 
 **Request body**: `{"osm_id": 6619234, "stop_ids": ["node/…", "node/…"], "name": "…"}`.
 - `osm_id` names a route. For a trail assembled from segments (TM05-97), use
-  `from_way: "way/…"` instead.
+  `from_way: "way/…"` instead, and for a route planned across connected trails (TM05-119),
+  `planned_route: "<route id>"` ([Planned routes](#planned-routes-tm05-119)). The list
+  filters by any of the three.
 - `stop_ids` are campsite ids, in any order.
 - `name` is optional, up to 120 characters. It defaults to "<trail>: N nights".
 
@@ -1155,6 +1157,67 @@ The POST body:
 - **Authentication and isolation** work as for waypoints and plans: a token is required
   (**401** without one), and another user's hike returns **404** on every endpoint.
   Deleting the account deletes its hikes.
+
+## Planned routes (TM05-119)
+
+A route across connected trails, through points the user picks. `docs/routing.md`
+explains the graph, the costs and the engine.
+
+| Method and path | What it does |
+|---|---|
+| `POST /api/routing/plan/[?campsites_within_m=500]` | Snap the points to the trails and route through them |
+| `GET /api/routing/<route id>/[?campsites_within_m=500]` | The same route again, by its id |
+| `GET /api/routing/<route id>/candidates/[?campsites_within_m=500]` | Potential campsites along it ([TM05-99](#potential-campsites-tm05-99)) |
+| `GET /api/routing/<route id>/gpx/[?campsites_within_m=500]` | GPX 1.1, as for a trail ([TM05-79](#gpx-export-tm05-79)) |
+
+All four are public. Signed in, campsite scores use the user's weights, and the GPX adds
+the user's own waypoints, as for a trail.
+
+**Request** (`POST /api/routing/plan/`):
+
+```json
+{"points": [[-73.9581, 44.1832], [-73.9235, 44.1127], [-73.9581, 44.1832]], "cost": "naismith"}
+```
+
+- `points`: `[lon, lat]`, start first and end last, 2 to 10 of them. Stops between are
+  visited in order. Each snaps to the nearest trail vertex within 400 m.
+- `cost`: `naismith` (default: quickest by Naismith's rule) or `distance` (shortest).
+
+**Route id**: `<region>:<cost>:<node>,<node>,...`, the OSM node ids the points snapped to,
+e.g. `adirondacks:naismith:2306094170,4252860218,2306094170`. It re-solves to the same
+route while the trails are unchanged.
+
+**Response**: the route detail of [`GET /api/routes/<osm_id>/`](#get-apiroutesosm_id),
+with `osm_id: null`, `source_id: "planned/<digest>"` and `name: "Route via …"`, plus:
+
+```json
+"planned": {
+  "id": "adirondacks:naismith:2306094170,4252860218,2306094170",
+  "region": "adirondacks",
+  "cost": "naismith",
+  "stops": [{"node_id": 2306094170, "lon": -73.958, "lat": 44.183, "trail_name": "Van Hoevenberg Trail", "snapped_m": 12.4}, …],
+  "legs": [{"from": "…", "to": "…", "length_m": 11372.9, "ascent_m": 1051.2, "descent_m": 61.0, "naismith_s": 14495}, …],
+  "trails": [{"name": "Van Hoevenberg Trail", "length_m": 11372.9}, …],
+  "graph_totals": {"length_m": …, "ascent_m": …, "descent_m": …, "naismith_s": …},
+  "timing_ms": {"snap": 31.2, "graph_load": 0.4, "graph_was_cached": true, "search": 18.9,
+                "assemble": 6.1, "nodes_settled": 4210, "total": 512.0}
+}
+```
+
+- `snapped_m` is click to vertex, and `null` when the route was opened from its id.
+- `trails` lists every trail the route uses, in the order it first reaches it, with the
+  distance on each ("Unnamed path" for ways without a name).
+- `graph_totals` are the graph's own (50 m samples). The panel's stats are the profile's,
+  as for any trail.
+
+**Errors**: **400** for a bad `campsites_within_m`. **422** with `{"error": "…"}` when
+the request can't be routed:
+- a point is more than 400 m from any trail
+- consecutive stops aren't connected ("The trails don't connect A to B …")
+- a route id names a node no longer on the graph
+- there is no graph built for the region yet
+
+**404** for a path that isn't a route id.
 
 ## Not included yet
 
