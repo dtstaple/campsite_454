@@ -11,7 +11,8 @@ designated site. It is then scored with the same engine as a mapped campsite.
          public_land   inside public land whose (most restrictive) access is open
          trail         at least 150 ft from any mapped trail
          water         at least 150 ft from any mapped water
-         elevation     clear of the DEC elevation limits (TM05-76) by their margin
+         elevation     clear of the region's elevation limits (TM05-76, TM05-118) by
+                       their margin
          terrain       3DEP elevation and slope available (counted with the elevation
                        sample, too, when 3DEP has no value there)
          slope         at or below `max_slope_deg`
@@ -55,7 +56,13 @@ from geodata.models import METRIC_SRID
 from scoring.config import load as load_scoring_config
 from scoring.engine import score_location
 from scoring.factors import ACCESS_STRICTNESS
-from scoring.verdict import ELEVATION_MARGIN_FT, FT_PER_M, RULES, elevation_limits
+from scoring.verdict import (
+    ELEVATION_MARGIN_FT,
+    FT_PER_M,
+    authority_short,
+    elevation_limits,
+    undesignated_rule,
+)
 
 CONFIG_PATH = Path(__file__).with_name("candidates.yml")
 
@@ -194,21 +201,24 @@ def to_wgs84(samples: list[dict], indices: list[int]) -> dict[int, Point]:
 
 
 def elevation_check(point: Point, elevation_m: float, land_names: str) -> tuple[bool, str]:
-    """Whether the point is clear of every DEC elevation limit by the verdict's margin,
-    and how that reads. An unsaved stand-in site: never a lean-to, so the High Peaks
-    3,500 ft limit applies wherever the land is the High Peaks Wilderness."""
+    """Whether the point is clear of every elevation limit of its region (TM05-118,
+    scoring/legality.yml) by the verdict's margin, and how that reads. An unsaved stand-in
+    site: never a lean-to, so the High Peaks 3,500 ft limit applies wherever the land is
+    the High Peaks Wilderness."""
     stand_in = SimpleNamespace(geom=point, site_type="")
     limits = elevation_limits(stand_in, land_names)
     feet = elevation_m * FT_PER_M
+    short = authority_short(stand_in)
+    authority = f"{short} " if short else ""
     if not limits:
-        return True, f"About {feet:,.0f} ft; no DEC elevation limit applies here."
+        return True, f"About {feet:,.0f} ft; no {authority}elevation limit applies here."
     for _rule, limit in limits:
         if feet > limit - ELEVATION_MARGIN_FT:
             return False, (
                 f"About {feet:,.0f} ft, too close to or above the {limit:,.0f} ft limit."
             )
     tightest = min(limit for _, limit in limits)
-    return True, f"About {feet:,.0f} ft, below the {tightest:,.0f} ft DEC limit."
+    return True, f"About {feet:,.0f} ft, below the {tightest:,.0f} ft {authority}limit."
 
 
 # --- 3-4. scoring and spread ---------------------------------------------------------------
@@ -404,7 +414,7 @@ def find_candidates(route_geom: GEOSGeometry, within_m: float, settings: dict) -
                     },
                 ],
                 "not_checked": ROAD_NOTE,
-                "rule": RULES["designated_150"],
+                "rule": undesignated_rule(SimpleNamespace(geom=points[i])),
                 "elevation_m": round(terrain[i]["elevation_m"], 1),
                 "slope_deg": round(slope, 1),
                 "nearest_trail_m": trail_m,
