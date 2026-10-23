@@ -30,3 +30,11 @@ ruff==0.6.9
 # standard library cannot validate XML Schema; xmlschema is pure Python (no libxml2 build,
 # unlike lxml), MIT-licensed, and pulls in only elementpath.
 xmlschema==4.1.0
+
+# --- terrain analysis (Davis, TM05-139; used by the terrain pipeline, TM05-141) ---
+# GeoLibre: the whitebox_next_gen terrain tools (slope, aspect, flow accumulation, wetness
+# index, viewshed, ...) compiled to one WASM module and run in-process. MIT, pure Python;
+# its only dependency is wasmtime (Apache-2.0 WITH LLVM-exception, prebuilt wheels). No
+# GDAL build or tool server needed. The WASM runtime is fetched and checksum-checked
+# outside the repo -- docs/terrain-analysis.md.
+geolibre-wasm==1.7.1
