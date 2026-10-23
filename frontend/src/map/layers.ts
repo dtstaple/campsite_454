@@ -2,8 +2,9 @@
  * The MapLibre source and layer definitions, as data.
  *
  * The only place layers are defined. Nothing here is stateful: Discover.tsx calls
- * addMapSources() and addMapLayers() once on the map's `load` event and feeds the
- * sources afterwards from its refresh(). Kept out of the component so it reads as
+ * addMapSources() and addMapLayers() once on the map's `load` event. Trails, water and
+ * public land are vector tiles the map fetches itself (TM05-140, tileLayers.ts); only
+ * campsites are fed from Discover's refresh(). Kept out of the component so it reads as
  * composition rather than as a hundred lines of paint properties.
  *
  * Every colour, width and opacity comes from theme.css via theme.ts. MapLibre paint
@@ -17,7 +18,14 @@ import { mapColors, mapHillshade, mapPaint, scoreColors } from "../theme";
 import { scoreColorExpression } from "../score/grade";
 import { campsiteHighlightPaint } from "../campsite/highlight";
 import { SOURCE_ID_PROPERTY } from "./featureIds";
-import type { LayerName } from "../api";
+import { API_BASE_URL, type LayerName } from "../api";
+import {
+  drawLayerVisibility,
+  IMAGERY_ONLY,
+  isTiled,
+  vectorSource,
+  type TiledLayer,
+} from "./tileLayers";
 import type { ActivityMode } from "../modes/modes";
 
 export const LAYERS: readonly { name: LayerName; label: string }[] = [
@@ -66,15 +74,40 @@ export const CLICKABLE: readonly { id: string; layer: ClickableLayer }[] = [
 
 export const CLICKABLE_IDS: string[] = CLICKABLE.map((entry) => entry.id);
 
-/** One GeoJSON source per layer. The API output goes in unmodified. */
+/**
+ * One source per layer: a vector tile source for each tiled layer, and a GeoJSON source
+ * for campsites, which the API output goes into unmodified.
+ */
 export function addMapSources(map: maplibregl.Map): void {
   for (const layer of LAYERS) {
+    if (isTiled(layer.name)) {
+      map.addSource(layer.name, vectorSource(API_BASE_URL, layer.name));
+      continue;
+    }
     map.addSource(layer.name, {
       type: "geojson",
       data: EMPTY,
       // TM05-69: campsites are keyed by source_id so feature-state can mark the selected one.
-      ...(layer.name === "campsites" ? { promoteId: SOURCE_ID_PROPERTY } : {}),
+      promoteId: SOURCE_ID_PROPERTY,
     });
+  }
+}
+
+/**
+ * Show or hide every draw layer of a tiled source. That includes the satellite-only
+ * casings (basemap/satellite.ts marks them IMAGERY_ONLY), which also need the satellite
+ * basemap on.
+ */
+export function setTiledLayerVisible(
+  map: maplibregl.Map,
+  layer: TiledLayer,
+  on: boolean,
+  imageryOn: boolean,
+): void {
+  for (const drawn of map.getStyle().layers ?? []) {
+    if (!("source" in drawn) || drawn.source !== layer) continue;
+    const imageryOnly = (drawn.metadata as Record<string, unknown> | undefined)?.[IMAGERY_ONLY] === true;
+    map.setLayoutProperty(drawn.id, "visibility", drawLayerVisibility(on, imageryOnly, imageryOn));
   }
 }
 
@@ -93,6 +126,7 @@ export function addMapLayers(map: maplibregl.Map): void {
     id: "public-land-fill",
     type: "fill",
     source: "public-land",
+    "source-layer": "public-land",
     paint: {
       "fill-color": colour.publicLand,
       "fill-opacity": paint.publicLandFillOpacity,
@@ -102,6 +136,7 @@ export function addMapLayers(map: maplibregl.Map): void {
     id: "public-land-outline",
     type: "line",
     source: "public-land",
+    "source-layer": "public-land",
     paint: {
       "line-color": colour.publicLand,
       "line-width": paint.publicLandLineWidth,
@@ -115,6 +150,7 @@ export function addMapLayers(map: maplibregl.Map): void {
     id: "water-fill",
     type: "fill",
     source: "water",
+    "source-layer": "water",
     filter: ["==", ["geometry-type"], "Polygon"],
     paint: { "fill-color": colour.water, "fill-opacity": paint.waterFillOpacity },
   });
@@ -122,6 +158,7 @@ export function addMapLayers(map: maplibregl.Map): void {
     id: "water-line",
     type: "line",
     source: "water",
+    "source-layer": "water",
     filter: ["==", ["geometry-type"], "LineString"],
     paint: {
       "line-color": colour.water,
@@ -133,6 +170,7 @@ export function addMapLayers(map: maplibregl.Map): void {
     id: "water-line-hit",
     type: "line",
     source: "water",
+    "source-layer": "water",
     filter: ["==", ["geometry-type"], "LineString"],
     paint: { "line-color": colour.water, "line-width": paint.hitWidth, "line-opacity": 0 },
   });
@@ -141,6 +179,7 @@ export function addMapLayers(map: maplibregl.Map): void {
     id: "trails-line",
     type: "line",
     source: "trails",
+    "source-layer": "trails",
     paint: {
       "line-color": colour.trails,
       "line-width": paint.trailsWidth,
@@ -151,6 +190,7 @@ export function addMapLayers(map: maplibregl.Map): void {
     id: "trails-hit",
     type: "line",
     source: "trails",
+    "source-layer": "trails",
     paint: { "line-color": colour.trails, "line-width": paint.hitWidth, "line-opacity": 0 },
   });
 

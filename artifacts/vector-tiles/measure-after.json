@@ -1,0 +1,95 @@
+{
+  "label": "after",
+  "results": [
+    {
+      "session": "Adirondacks overview (z8)",
+      "notice": "",
+      "requests": 26,
+      "kb": 541.2,
+      "final_requests": 8,
+      "final_kb": 253.3,
+      "load_ms": 1977,
+      "round": 1
+    },
+    {
+      "session": "High Peaks (z12)",
+      "notice": "",
+      "requests": 36,
+      "kb": 118.6,
+      "final_requests": 0,
+      "final_kb": 0,
+      "load_ms": 649,
+      "round": 1
+    },
+    {
+      "session": "Marcy Dam (z15)",
+      "notice": "",
+      "requests": 42,
+      "kb": 86.6,
+      "final_requests": 24,
+      "final_kb": 31.8,
+      "load_ms": 30,
+      "round": 1
+    },
+    {
+      "session": "Adirondacks overview (z8)",
+      "notice": "",
+      "requests": 53,
+      "kb": 442.2,
+      "final_requests": 8,
+      "final_kb": 253.2,
+      "load_ms": 406,
+      "round": 2
+    },
+    {
+      "session": "High Peaks (z12)",
+      "notice": "",
+      "requests": 36,
+      "kb": 118.8,
+      "final_requests": 0,
+      "final_kb": 0,
+      "load_ms": 1018,
+      "round": 2
+    },
+    {
+      "session": "Marcy Dam (z15)",
+      "notice": "",
+      "requests": 42,
+      "kb": 86.5,
+      "final_requests": 24,
+      "final_kb": 31.7,
+      "load_ms": 751,
+      "round": 2
+    },
+    {
+      "session": "Adirondacks overview (z8)",
+      "notice": "",
+      "requests": 44,
+      "kb": 365.8,
+      "final_requests": 8,
+      "final_kb": 253.2,
+      "load_ms": 455,
+      "round": 3
+    },
+    {
+      "session": "High Peaks (z12)",
+      "notice": "",
+      "requests": 36,
+      "kb": 119,
+      "final_requests": 0,
+      "final_kb": 0,
+      "load_ms": 1064,
+      "round": 3
+    },
+    {
+      "session": "Marcy Dam (z15)",
+      "notice": "",
+      "requests": 42,
+      "kb": 86.8,
+      "final_requests": 24,
+      "final_kb": 31.9,
+      "load_ms": 56,
+      "round": 3
+    }
+  ]
+}

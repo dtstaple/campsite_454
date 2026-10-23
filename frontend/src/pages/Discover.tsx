@@ -31,9 +31,11 @@ import {
   EMPTY,
   LAYERS,
   setHillshadeVisible,
+  setTiledLayerVisible,
 } from "../map/layers";
 import { popupContent } from "../map/popups";
 import { sourceIdOf, withSourceIds } from "../map/featureIds";
+import { isTiled } from "../map/tileLayers";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useSession } from "../session";
 import ModeSwitcher from "../modes/ModeSwitcher";
@@ -225,7 +227,11 @@ export default function Discover() {
     };
   }, [session]);
 
-  /** Fetch the viewport in one request and push each layer into its source. */
+  /**
+   * Fetch the viewport's campsites and push them into their source. Trails, water and
+   * public land are vector tiles the map loads itself (TM05-140), so only campsites,
+   * whose colours depend on the user's weights, still come from /api/map-data/.
+   */
   const refresh = useCallback(async () => {
     const current = map.current;
     if (!current || !styleReady.current) return;
@@ -242,13 +248,14 @@ export default function Discover() {
     const shown = (layer: LayerName) =>
       enabledRef.current[layer] && layerVisibleAtZoom(layer, currentZoom);
 
-    const wanted = LAYERS.map((l) => l.name).filter(shown);
+    const fetched = LAYERS.map((l) => l.name).filter((name) => !isTiled(name));
+    const wanted = fetched.filter(shown);
 
-    // Nothing to draw at all: clear the sources and skip the request entirely.
+    // Nothing to fetch: clear the sources and skip the request entirely.
     if (wanted.length === 0) {
-      for (const layer of LAYERS) {
-        (current.getSource(layer.name) as maplibregl.GeoJSONSource | undefined)?.setData(EMPTY);
-        setMeta((previous) => ({ ...previous, [layer.name]: undefined }));
+      for (const name of fetched) {
+        (current.getSource(name) as maplibregl.GeoJSONSource | undefined)?.setData(EMPTY);
+        setMeta((previous) => ({ ...previous, [name]: undefined }));
       }
       setLoading(false);
       return;
@@ -267,15 +274,15 @@ export default function Discover() {
       if (controller.signal.aborted) return;
       setFromCache(cached);
 
-      for (const layer of LAYERS) {
-        const source = current.getSource(layer.name) as maplibregl.GeoJSONSource | undefined;
-        const collection = data.layers[layer.name];
-        if (shown(layer.name) && collection) {
+      for (const name of fetched) {
+        const source = current.getSource(name) as maplibregl.GeoJSONSource | undefined;
+        const collection = data.layers[name];
+        if (shown(name) && collection) {
           source?.setData(withSourceIds(collection as unknown as GeoJsonFeatureCollection));
-          setMeta((previous) => ({ ...previous, [layer.name]: collection.metadata }));
+          setMeta((previous) => ({ ...previous, [name]: collection.metadata }));
         } else {
           source?.setData(EMPTY);
-          setMeta((previous) => ({ ...previous, [layer.name]: undefined }));
+          setMeta((previous) => ({ ...previous, [name]: undefined }));
         }
       }
     } catch (caught) {
@@ -493,10 +500,22 @@ export default function Discover() {
     };
   }, [refresh]);
 
-  // Toggling a layer refetches rather than hiding, so a layer turned back on is current.
+  // Toggling a tiled layer shows or hides it in place (the browser already holds its
+  // tiles). Toggling campsites refetches, so a layer turned back on is current.
   useEffect(() => {
+    if (!mapInstance) return;
+    for (const layer of LAYERS) {
+      if (isTiled(layer.name)) {
+        setTiledLayerVisible(
+          mapInstance,
+          layer.name,
+          enabled[layer.name],
+          basemapRef.current === "satellite",
+        );
+      }
+    }
     void refresh();
-  }, [enabled, refresh]);
+  }, [enabled, mapInstance, refresh]);
 
   const truncated = LAYERS.filter((layer) => meta[layer.name]?.truncated);
 
