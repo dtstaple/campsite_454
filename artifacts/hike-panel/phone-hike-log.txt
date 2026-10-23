@@ -1,0 +1,4 @@
+title: Northville-Placid Trail
+glance: ELAPSED 0:08:01 DISTANCE 0.39 mi TRAIL 0.4 of 137 mi
+values: 0:08:01 | 0.39 mi | 0.4 of 137 mi
+overlap: false; any clipped: false

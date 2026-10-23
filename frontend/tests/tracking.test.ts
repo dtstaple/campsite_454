@@ -231,7 +231,7 @@ const at = (northM: number, eastM = 0): [number, number] => {
 test("the mile along the trail and the miles left", () => {
   const progress = trailProgress(TRAIL, at(1609.344), 1, { distanceM: 0, movingMs: 0 });
   assert.ok(Math.abs(progress.doneM - 1609.344) < 2);
-  assert.equal(mileOf(progress), "mi 1.0 of 1.9");
+  assert.equal(mileOf(progress), "1.0 of 1.9 mi");
   assert.ok(Math.abs(progress.leftM - (3000 - 1609.344)) < 2);
   assert.equal(progress.offTrail, false);
   assert.ok(progress.offM < 1);
