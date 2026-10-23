@@ -144,7 +144,10 @@ export function trailProgress(
 
 const M_PER_MI = 1609.344;
 
-/** "mi 2.3 of 7.4". */
+/** "2.3 of 7.4 mi", "1.5 of 137 mi": the unit once, at the end (TM05-138). A trail of
+ * 100 mi or more drops the total's decimal, so the value stays short on a phone. */
 export function mileOf(progress: Pick<TrailProgress, "doneM" | "totalM">): string {
-  return `mi ${(progress.doneM / M_PER_MI).toFixed(1)} of ${(progress.totalM / M_PER_MI).toFixed(1)}`;
+  const total = progress.totalM / M_PER_MI;
+  const totalText = total >= 100 ? total.toFixed(0) : total.toFixed(1);
+  return `${(progress.doneM / M_PER_MI).toFixed(1)} of ${totalText} mi`;
 }

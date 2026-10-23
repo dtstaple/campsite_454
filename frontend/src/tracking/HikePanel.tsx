@@ -15,8 +15,9 @@ import Sheet from "../components/Sheet";
 import { token } from "../theme";
 import { duration, miles } from "../trails/format";
 import { TRACKING } from "./config";
-import { clock, defaultHikeName, feetOrDash, gainFeet, miles2, pace } from "./format";
-import { farFromTrailNote, mileOf, trailLine, trailProgress } from "./progress";
+import { clock, defaultHikeName, feetOrDash, gainFeet, pace } from "./format";
+import { glanceItems } from "./glance";
+import { farFromTrailNote, trailLine, trailProgress } from "./progress";
 import { SPEEDS } from "./simulate";
 import { hikeStats, trackLines } from "./track";
 import type { Hike } from "./useHike";
@@ -65,9 +66,9 @@ export default function HikePanel({ map, hike, signedIn }: Props) {
       </header>
 
       <dl className="hike-glance">
-        <Stat label="Elapsed" value={clock(stats.elapsedMs)} />
-        <Stat label="Distance" value={miles2(stats.distanceM)} />
-        {progress ? <Stat label="Trail" value={mileOf(progress)} /> : <Stat label="Pace" value={pace(stats.paceMinPerMi)} />}
+        {glanceItems(stats, progress).map((item) => (
+          <Stat key={item.label} label={item.label} value={item.value} />
+        ))}
       </dl>
 
       {progress?.offTrail && (

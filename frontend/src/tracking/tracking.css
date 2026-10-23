@@ -29,10 +29,21 @@
   gap: var(--space-sm);
 }
 
+/* The title column shrinks (and wraps) so the status always keeps its place. */
+.hike-head > div {
+  min-width: 0;
+}
+
+.hike-status {
+  flex: none;
+}
+
 .hike-title {
   color: var(--text-primary);
   font-size: var(--text-md);
   font-weight: var(--weight-semibold);
+  /* A long trail name wraps rather than pushing the status off the panel. */
+  overflow-wrap: anywhere;
 }
 
 .hike-simulated {
@@ -84,10 +95,19 @@
   font-size: var(--text-sm);
 }
 
-/* The glance row sizes to its values, so "mi 4.2 of 7.1" never wraps at phone width. */
+/* The glance row: each value keeps to one line, and a value that doesn't fit beside the
+ * others moves to the next line whole (TM05-138: on a 137 mi trail "1.5 of 137 mi" used to
+ * run into the distance beside it). */
 .hike-glance {
-  grid-template-columns: repeat(3, auto);
+  display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
+  gap: var(--space-xs) var(--space-base);
+}
+
+.hike-glance .hike-stat {
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
 .hike-glance .hike-stat dd {
