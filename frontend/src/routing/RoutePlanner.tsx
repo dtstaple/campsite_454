@@ -15,7 +15,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import * as maplibregl from "maplibre-gl";
 import { planRoute, RouteApiError, type RouteDetail } from "../trails/api";
 import { placement } from "../waypoints/placement";
-import { COSTS, stopLabels, withoutStop, type Cost } from "./planned";
+import { COSTS, stopLabels, withoutStop, withSuggestion, type Cost, type RouteSuggestion } from "./planned";
 import "./routing.css";
 
 interface Props {
@@ -32,6 +32,7 @@ export default function RoutePlanner({ map, withinM, onPlanned }: Props) {
   const [cost, setCost] = useState<Cost>("naismith");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [suggestion, setSuggestion] = useState<RouteSuggestion | null>(null);
 
   // --- picking stops on the map ----------------------------------------------------------
   useEffect(() => {
@@ -83,6 +84,7 @@ export default function RoutePlanner({ map, withinM, onPlanned }: Props) {
     abort.current = controller;
     setBusy(true);
     setError(null);
+    setSuggestion(null);
     try {
       const detail = await planRoute(stops, cost, withinM, controller.signal);
       setPicking(false);
@@ -91,6 +93,7 @@ export default function RoutePlanner({ map, withinM, onPlanned }: Props) {
     } catch (cause) {
       if (controller.signal.aborted) return;
       setError(cause instanceof RouteApiError ? cause.message : String(cause));
+      setSuggestion(cause instanceof RouteApiError ? cause.suggestion : null);
     } finally {
       if (!controller.signal.aborted) setBusy(false);
     }
@@ -209,6 +212,21 @@ export default function RoutePlanner({ map, withinM, onPlanned }: Props) {
         <p className="route-planner-error" role="alert">
           {error}
         </p>
+      )}
+      {suggestion && (
+        <div className="route-planner-actions">
+          <button
+            type="button"
+            className="route-planner-cost"
+            onClick={() => {
+              setStops(withSuggestion(stops, suggestion));
+              setSuggestion(null);
+              setError(null);
+            }}
+          >
+            {suggestion.instead_of === "start" ? "Start" : "End"} on {suggestion.trail_name} instead
+          </button>
+        </div>
       )}
     </section>
   );

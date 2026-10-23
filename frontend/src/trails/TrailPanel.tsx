@@ -27,7 +27,7 @@ import { gpxFilename, gpxPath } from "./gpx";
 import SaveTrail from "./SaveTrail";
 import Sheet from "../components/Sheet";
 import { gradeAt, nearestIndex } from "./profile";
-import { duration as plannedDuration } from "../routing/planned";
+import { duration as plannedDuration, offTrailNote, stretch } from "../routing/planned";
 
 export type DetailState =
   | { status: "loading"; name: string }
@@ -249,11 +249,17 @@ function Ready({
           <div className="panel-subtitle">Trails on this route</div>
           <ol className="trail-planned-list">
             {detail.planned.trails.map((trail) => (
-              <li key={trail.name}>
-                {trail.name}: {miles(trail.length_m)}
+              <li key={`${trail.name}|${trail.kind}`}>
+                {trail.name}: {stretch(trail.length_m, miles)}
+                {trail.kind && trail.kind !== "trail" && (
+                  <span className={`trail-planned-kind is-${trail.kind.replace(" ", "-")}`}>{trail.kind}</span>
+                )}
               </li>
             ))}
           </ol>
+          {offTrailNote(detail.planned.off_trail, miles) && (
+            <p className="trail-planned-note">{offTrailNote(detail.planned.off_trail, miles)}</p>
+          )}
           {detail.planned.legs.length > 1 && (
             <>
               <div className="panel-subtitle">Legs</div>

@@ -139,6 +139,22 @@
   color: var(--text-secondary);
 }
 
+/* TM05-137: where the route leaves trail. */
+.trail-planned-kind {
+  margin-left: var(--space-xs);
+  padding: 0 var(--space-xs);
+  border: 1px solid var(--route-off-trail);
+  border-radius: var(--radius-pill);
+  color: var(--route-off-trail);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.trail-planned-note {
+  margin: var(--space-xs) 0;
+  color: var(--route-off-trail);
+}
+
 @media (max-width: 640px) {
   /* On a phone the planner spans the bottom, above MapLibre's attribution, leaving the
    * map above it for the clicks. It folds to one button once a route opens in a sheet. */

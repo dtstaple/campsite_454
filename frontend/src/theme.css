@@ -406,4 +406,6 @@
   --route-stop-fill: var(--accent);
   --route-stop-text: var(--bg-base);
   --route-stop-ring: var(--text-primary);
+  /* TM05-137: road walks, tracks and bridged gaps in a planned route. */
+  --route-off-trail: var(--accent);
 }
