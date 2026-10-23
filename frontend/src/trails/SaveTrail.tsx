@@ -27,7 +27,8 @@ export default function SaveTrail({ detail }: { detail: RouteDetail }) {
   }, [session]);
 
   const ref = trailRef(detail);
-  if (!session || !ref || saved === null) return null;
+  // TM05-119: a planned route can't be a saved trail (saved trails are routes and ways).
+  if (!session || !ref || "planned_route" in ref || saved === null) return null;
   const row = savedRowFor(saved, ref);
 
   const toggle = async () => {

@@ -27,6 +27,7 @@ import { gpxFilename, gpxPath } from "./gpx";
 import SaveTrail from "./SaveTrail";
 import Sheet from "../components/Sheet";
 import { gradeAt, nearestIndex } from "./profile";
+import { duration as plannedDuration } from "../routing/planned";
 
 export type DetailState =
   | { status: "loading"; name: string }
@@ -241,6 +242,31 @@ function Ready({
           Elevation is unavailable right now ({profile.reason}). Distance:{" "}
           {miles(detail.line.length_m)}.
         </div>
+      )}
+
+      {detail.planned && (
+        <section className="trail-planned" aria-label="Trails on this route">
+          <div className="panel-subtitle">Trails on this route</div>
+          <ol className="trail-planned-list">
+            {detail.planned.trails.map((trail) => (
+              <li key={trail.name}>
+                {trail.name}: {miles(trail.length_m)}
+              </li>
+            ))}
+          </ol>
+          {detail.planned.legs.length > 1 && (
+            <>
+              <div className="panel-subtitle">Legs</div>
+              <ol className="trail-planned-list">
+                {detail.planned.legs.map((leg, i) => (
+                  <li key={i}>
+                    {miles(leg.length_m)}, {feet(leg.ascent_m)} up, ≈ {plannedDuration(leg.naismith_s)}
+                  </li>
+                ))}
+              </ol>
+            </>
+          )}
+        </section>
       )}
 
       {detail.connections && detail.connections.length > 0 && (

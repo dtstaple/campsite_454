@@ -396,3 +396,14 @@
   /* Room for one row of location buttons under the panel. */
   --hike-panel-lift: 52px;
 }
+
+/* --- Route planner (TM05-119) ------------------------------------------------------------ */
+:root {
+  --route-planner-width: 320px;
+  /* The planner's card sits above MapLibre's attribution at the bottom of the map. */
+  --route-planner-bottom: 40px;
+  --route-stop-size: 24px;
+  --route-stop-fill: var(--accent);
+  --route-stop-text: var(--bg-base);
+  --route-stop-ring: var(--text-primary);
+}

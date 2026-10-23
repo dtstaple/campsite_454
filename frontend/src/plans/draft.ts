@@ -28,11 +28,14 @@ export function toggleStop(draft: PlanDraft, id: string): PlanDraft {
   return { ...draft, stopIds: has ? draft.stopIds.filter((s) => s !== id) : [...draft.stopIds, id] };
 }
 
-/** The API's name for the trail a detail is: its route, or the way it was assembled from. */
+/** The API's name for the trail a detail is: its route, the way it was assembled from,
+ * or (TM05-119) a planned route's id. */
 export function trailRef(detail: {
   osm_id: number | null;
   assembly?: { from_way: string } | null;
-}): { osm_id: number } | { from_way: string } | null {
+  planned?: { id: string } | null;
+}): { osm_id: number } | { from_way: string } | { planned_route: string } | null {
+  if (detail.planned) return { planned_route: detail.planned.id };
   if (detail.osm_id !== null) return { osm_id: detail.osm_id };
   if (detail.assembly?.from_way) return { from_way: detail.assembly.from_way };
   return null;
@@ -52,9 +55,10 @@ export function planFilename(name: string): string {
 /** The saved-trail row for a trail (TM05-100), if this trail is saved. */
 export function savedRowFor<T extends { osm_id: number | null; from_way: string | null }>(
   saved: readonly T[],
-  trail: { osm_id: number } | { from_way: string } | null,
+  trail: { osm_id: number } | { from_way: string } | { planned_route: string } | null,
 ): T | null {
-  if (!trail) return null;
+  // A planned route (TM05-119) is never a saved trail: saved trails are routes and ways.
+  if (!trail || "planned_route" in trail) return null;
   if ("osm_id" in trail) return saved.find((row) => row.osm_id === trail.osm_id) ?? null;
   return saved.find((row) => row.osm_id === null && row.from_way === trail.from_way) ?? null;
 }
