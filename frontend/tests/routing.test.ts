@@ -1,6 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { COSTS, duration, routingPath, stopLabels, withoutStop } from "../src/routing/planned.ts";
+import {
+  COSTS,
+  duration,
+  offTrailNote,
+  routingPath,
+  stretch,
+  stopLabels,
+  withoutStop,
+  withSuggestion,
+} from "../src/routing/planned.ts";
 import { gpxPath } from "../src/trails/gpx.ts";
 import { candidatesPath } from "../src/trails/candidates.ts";
 import { savedRowFor, trailRef } from "../src/plans/draft.ts";
@@ -51,4 +60,40 @@ test("both costs are offered, quickest first", () => {
     COSTS.map((c) => c.id),
     ["naismith", "distance"],
   );
+});
+
+const miles = (m: number) => `${(m / 1609.344).toFixed(1)} mi`;
+
+test("short stretches read in feet, longer ones in miles", () => {
+  assert.equal(stretch(60, miles), "197 ft");
+  assert.equal(stretch(160, miles), "525 ft");
+  assert.equal(stretch(4000, miles), "2.5 mi");
+});
+
+test("a route that leaves trail says how much, and a few metres of bridged gap stay quiet", () => {
+  assert.equal(offTrailNote({ road_walk_m: 0, track_m: 0, bridged_m: 12 }, miles), null);
+  assert.equal(
+    offTrailNote({ road_walk_m: 322, track_m: 1609, bridged_m: 4 }, miles),
+    "Includes 0.2 mi of road walk and 1.0 mi of track.",
+  );
+  assert.equal(offTrailNote(undefined, miles), null);
+});
+
+test("the suggested point replaces the start, or the stop that could not be reached", () => {
+  const stops: [number, number][] = [
+    [-73.8067, 43.8545],
+    [-73.9, 44.0],
+    [-73.8824, 44.0558],
+  ];
+  const at = { lon: -73.837, lat: 43.955, trail_name: "Branch Road", distance_m: 9800 };
+  assert.deepEqual(withSuggestion(stops, { ...at, instead_of: "start" }), [
+    [-73.837, 43.955],
+    [-73.9, 44.0],
+    [-73.8824, 44.0558],
+  ]);
+  assert.deepEqual(withSuggestion(stops, { ...at, instead_of: "stop" }), [
+    [-73.8067, 43.8545],
+    [-73.9, 44.0],
+    [-73.837, 43.955],
+  ]);
 });

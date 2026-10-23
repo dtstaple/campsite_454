@@ -99,6 +99,7 @@ def test_refresh_runs_ingests_then_profiles_then_enrichment(steps):
         ("ingest", "osm-campsites", "adirondacks"),
         ("ingest", "ridb", "adirondacks"),
         ("ingest", "osm-routes", "adirondacks"),
+        ("build_trail_graph", "adirondacks"),  # TM05-137: the routing graph
         ("build_route_profiles", "adirondacks"),
         ("enrich_campsites", "adirondacks"),
         ("enrich_routes", "adirondacks"),
@@ -140,7 +141,9 @@ def test_refresh_stops_at_the_first_failure_and_still_prints_the_summary(steps):
 
     assert [command[1] for command in steps.calls] == ["padus", "nhd-flowlines", "osm-trails"]
     assert "Stopped at osm-trails: RuntimeError: Overpass is having a day" in str(error.value)
-    assert "Not run: osm-campsites, ridb, osm-routes, route-profiles" in str(error.value)
+    assert "Not run: osm-campsites, ridb, osm-routes, trail-graph, route-profiles" in str(
+        error.value
+    )
     row = summary_row(out.getvalue(), "osm-trails")
     assert row.split()[:4] == ["osm-trails", "FAILED", "0.0", "3"]
     assert "osm-campsites" not in out.getvalue()

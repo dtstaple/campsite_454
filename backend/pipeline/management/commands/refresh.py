@@ -37,11 +37,15 @@ INGEST_ORDER = (
     "osm-landmarks",
     "ridb",
     "osm-routes",
+    # TM05-137: roads between trails, for the routing graph's road walks.
+    "osm-connectors",
 )
 
 # After every ingest, in order: profiles read the routes, campsite enrichment reads every
 # layer, and route facts read the profiles.
 DERIVED_STEPS: tuple[tuple[str, str], ...] = (
+    # TM05-119/137: the routing graph, from the trails and the roads between them.
+    ("trail-graph", "build_trail_graph"),
     ("route-profiles", "build_route_profiles"),
     ("enrich", "enrich_campsites"),
     ("route-facts", "enrich_routes"),

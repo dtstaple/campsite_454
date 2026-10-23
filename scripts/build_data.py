@@ -35,6 +35,9 @@ def steps(region: str) -> list[tuple[str, list[str]]]:
         ("osm-landmarks", ["ingest", "osm-landmarks", region]),
         ("ridb", ["ingest", "ridb", region]),
         ("osm-routes", ["ingest", "osm-routes", region]),
+        # TM05-137: roads between trails, then the routing graph (TM05-119) over both.
+        ("osm-connectors", ["ingest", "osm-connectors", region]),
+        ("trail-graph", ["build_trail_graph", region]),
         ("route-profiles", ["build_route_profiles", region]),
         ("enrich", ["enrich_campsites", region]),
         # TM05-85: the Discover filters' stored facts; needs the profiles above.

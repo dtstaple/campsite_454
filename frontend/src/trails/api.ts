@@ -7,7 +7,7 @@ import type { CandidateSearch } from "./candidates";
 import type { Connection } from "./connections";
 import { API_BASE_URL, type Bbox } from "../api";
 import { authHeaders, storedSession } from "../auth";
-import { routingPath, type Cost, type PlannedBlock } from "../routing/planned";
+import { routingPath, type Cost, type PlannedBlock, type RouteSuggestion } from "../routing/planned";
 
 export interface RouteSummary {
   osm_id: number;
@@ -114,7 +114,15 @@ export interface RouteDetail extends Omit<RouteSummary, "osm_id"> {
   planned?: PlannedBlock | null;
 }
 
-export class RouteApiError extends Error {}
+export class RouteApiError extends Error {
+  /** TM05-137: where a connected route would be possible, when the API can't route. */
+  suggestion: RouteSuggestion | null;
+
+  constructor(message: string, suggestion: RouteSuggestion | null = null) {
+    super(message);
+    this.suggestion = suggestion;
+  }
+}
 
 async function getJson<T>(url: string, signal?: AbortSignal): Promise<T> {
   let response: Response;
@@ -261,7 +269,9 @@ export async function planRoute(
     throw new RouteApiError(`Could not reach the API at ${API_BASE_URL}.`);
   }
   const body = await response.json().catch(() => null);
-  if (!response.ok) throw new RouteApiError(body?.error ?? `HTTP ${response.status}`);
+  if (!response.ok) {
+    throw new RouteApiError(body?.error ?? `HTTP ${response.status}`, body?.suggestion ?? null);
+  }
   return body as RouteDetail;
 }
 

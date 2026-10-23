@@ -45,9 +45,31 @@ class TrailEdge(models.Model):
     pairs from 3DEP, with the gaps filled.
     """
 
+    class Kind(models.TextChoices):
+        TRAIL = "trail", "Trail"
+        TRACK = "track", "Track"
+        ROAD = "road", "Road walk"
+        BRIDGE = "bridge", "Gap bridged"
+
     build = models.ForeignKey(TrailGraphBuild, on_delete=models.CASCADE, related_name="trail_edges")
     region = models.CharField(max_length=64, db_index=True)
-    trail = models.ForeignKey(Trail, on_delete=models.CASCADE, related_name="graph_edges")
+    # TM05-137: a trail or track way, a road walk along a Connector, or a short bridge
+    # across a near-miss gap the map leaves between two trails.
+    kind = models.CharField(max_length=8, choices=Kind.choices, default=Kind.TRAIL)
+    trail = models.ForeignKey(
+        Trail, on_delete=models.CASCADE, related_name="graph_edges", null=True, blank=True
+    )
+    connector = models.ForeignKey(
+        "geodata.Connector",
+        on_delete=models.CASCADE,
+        related_name="graph_edges",
+        null=True,
+        blank=True,
+    )
+    start_along_m = models.FloatField(
+        default=0.0, help_text="Distance along the way, metres, where this edge starts."
+    )
+    cost_factor = models.FloatField(default=1.0, help_text="Routing cost multiplier, >= 1.")
     start_node = models.BigIntegerField(db_index=True)
     end_node = models.BigIntegerField(db_index=True)
     start_index = models.IntegerField(help_text="Vertex index in the way where it starts.")

@@ -20,6 +20,9 @@ Costs:
                every 600 m of ascent. Descent is free, as in the rule as Naismith gave it.
     distance   metres walked.
 
+Either is multiplied by the edge's `factor` (1 for trail, more for a road walk, TM05-137),
+so a route leaves trail only when that saves enough. A factor is never below 1.
+
 The search is A* with a straight-line heuristic (distance divided by the flat speed for
 naismith), which never overestimates, so the answer is the true least-cost path.
 """
@@ -28,6 +31,7 @@ from __future__ import annotations
 
 import heapq
 import math
+from collections import ChainMap
 from dataclasses import dataclass, field
 
 FLAT_SPEED_M_PER_S = 5000 / 3600  # Naismith: 5 km/h
@@ -59,6 +63,11 @@ class Edge:
     length_m: float
     ascent_m: float = 0.0
     descent_m: float = 0.0
+    factor: float = 1.0
+
+    def __post_init__(self):
+        if self.factor < 1.0:
+            raise RoutingError(f"Edge {self.id} has cost factor {self.factor}; it must be >= 1.")
 
 
 @dataclass(frozen=True)
@@ -146,16 +155,20 @@ class Graph:
         self.coords = dict(coords)
         self.edges: dict[int, Edge] = {}
         self.adjacency: dict[int, list[tuple[int, Edge, bool]]] = {n: [] for n in self.coords}
+        self.removed: set[int] = set()
         for edge in edges:
             self.add_edge(edge)
 
     def copy(self) -> Graph:
-        """A copy that can take extra nodes and edges without touching this one. Shallow:
-        the adjacency lists are shared until add_edge or remove_edge replaces them."""
+        """A copy that can take extra nodes and edges without touching this one, in O(1):
+        each map is layered over this graph's (ChainMap), so a request's few extra nodes
+        and edges never copy the region's ~100,000 (TM05-137). Adjacency lists are shared
+        until add_edge or remove_edge replaces them."""
         twin = Graph.__new__(Graph)
-        twin.coords = dict(self.coords)
-        twin.edges = dict(self.edges)
-        twin.adjacency = dict(self.adjacency)
+        twin.coords = ChainMap({}, self.coords)
+        twin.edges = ChainMap({}, self.edges)
+        twin.adjacency = ChainMap({}, self.adjacency)
+        twin.removed = set(self.removed)
         return twin
 
     def add_node(self, node: int, xy: tuple[float, float]) -> None:
@@ -172,9 +185,15 @@ class Graph:
         self.adjacency[edge.v] = [*self.adjacency[edge.v], (edge.u, edge, False)]
 
     def remove_edge(self, edge_id: int) -> None:
-        edge = self.edges.pop(edge_id)
+        if not self.has_edge(edge_id):
+            raise KeyError(edge_id)
+        edge = self.edges[edge_id]
+        self.removed.add(edge_id)
         for node in (edge.u, edge.v):
             self.adjacency[node] = [a for a in self.adjacency[node] if a[1].id != edge_id]
+
+    def has_edge(self, edge_id: int) -> bool:
+        return edge_id in self.edges and edge_id not in self.removed
 
     def __contains__(self, node: int) -> bool:
         return node in self.coords
@@ -185,15 +204,15 @@ class Graph:
 
     @property
     def edge_count(self) -> int:
-        return len(self.edges)
+        return len(self.edges) - len(self.removed)
 
 
 def step_cost(edge: Edge, forward: bool, cost: str) -> float:
     length = edge.length_m
     if cost == "distance":
-        return length
+        return length * edge.factor
     ascent = edge.ascent_m if forward else edge.descent_m
-    return naismith_seconds(length, ascent)
+    return naismith_seconds(length, ascent) * edge.factor
 
 
 def _heuristic(graph: Graph, node: int, goal: int, cost: str) -> float:

@@ -33,7 +33,10 @@ def _within(request) -> int:
 
 
 def _cannot(error: PlanningError) -> Response:
-    return Response({"error": str(error)}, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+    body = {"error": str(error)}
+    if error.suggestion:
+        body["suggestion"] = error.suggestion
+    return Response(body, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
 
 
 def _detail(request, planned, within: int, started: float) -> Response:
