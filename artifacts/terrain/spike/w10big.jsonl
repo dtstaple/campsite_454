@@ -1,0 +1,19 @@
+{"tool": "slope", "exit": 0, "load_s": 0.11, "run_s": 1.25, "wasm_mem_mb": 85, "rss_mb": 140, "log_tail": ["{\"path\":\"/work/slope.tif\"}"]}
+{"tool": "aspect", "exit": 0, "load_s": 0.01, "run_s": 1.18, "wasm_mem_mb": 85, "rss_mb": 154, "log_tail": ["{\"path\":\"/work/aspect.tif\"}"]}
+{"tool": "breach_depressions_least_cost", "exit": 0, "load_s": 0.01, "run_s": 0.89, "wasm_mem_mb": 134, "rss_mb": 204, "log_tail": ["{\"path\":\"/work/breached.tif\"}"]}
+{"tool": "fill_depressions", "exit": 0, "load_s": 0.01, "run_s": 0.85, "wasm_mem_mb": 117, "rss_mb": 186, "log_tail": ["{\"path\":\"/work/filled.tif\"}"]}
+{"tool": "depth_in_sink", "exit": 0, "load_s": 0.01, "run_s": 0.27, "wasm_mem_mb": 134, "rss_mb": 198, "log_tail": ["{\"path\":\"/work/sinkdepth.tif\"}"]}
+{"tool": "d8_flow_accum", "exit": 0, "load_s": 0.01, "run_s": 0.74, "wasm_mem_mb": 85, "rss_mb": 155, "log_tail": ["{\"path\":\"/work/d8sca.tif\"}"]}
+{"tool": "dinf_flow_accum", "exit": 0, "load_s": 0.01, "run_s": 1.4, "wasm_mem_mb": 128, "rss_mb": 190, "log_tail": ["{\"path\":\"/work/dinfsca.tif\"}"]}
+{"tool": "fd8_flow_accum", "exit": 0, "load_s": 0.01, "run_s": 1.27, "wasm_mem_mb": 112, "rss_mb": 174, "log_tail": ["{\"path\":\"/work/fd8sca.tif\"}"]}
+{"tool": "wetness_index", "exit": 0, "load_s": 0.01, "run_s": 0.7, "wasm_mem_mb": 93, "rss_mb": 154, "log_tail": ["reading SCA raster", "reading slope raster", "{\"path\":\"/work/twi.tif\"}"]}
+{"tool": "relative_topographic_position", "exit": 0, "load_s": 0.01, "run_s": 85.77, "wasm_mem_mb": 82, "rss_mb": 147, "log_tail": ["running relative_topographic_position", "{\"path\":\"/work/rtp.tif\"}"]}
+{"tool": "deviation_from_mean_elevation", "exit": 0, "load_s": 0.01, "run_s": 0.7, "wasm_mem_mb": 93, "rss_mb": 167, "log_tail": ["running deviation_from_mean_elevation", "{\"path\":\"/work/dev.tif\"}"]}
+{"tool": "openness", "exit": 0, "load_s": 0.01, "run_s": 12.57, "wasm_mem_mb": 94, "rss_mb": 155, "log_tail": ["running openness with search_dist=50", "{\"neg_output\":\"/work/open_neg.tif\",\"pos_output\":\"/work/open_pos.tif\"}"]}
+{"tool": "geomorphons", "exit": 0, "load_s": 0.01, "run_s": 11.36, "wasm_mem_mb": 49, "rss_mb": 96, "log_tail": ["running geomorphons", "{\"path\":\"/work/geomorphons.tif\"}"]}
+{"tool": "exposure_towards_wind_flux", "exit": 0, "load_s": 0.01, "run_s": 5.59, "wasm_mem_mb": 93, "rss_mb": 149, "log_tail": ["running exposure_towards_wind_flux", "{\"path\":\"/work/windexp.tif\"}"]}
+{"tool": "sky_view_factor", "exit": 0, "load_s": 0.0, "run_s": 209.09, "wasm_mem_mb": 105, "rss_mb": 117, "log_tail": ["{\"path\":\"/work/svf.tif\"}"]}
+{"tool": "viewshed", "exit": 0, "load_s": 0.12, "run_s": 4.42, "wasm_mem_mb": 65, "rss_mb": 121, "log_tail": ["running viewshed station 1 of 1", "{\"path\":\"/work/viewshed.tif\"}"]}
+{"tool": "solar_radiation", "exit": 0, "load_s": 0.01, "run_s": 52.01, "wasm_mem_mb": 461
+{"tool": "reclass", "exit": 0, "load_s": 0.01, "run_s": 0.42, "wasm_mem_mb": 79
+{"tool": "raster_to_vector_polygons", "exit": 0, "load_s": 0.01, "run_s": 11.33, "wasm_mem_mb": 328

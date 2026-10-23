@@ -1,0 +1,7 @@
+{"tool": "breach_depressions_least_cost", "exit": -1, "load_s": 0.01, "run_s": 308.72, "wasm_mem_mb": 2644, "rss_mb": 1049, "log_tail": ["", "Caused by:", "    wasm trap: wasm `unreachable` instruction executed"]}
+{"tool": "dinf_flow_accum", "exit": 1, "load_s": 0.09, "run_s": 0.0, "wasm_mem_mb": 7, "rss_mb": 64, "log_tail": ["execution error: failed reading input raster: GeoTIFF read error: I/O error: No such file or directory (os error 44)"]}
+{"tool": "slope", "exit": 0, "load_s": 0.01, "run_s": 11.94, "wasm_mem_mb": 841, "rss_mb": 1006, "log_tail": ["{\"path\":\"/work/slope.tif\"}"]}
+{"tool": "wetness_index", "exit": 1, "load_s": 0.01, "run_s": 0.0, "wasm_mem_mb": 7, "rss_mb": 64, "log_tail": ["execution error: failed reading 'sca' raster: GeoTIFF read error: I/O error: No such file or directory (os error 44)"]}
+{"tool": "fill_depressions", "exit": 0, "load_s": 0.01, "run_s": 10.57, "wasm_mem_mb": 1226, "rss_mb": 1392, "log_tail": ["{\"path\":\"/work/filled.tif\"}"]}
+{"tool": "dinf_flow_accum", "exit": 0, "load_s": 0.0, "run_s": 14.63, "wasm_mem_mb": 1302, "rss_mb": 1410, "log_tail": ["{\"path\":\"/work/dinfsca.tif\"}"]}
+{"tool": "wetness_index", "exit": 0, "load_s": 0.0, "run_s": 6.53, "wasm_mem_mb": 916, "rss_mb": 1117, "log_tail": ["reading SCA raster", "reading slope raster", "{\"path\":\"/work/twi.tif\"}"]}
