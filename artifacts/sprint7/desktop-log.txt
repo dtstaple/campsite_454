@@ -1,0 +1,22 @@
+signed in, now at http://localhost:5173/discover
+screenshot /Users/ds1244/Desktop/campsite454/campsite_454/artifacts/sprint7/desktop-1-map.png
+screenshot /Users/ds1244/Desktop/campsite454/campsite_454/artifacts/sprint7/desktop-2-planner-stops.png
+route opened in 0.8 s
+trails on this route: TRAILS ON THIS ROUTE Indian Pass Trail: 1.1 mi Heart Lake Loop: 1.0 mi Old Marcy Dam Trail: 1.6 mi Van Hoevenberg Trail: 10.3 mi Unnamed path: 0.4 mi Marcy Dam Truck Trail: 0.1 mi Van Hoevenberg Ski Trail: 1.0 mi Phelps Mountain Trail: 2.0 mi LEGS 7.7 mi, 3,528 ft up, ≈ 4 h 17 min 4.7 mi, 1,428 ft up, ≈ 2 h 14 min 5.1 mi, 288 ft up, ≈ 1 h 47 min
+stats: DISTANCE 17.5 mi GAIN 4,727 ft LOSS 4,734 ft HIGH POINT 5,337 ft MAX GRADE 39% DIFFICULTY Hard TYPE Loop TIME ≈ 8 h 5 min
+screenshot /Users/ds1244/Desktop/campsite454/campsite_454/artifacts/sprint7/desktop-3-route-profile.png
+find campsites: 8 mapped campsites and 8 potential spots.
+screenshot /Users/ds1244/Desktop/campsite454/campsite_454/artifacts/sprint7/desktop-4-find-campsites.png
+night buttons enabled: 4
+plan: OVERNIGHT PLAN New plan Day To Distance Gain Loss 1 Phelps Brook Lean-to Permitted · designated site 2.7 mi 185 ft 98 ft 2 Ed Hudowalski Lean-to Permitted · designated site 0.3 mi 81 ft 11 ft 3 End 14.6 mi 4,471 ft 4,637 ft 2 nights 17.5 mi 4,738 ft 4,747 ft In the trail's own direction, start to end. Gain and loss are measured like the trail's, per day. Save plan
+screenshot /Users/ds1244/Desktop/campsite454/campsite_454/artifacts/sprint7/desktop-5-two-nights.png
+gpx /Users/ds1244/Desktop/campsite454/campsite_454/artifacts/sprint7/desktop-route.gpx: 165430 bytes, 2106 track points, 8 waypoints
+adk-boreas-ponds-lean-to: Permitted · designated site Designated campsite: a lean-to.
+screenshot /Users/ds1244/Desktop/campsite454/campsite_454/artifacts/sprint7/desktop-verdict-adk-boreas-ponds-lean-to.png
+adk-sno-bird: Unknown: check current rules Recorded as a designated site (described as a designated campsite in OpenStreetMap), but at about 4,028 ft, too close to the 4,000 ft camping limit to call from the elevation data. “Except in an emergency, camping is prohibited above an elevation of 4,000 feet in the Adi
+screenshot /Users/ds1244/Desktop/campsite454/campsite_454/artifacts/sprint7/desktop-verdict-adk-sno-bird.png
+wm-liberty-springs-tentsite: the map click opened a trail; opening the site from its campsite list
+wm-liberty-springs-tentsite: Permitted · designated site Designated campsite: mapped as run by the Appalachian Mountain Club in OpenStreetMap.
+screenshot /Users/ds1244/Desktop/campsite454/campsite_454/artifacts/sprint7/desktop-verdict-wm-liberty-springs-tentsite.png
+wm-unknown-pond-campsite: Unknown: check current rules About 0.05 mi from Unknown Pond. Camping within 0.25 mi of it is allowed only at designated sites, and this isn't one we can confirm. “1/4 mile FPA regulations apply to the following areas (except at designated sites): Waterbodies: Black Pond, East Pond, Greeley Ponds, K
+screenshot /Users/ds1244/Desktop/campsite454/campsite_454/artifacts/sprint7/desktop-verdict-wm-unknown-pond-campsite.png

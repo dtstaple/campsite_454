@@ -7,8 +7,9 @@ import type { Legality } from "../campsite/legality";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
 
-/** Which trail a plan is along: a route by relation id, or an assembled trail by way. */
-export type TrailRef = { osm_id: number } | { from_way: string };
+/** Which trail a plan is along: a route by relation id, an assembled trail by way, or
+ * (TM05-119) a route planned across connected trails by its id. */
+export type TrailRef = { osm_id: number } | { from_way: string } | { planned_route: string };
 
 export interface PlanStop {
   night: number;
@@ -54,6 +55,7 @@ export interface PlanSummary {
   name: string;
   osm_id: number | null;
   from_way: string | null;
+  planned_route?: string | null;
   trail_name: string;
   nights?: number;
   updated_at: string;

@@ -14,13 +14,16 @@ import type { Feature, FeatureCollection, Point } from "geojson";
 import { clampBbox, type Bbox } from "../api";
 import {
   fetchCandidates,
+  fetchPlannedRoute,
   fetchRouteDetail,
   fetchRoutes,
   fetchTrailForWay,
   RouteApiError,
   type CampsiteAlong,
+  type RouteDetail,
   type RouteHit,
 } from "./api";
+import RoutePlanner from "../routing/RoutePlanner";
 import TrailSearch from "./TrailSearch";
 import { locate, measure, pointAt, type LngLat, type MeasuredLine } from "./geometry";
 import {
@@ -102,11 +105,17 @@ export default function TrailInsight({
   userPosition,
   hike,
 }: Props) {
-  // A named route by relation id, or (TM05-97) a named trail way, which the API resolves to
-  // its route or to a trail assembled from the connected same-name ways.
+  // A named route by relation id, (TM05-97) a named trail way, which the API resolves to
+  // its route or to a trail assembled from the connected same-name ways, or (TM05-119) a
+  // route planned across connected trails, by its id.
   const [selected, setSelected] = useState<
-    { osmId: number; name: string } | { wayId: string; name: string } | null
+    | { osmId: number; name: string }
+    | { wayId: string; name: string }
+    | { plannedId: string; name: string }
+    | null
   >(null);
+  // The planner hands over the detail it just fetched; this skips fetching it again.
+  const justPlanned = useRef<string | null>(null);
   const [state, setState] = useState<DetailState | null>(null);
   const [cursorM, setCursorM] = useState<number | null>(null);
   const [withinM, setWithinM] = useState(DEFAULT_WITHIN_M);
@@ -376,11 +385,17 @@ export default function TrailInsight({
 
   useEffect(() => {
     if (!selected) return;
+    if ("plannedId" in selected && justPlanned.current === selected.plannedId) {
+      justPlanned.current = null;
+      return;
+    }
     const controller = new AbortController();
     const request =
       "osmId" in selected
         ? fetchRouteDetail(selected.osmId, withinM, controller.signal)
-        : fetchTrailForWay(selected.wayId, withinM, controller.signal);
+        : "wayId" in selected
+          ? fetchTrailForWay(selected.wayId, withinM, controller.signal)
+          : fetchPlannedRoute(selected.plannedId, withinM, controller.signal);
     request
       .then((detail) => setState({ status: "ready", detail }))
       .catch((error) => {
@@ -481,7 +496,20 @@ export default function TrailInsight({
     );
     setSelected({ osmId: hit.osm_id, name: hit.name });
   };
-  const search = <TrailSearch map={map} onPick={pick} />;
+  // TM05-119: a planned route opens in the panel like any trail.
+  const openPlanned = useCallback((detail: RouteDetail) => {
+    const id = detail.planned?.id;
+    if (!id) return;
+    justPlanned.current = id;
+    setState({ status: "ready", detail });
+    setSelected({ plannedId: id, name: detail.name });
+  }, []);
+  const search = (
+    <>
+      <TrailSearch map={map} onPick={pick} />
+      <RoutePlanner map={map} withinM={withinM} onPlanned={openPlanned} />
+    </>
+  );
 
   const trailKey = state?.status === "ready" ? state.detail.source_id : null;
   const draft = trailKey ? draftFor(planDraft, trailKey) : null;
@@ -501,10 +529,13 @@ export default function TrailInsight({
       ? worked.stops.filter((stop) => draft.stopIds.includes(stop.id))
       : [];
 
-  if (!state) return search;
+  // The search and the planner keep one place in the tree whether or not a trail is open,
+  // so opening one does not remount them and lose what they hold (TM05-119).
   return (
     <>
       {search}
+      {state && (
+      <>
       <TrailPanel
       state={state}
       cursorM={cursorM}
@@ -551,7 +582,8 @@ export default function TrailInsight({
       }}
       onConnectionHover={(connection) => setHoveredJunctions(connection?.junctions ?? null)}
       hike={
-        hike && readyDetail ? (
+        // A hike keeps its trail by route or way (TM05-111); a planned route is neither yet.
+        hike && readyDetail && !readyDetail.planned ? (
           <StartHike
             busy={hike.busy}
             onStart={() => hike.onStart(trailSnapshot(readyDetail, candidates))}
@@ -603,6 +635,8 @@ export default function TrailInsight({
         campsites={readyDetail?.campsites.items ?? null}
         onResult={(key, next) => setFinding((current) => (current?.key === key ? { key, finder: next } : current))}
       />
+      </>
+      )}
     </>
   );
 }

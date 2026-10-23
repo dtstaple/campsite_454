@@ -48,9 +48,10 @@ class TripPlan(models.Model):
     """Overnight stops along one trail (TM05-81).
 
     The trail is kept by its stable identity, not a row: a named route by its OSM relation
-    id, or an assembled trail (TM05-97) by the way it was opened from. Both survive a
-    re-ingest, and assembled trails have no row to point at. `trail_name` is a snapshot
-    for listing plans without resolving every trail.
+    id, an assembled trail (TM05-97) by the way it was opened from, or a route planned
+    across connected trails (TM05-119) by its route id (routing/service.py). All three
+    survive a re-ingest, and the last two have no row to point at. `trail_name` is a
+    snapshot for listing plans without resolving every trail.
     """
 
     user = models.ForeignKey(
@@ -59,6 +60,7 @@ class TripPlan(models.Model):
     name = models.CharField(max_length=120)
     osm_id = models.BigIntegerField(null=True, blank=True)
     from_way = models.CharField(max_length=64, blank=True, default="")
+    planned_route = models.CharField(max_length=255, blank=True, default="")
     trail_name = models.CharField(max_length=255, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -67,7 +69,9 @@ class TripPlan(models.Model):
         ordering = ["-updated_at", "-id"]
         constraints = [
             models.CheckConstraint(
-                condition=models.Q(osm_id__isnull=False) | ~models.Q(from_way=""),
+                condition=models.Q(osm_id__isnull=False)
+                | ~models.Q(from_way="")
+                | ~models.Q(planned_route=""),
                 name="trip_plan_has_a_trail",
             )
         ]

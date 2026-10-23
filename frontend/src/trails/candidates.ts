@@ -84,12 +84,18 @@ export function searchSummary(mapped: number, search: CandidateSearch | null): s
   return `${places(mapped, "mapped campsite")} and ${places(found, "potential spot")}.`;
 }
 
-/** The URL path of a trail's candidate search: by route, or by the way it was opened from. */
+/** The URL path of a trail's candidate search: by route, by the way it was opened from,
+ * or (TM05-119) by a planned route's id. */
 export function candidatesPath(
-  detail: { osm_id: number | null; assembly?: { from_way: string } | null },
+  detail: {
+    osm_id: number | null;
+    assembly?: { from_way: string } | null;
+    planned?: { id: string } | null;
+  },
   withinM: number,
 ): string | null {
   const query = `?campsites_within_m=${withinM}`;
+  if (detail.planned) return `/api/routing/${detail.planned.id}/candidates/${query}`;
   if (detail.osm_id !== null) return `/api/routes/${detail.osm_id}/candidates/${query}`;
   const way = detail.assembly?.from_way;
   if (!way) return null;

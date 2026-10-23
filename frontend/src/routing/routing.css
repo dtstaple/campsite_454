@@ -1,0 +1,163 @@
+/* Route planner (TM05-119). Every value comes from theme.css. */
+
+.route-planner {
+  position: absolute;
+  bottom: var(--route-planner-bottom);
+  left: 50%;
+  z-index: 2;
+  width: min(var(--route-planner-width), calc(100% - 2 * var(--space-md)));
+  transform: translateX(-50%);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-floating);
+  backdrop-filter: blur(var(--blur-floating));
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-panel);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+}
+
+.route-planner.is-closed {
+  width: auto;
+  padding: var(--space-xs);
+}
+
+.route-planner-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.route-planner-title {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-bold);
+}
+
+.route-planner-hint {
+  margin: var(--space-xs) 0;
+  color: var(--text-secondary);
+}
+
+.route-planner-stops {
+  margin: var(--space-xs) 0;
+  padding: 0;
+  list-style: none;
+}
+
+.route-planner-count {
+  margin: var(--space-xs) 0;
+}
+
+.route-planner-stop {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 2px 0;
+}
+
+.route-planner-stop-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.route-planner-costs {
+  display: flex;
+  gap: var(--space-xs);
+  margin: var(--space-xs) 0;
+}
+
+.route-planner-cost {
+  flex: 1;
+  padding: var(--space-xs);
+  background: none;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  cursor: pointer;
+}
+
+.route-planner-cost[aria-pressed="true"] {
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.route-planner-actions {
+  display: flex;
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
+}
+
+.route-planner-actions > * {
+  flex: 1;
+}
+
+.route-planner-error {
+  margin: var(--space-xs) 0 0;
+  color: var(--danger);
+}
+
+.route-planner button:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.route-stop-marker {
+  display: grid;
+  place-items: center;
+  width: var(--route-stop-size);
+  height: var(--route-stop-size);
+  background: var(--route-stop-fill);
+  color: var(--route-stop-text);
+  border: 2px solid var(--route-stop-ring);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--pin-shadow);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  pointer-events: none;
+}
+
+.is-picking-route-stops .maplibregl-canvas-container {
+  cursor: crosshair;
+}
+
+/* The planned route's trails and legs in the trail panel. */
+.trail-planned {
+  margin: var(--space-sm) 0;
+  font-size: var(--text-sm);
+}
+
+.trail-planned-list {
+  margin: var(--space-xs) 0;
+  padding-left: var(--space-base);
+  color: var(--text-secondary);
+}
+
+@media (max-width: 640px) {
+  /* On a phone the planner spans the bottom, above MapLibre's attribution, leaving the
+   * map above it for the clicks. It folds to one button once a route opens in a sheet. */
+  .app .route-planner {
+    /* Above the row of live-location buttons, which sits above the attribution. */
+    bottom: calc(
+      var(--phone-attribution-height) + var(--live-controls-lift) + var(--hike-panel-lift) +
+        var(--space-sm) + env(safe-area-inset-bottom)
+    );
+    width: calc(100% - 2 * var(--space-sm) - env(safe-area-inset-left) - env(safe-area-inset-right));
+  }
+
+  /* Compact on a phone: the count and Undo last stand in for the list and the hint. */
+  .app .route-planner-stops,
+  .app .route-planner-hint {
+    display: none;
+  }
+
+  .app .route-planner.is-closed {
+    width: auto;
+  }
+}

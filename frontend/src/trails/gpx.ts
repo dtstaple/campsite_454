@@ -8,11 +8,14 @@
 export interface GpxTarget {
   osm_id: number | null;
   assembly?: { from_way: string } | null;
+  /** TM05-119: a route planned across connected trails, by its id. */
+  planned?: { id: string } | null;
 }
 
 /** The API path (no host) of the trail's GPX, with its campsite distance. */
 export function gpxPath(detail: GpxTarget, withinM: number): string | null {
   const query = `?campsites_within_m=${withinM}`;
+  if (detail.planned) return `/api/routing/${detail.planned.id}/gpx/${query}`;
   if (detail.osm_id !== null) return `/api/routes/${detail.osm_id}/gpx/${query}`;
   const way = detail.assembly?.from_way;
   if (!way) return null;

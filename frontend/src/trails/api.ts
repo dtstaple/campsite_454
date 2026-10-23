@@ -7,6 +7,7 @@ import type { CandidateSearch } from "./candidates";
 import type { Connection } from "./connections";
 import { API_BASE_URL, type Bbox } from "../api";
 import { authHeaders, storedSession } from "../auth";
+import { routingPath, type Cost, type PlannedBlock } from "../routing/planned";
 
 export interface RouteSummary {
   osm_id: number;
@@ -109,6 +110,8 @@ export interface RouteDetail extends Omit<RouteSummary, "osm_id"> {
   route_type?: RouteType;
   /** TM05-101: named trails meeting this one at a junction node, by mile. */
   connections?: Connection[];
+  /** TM05-119: set for a route planned across connected trails, named by its id. */
+  planned?: PlannedBlock | null;
 }
 
 export class RouteApiError extends Error {}
@@ -232,6 +235,39 @@ export function searchRoutes(
 export function fetchRouteDetail(osmId: number, withinM: number, signal?: AbortSignal) {
   const params = new URLSearchParams({ campsites_within_m: String(withinM) });
   return getJson<RouteDetail>(`${API_BASE_URL}/api/routes/${osmId}/?${params}`, signal);
+}
+
+/**
+ * TM05-119: a route across connected trails through clicked points, start first and end
+ * last. The answer is a route detail with a `planned` block; 422 says why it can't route.
+ */
+export async function planRoute(
+  points: [number, number][],
+  cost: Cost,
+  withinM: number,
+  signal?: AbortSignal,
+): Promise<RouteDetail> {
+  const params = new URLSearchParams({ campsites_within_m: String(withinM) });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}/api/routing/plan/?${params}`, {
+      method: "POST",
+      signal,
+      headers: { "Content-Type": "application/json", ...authHeaders(storedSession()) },
+      body: JSON.stringify({ points, cost }),
+    });
+  } catch (cause) {
+    if (signal?.aborted) throw cause;
+    throw new RouteApiError(`Could not reach the API at ${API_BASE_URL}.`);
+  }
+  const body = await response.json().catch(() => null);
+  if (!response.ok) throw new RouteApiError(body?.error ?? `HTTP ${response.status}`);
+  return body as RouteDetail;
+}
+
+/** TM05-119: a planned route again, by its id. */
+export function fetchPlannedRoute(id: string, withinM: number, signal?: AbortSignal) {
+  return getJson<RouteDetail>(`${API_BASE_URL}${routingPath(id, "", withinM)}`, signal);
 }
 
 /**

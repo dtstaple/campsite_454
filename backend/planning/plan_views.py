@@ -28,6 +28,8 @@ from api.gpx import Waypoint as GpxWaypoint
 from api.gpx import build_gpx, track_points
 from api.routes import DEFAULT_WITHIN_M, gpx_response, trail_for_way
 from geodata.models import Campsite, TrailRoute
+from routing.service import PlanningError
+from routing.service import resolve as resolve_planned
 
 from .models import PlanStop, TripPlan
 from .plans import CANDIDATE_PREFIX, CandidateStop, PlanError, build_plan, is_candidate
@@ -37,9 +39,15 @@ MAX_PLANS_PER_USER = 200
 NAME_MAX = TripPlan._meta.get_field("name").max_length
 
 
-def _resolve_trail(osm_id, from_way):
+def _resolve_trail(osm_id, from_way, planned_route=None):
     """The route a plan is along. PlanError for a body that names none, 404 for one that
-    names a trail that does not exist."""
+    names a trail that does not exist. A planned route (TM05-119) is solved again from its
+    id; PlanError if it no longer can be."""
+    if planned_route:
+        try:
+            return resolve_planned(str(planned_route)).trail_route
+        except PlanningError as error:
+            raise PlanError(str(error)) from None
     if osm_id not in (None, ""):
         try:
             osm_id = int(osm_id)
@@ -49,7 +57,15 @@ def _resolve_trail(osm_id, from_way):
     if from_way:
         _, route, _ = trail_for_way(str(from_way))
         return route
-    raise PlanError("Say which trail: osm_id for a route, or from_way for a trail way.")
+    raise PlanError(
+        "Say which trail: osm_id for a route, from_way for a trail way, or planned_route "
+        "for a planned route."
+    )
+
+
+def _trail_fields(data) -> tuple:
+    """(osm_id, from_way, planned_route) from a request body."""
+    return data.get("osm_id"), data.get("from_way"), data.get("planned_route")
 
 
 def _sites(stop_ids):
@@ -86,6 +102,7 @@ def _saved(plan: TripPlan, worked: dict | None) -> dict:
         "name": plan.name,
         "osm_id": plan.osm_id,
         "from_way": plan.from_way or None,
+        "planned_route": plan.planned_route or None,
         "trail_name": plan.trail_name,
         "created_at": plan.created_at,
         "updated_at": plan.updated_at,
@@ -94,7 +111,7 @@ def _saved(plan: TripPlan, worked: dict | None) -> dict:
 
 
 def _work_out(plan: TripPlan) -> dict:
-    route = _resolve_trail(plan.osm_id, plan.from_way)
+    route = _resolve_trail(plan.osm_id, plan.from_way, plan.planned_route)
     sites = [
         stop.campsite if stop.campsite_id else CandidateStop(stop.candidate_id)
         for stop in plan.stops.select_related("campsite__facts")
@@ -111,7 +128,7 @@ def _bad(error: PlanError):
 @permission_classes([IsAuthenticated])
 def plan_preview_view(request):
     try:
-        route = _resolve_trail(request.data.get("osm_id"), request.data.get("from_way"))
+        route = _resolve_trail(*_trail_fields(request.data))
         return Response(_public(build_plan(route, _sites(request.data.get("stop_ids")))))
     except PlanError as error:
         return _bad(error)
@@ -130,6 +147,8 @@ def plans_view(request):
                 return _bad(PlanError("osm_id must be a number."))
         elif request.query_params.get("from_way"):
             mine = mine.filter(from_way=request.query_params["from_way"])
+        elif request.query_params.get("planned_route"):
+            mine = mine.filter(planned_route=request.query_params["planned_route"])
         return Response(
             [
                 {**_saved(plan, None), "nights": plan.nights}
@@ -141,7 +160,8 @@ def plans_view(request):
         return _bad(PlanError(f"You can keep up to {MAX_PLANS_PER_USER} plans."))
     try:
         name = _clean_name(request.data.get("name"))
-        route = _resolve_trail(request.data.get("osm_id"), request.data.get("from_way"))
+        osm_id, from_way, planned_route = _trail_fields(request.data)
+        route = _resolve_trail(osm_id, from_way, planned_route)
         sites = _sites(request.data.get("stop_ids"))
         worked = build_plan(route, sites)
     except PlanError as error:
@@ -151,7 +171,8 @@ def plans_view(request):
             user=request.user,
             name=name or f"{route.name}: {worked['nights']} nights",
             osm_id=route.osm_id,
-            from_way="" if route.osm_id else str(request.data.get("from_way")),
+            from_way="" if route.osm_id or planned_route else str(from_way),
+            planned_route=str(planned_route) if planned_route else "",
             trail_name=route.name,
         )
         PlanStop.objects.bulk_create(_stop_rows(plan, sites))
@@ -182,7 +203,7 @@ def plan_view(request, pk: int):
             name = _clean_name(request.data.get("name")) if "name" in request.data else None
             sites = _sites(request.data["stop_ids"]) if "stop_ids" in request.data else None
             if sites is not None:
-                route = _resolve_trail(plan.osm_id, plan.from_way)
+                route = _resolve_trail(plan.osm_id, plan.from_way, plan.planned_route)
                 build_plan(route, sites)  # validates before anything changes
             with transaction.atomic():
                 if name:
