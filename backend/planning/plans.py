@@ -23,7 +23,7 @@ from geodata.models import METRIC_SRID
 from geodata.route_rating import ALONG, NEAR_START, position_along
 from geodata.route_rating import config as route_config
 from scoring.config import load as load_scoring_config
-from scoring.verdict import PERMITTED, RULES, UNKNOWN, legality_verdict
+from scoring.verdict import PERMITTED, UNKNOWN, legality_verdict, undesignated_rule
 
 from .days import day_stats, smoothed_profile
 
@@ -81,13 +81,15 @@ def _name(site) -> str:
     return display_name(site)["display_name"] or "this campsite"
 
 
-def _candidate_legality() -> dict:
+def _candidate_legality(site) -> dict:
+    """A computed candidate's verdict: Unknown, citing the rule for undesignated sites
+    where it is (TM05-118)."""
     return {
         "verdict": UNKNOWN,
         "label": CANDIDATE_LABEL,
         "reason": "Computed from public land, trail, water, elevation and slope data. "
         "Nobody has mapped a campsite here, and road distance isn't checked.",
-        "rule": RULES["designated_150"],
+        "rule": undesignated_rule(site),
         "designated": False,
         "designation_basis": None,
         "elevation_ft": None,
@@ -161,7 +163,7 @@ def build_plan(route, sites) -> dict:
         site = stop.site
         if is_candidate(site):
             result = {"score": None}
-            legality = _candidate_legality()
+            legality = _candidate_legality(site)
             name = {"display_name": CANDIDATE_LABEL, "display_name_derived": False}
             warning = f"Night {night}, " + CANDIDATE_WARNING.format(label=CANDIDATE_LABEL)
             warnings.append(warning)

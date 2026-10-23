@@ -173,7 +173,10 @@ panel shows a **verdict** for the **site** instead: `legality` on
 `GET /api/campsites/<id>/detail/` and on each campsite in a route's detail. It sits
 **above** the score, and the panel's factor list no longer shows the legal factor.
 
-Code: `backend/scoring/verdict.py`.
+Code: `backend/scoring/verdict.py`. The rules it applies live in
+`backend/scoring/legality.yml`, one entry per region (TM05-118, "Per-region camping rules"
+below). This section describes the Adirondacks entry; the White Mountains entry and the
+format follow it.
 
 | Verdict | Label |
 |---|---|
@@ -247,6 +250,140 @@ No undesignated site lies clearly above an elevation limit today.
 
 Designation evidence: RIDB 660, lean-to 180, OSM "designated" 75, OSM DEC operator 58, none
 527.
+
+### Per-region camping rules (TM05-118)
+
+Camping rules differ by region, so they live in config, `backend/scoring/legality.yml`,
+not in code. `backend/scoring/rules.py` loads and checks the file at startup; a malformed
+file is an error at load, never at request time. **Adding a region is a new entry in
+that file and nothing else.**
+
+**Where no rules are recorded, the verdict is always "Unknown: check current rules",
+never "Permitted"**: outside every region, and in a region with no rules (today the Green
+Mountains and Maine, which are in `regions.yml` for ingestion but have no camping rules
+yet). The reason says so, and still mentions a designation or closed land if the data
+show one.
+
+#### The format
+
+```yaml
+version: 1
+margins:                      # measurements this close to a limit are not decided
+  elevation: {value: 50, unit: ft}
+  distance: {value: 15, unit: m}
+regions:
+  <key>:
+    label: Adirondack Park, New York
+    authority: {name: NYS Department of Environmental Conservation, short: DEC}
+    area: {bbox: [west, south, east, north]}   # lon/lat, EPSG:4326; first match wins
+    sources:
+      <name>: {title: ..., url: https://..., fetched: 2026-10-07}
+    designation:              # evidence of a designated site, beyond the universal ones
+      operators:
+        - {match: DEC, basis: mapped as operated by NYSDEC in OpenStreetMap}
+    rules:
+      - id: adirondack_4000
+        kind: max_elevation
+        limit: {value: 4000, unit: ft}
+        text: "Except in an emergency, camping is prohibited above ..."   # quoted
+        source: <name>
+    unchecked:                # cited rules the data cannot check (documentation only)
+      - {id: ..., text: ..., source: <name>, why: ...}
+```
+
+- **Every number carries its unit** (`m`, `km`, `ft`, `mi`), so a region in metres is as
+  easy to write as one in feet. Nothing in the format is specific to one country: land is
+  matched by the protected-area name the enrichment stored (PAD-US in the US, any other
+  protected-area dataset elsewhere), and the authority is just a name.
+- **Every rule quotes its official source** (`text`, and `source` naming a URL in
+  `sources`). The verdict cites it as `rule: {text, source}`.
+- **Universal designation evidence** holds in every region: a Recreation.gov (RIDB)
+  listing, a lean-to, or an OSM record described as "designated". A region adds operators
+  (matched against the OSM `operator` tag, spaces removed, any case).
+
+**Rule kinds.** The code knows these four; any other kind fails at load.
+
+| Kind | Fields | Effect |
+|---|---|---|
+| `max_elevation` | `limit`, optional `where`, optional `exempt` (site types) | Above it by more than the margin: an undesignated site is **Not permitted**. Within the margin, or above it for a designated site: **Unknown**. |
+| `no_camping` | `where` (required) | An undesignated site on matching land is **Not permitted**; a designated one is **Unknown** (the data disagree, or it may be one of the named exceptions). |
+| `setback` | `from` (`trail` or `water`), `distance`, optional `where` | An undesignated site inside it, or within the margin of it, is **Unknown**, citing it. Never Not permitted: setbacks hold "except at designated sites", and we cannot rule that out. Designated sites are exempt. |
+| `undesignated` | `reason` (required) | Exactly one per region with rules: the rule and reason cited when a site's designation cannot be confirmed and nothing more specific applies. |
+
+`where` matches the site's stored facts, case-insensitively: `land_name_contains`,
+`land_name_in`, `trail_name_in` (the nearest named trail) and `water_name_in` (the
+nearest named water). Several keys mean any of them.
+
+**Order of decision**, the same in every region:
+
+1. No region, or no rules: **Unknown**.
+2. Land closed (PAD-US): **Not permitted**, or **Unknown** for a designated site.
+3. `no_camping` areas.
+4. `max_elevation` limits.
+5. Designated, and clear of all of the above: **Permitted · designated site** (Unknown if
+   the region has an elevation limit there and the elevation is not known).
+6. Undesignated: the first `setback` it is inside, else the region's `undesignated` rule.
+   Both are **Unknown**.
+
+#### The White Mountains
+
+Source: [White Mountain National Forest: Backcountry Camping Regulations and Guide](https://www.fs.usda.gov/sites/nfs/files/r09/whitemountain/publication/Backcountry%20Camping%20Regulations%20%26%20Guide%20%28Web%20Version%29.pdf)
+(USDA Forest Service, fetched 2026-10-23). Every rule below quotes it.
+
+| Rule | Kind | Checked against |
+|---|---|---|
+| No camping: Bartlett Experimental Forest, Rocky Gorge Scenic Area | `no_camping` | PAD-US parcel name |
+| Mount Chocorua Scenic Area: no camping except at Jim Liberty Cabin and Camp Penacook Shelter | `no_camping` | PAD-US parcel name |
+| Pemigewasset, Presidential Range-Dry River and Great Gulf Wildernesses: no camping within 200 ft of any trail except at designated sites | `setback` | parcel name, nearest named trail |
+| 200 ft FPA trails: Ammonoosuc Ravine, Falling Waters, Liberty Springs (OSM: "Liberty Spring"), Old Bridle Path | `setback` | nearest named trail |
+| 200 ft FPA water: Black Mountain Pond | `setback` | nearest named water |
+| 1/4 mile FPA waterbodies: Black, East, Greeley, Kiah and Long Ponds, Thoreau Falls, Unknown Pond, Champney Falls, Diana's Baths, Sabbaday Falls, Sawyer Ponds | `setback` | nearest named water |
+| 1/4 mile FPA around any hut, shelter, developed tent site, cabin, picnic area, campground or trailhead, except at designated sites | `undesignated` | cited for every undesignated site |
+
+Designation evidence added for the White Mountains: sites run by the Appalachian
+Mountain Club, Randolph Mountain Club, Harvard Mountaineering Club or Dartmouth Outing
+Club ("Designated Sites Managed by Partners"). A DEC operator tag is evidence only in the
+Adirondacks.
+
+**Cited but not checkable** (`unchecked`), so they never make a verdict Permitted or Not
+permitted:
+
+- **The alpine zone** ("trees less than 8ft tall"): no camping except on 2 ft or more of
+  snow. There is no treeline layer, and no official treeline elevation to stand in for
+  one, so no elevation is used.
+- **The Cutler River Drainage** (Tuckerman and Huntington Ravines, Alpine Garden): it is
+  not a PAD-US parcel.
+- **Rules on part of a trail or river between named points** (the Appalachian Trail from
+  Moosilauke to the Connecticut River, the East Branch of the Pemigewasset, parts of the
+  Great Gulf Trail, Valley Way, Wild River Trail and Champney Falls Trail), Virginia
+  Lake's southern shoreline and Zeta Pass.
+
+The general rule for undesignated sites names the alpine zone in its reason, so it is
+never silently passed over. The White Mountains have no elevation limit, so a designated
+site there is never downgraded for its elevation. The highest designated sites today are
+the AMC's Liberty Springs (about 3,864 ft) and Naumann (about 3,778 ft) tentsites.
+
+#### Measured (dev DB, 1,500 sites, 2026-10-23)
+
+| Region | Verdict | Before TM05-118 | After |
+|---|---|---|---|
+| Adirondacks | Permitted · designated site | 308 | 308 |
+| | Not permitted | 3 | 3 |
+| | Unknown: check current rules | 432 | 432 |
+| White Mountains | Permitted · designated site | 660 | 664 |
+| | Not permitted | 3 | 3 |
+| | Unknown: check current rules | 93 | 89 |
+| Outside every region | Unknown: check current rules | 1 | 1 |
+
+- **Adirondacks: all 743 verdicts are byte-identical**: verdict, label, reason, cited
+  rule and designation basis. `tests/test_legality_rules.py` replays 1,920 Adirondack
+  inputs against the pre-TM05-118 outputs.
+- **White Mountains:** 4 AMC-run sites became Permitted. Of the 89 Unknown, 85 cite the
+  1/4 mile FPA rule, 3 a wilderness trail setback (two mapped on the Great Gulf Trail
+  itself), and 1 the 1/4 mile rule around Unknown Pond. No site became Not permitted from
+  a new rule. The 3 Not permitted are closed land, as before.
+- Before TM05-118, a White Mountains site with no confirmed designation cited NYS DEC's
+  150 ft rule; it now cites the Forest Service's rules.
 
 ### Stability promise
 

@@ -1,0 +1,155 @@
+# Camping rules per region (TM05-118). docs/scoring.md, "Per-region camping rules",
+# explains the format; backend/scoring/verdict.py applies it.
+#
+# A region is an area plus the rules that apply there, each quoted from an official
+# source. Adding a region is a new entry here and nothing else. A rule kind the code does
+# not know is a load error, never silently skipped.
+#
+# Nothing here is specific to one country: distances and elevations carry their unit,
+# land is matched by the protected-area name the enrichment stored (PAD-US in the US; any
+# other protected-area dataset elsewhere), and a region's authority is just a name.
+#
+# Outside every region, or in a region with no rules, the verdict is always
+# "Unknown: check current rules", never "Permitted".
+
+version: 1
+
+# A measured value this close to a limit is not decided either way: 3DEP's point
+# elevation and OpenStreetMap's positions are not exact.
+margins:
+  elevation: {value: 50, unit: ft}
+  distance: {value: 15, unit: m}
+
+regions:
+  adirondacks:
+    label: Adirondack Park, New York
+    authority: {name: NYS Department of Environmental Conservation, short: DEC}
+    # Roughly the Blue Line. The same box as backend/pipeline/regions.yml, but kept here on
+    # purpose: that file is ingestion extents, this one says where the rules apply.
+    area: {bbox: [-75.40, 43.00, -73.30, 44.90]}
+    sources:
+      state_land_rules:
+        title: State Land Camping Rules (NYS DEC)
+        url: https://dec.ny.gov/things-to-do/camping/state-land-rules
+        fetched: 2026-10-07
+      high_peaks:
+        title: High Peaks Wilderness Complex (NYS DEC)
+        url: https://dec.ny.gov/places/high-peaks-wilderness-complex
+        fetched: 2026-10-07
+    # Evidence of a designated site on top of the universal ones (a Recreation.gov
+    # listing, a lean-to, an OSM record described as "designated"). Matched against the
+    # OSM operator tag with spaces removed, case-insensitively.
+    designation:
+      operators:
+        - {match: DEC, basis: mapped as operated by NYSDEC in OpenStreetMap}
+    rules:
+      - id: adirondack_4000
+        kind: max_elevation
+        limit: {value: 4000, unit: ft}
+        text: "Except in an emergency, camping is prohibited above an elevation of 4,000 feet in the Adirondacks."
+        source: state_land_rules
+      - id: high_peaks_3500
+        kind: max_elevation
+        limit: {value: 3500, unit: ft}
+        where: {land_name_contains: [high peaks wilderness]}
+        exempt: [lean_to]
+        text: "No camping above 3,500 feet (except at lean-to)."
+        source: high_peaks
+      - id: designated_150
+        kind: undesignated
+        text: "Camping is prohibited within 150 feet of any road, trail, spring, stream, pond or other body of water except at areas designated by a 'Camp Here' disk."
+        source: state_land_rules
+        reason: >-
+          Not a designated site we can confirm. At-large camping is allowed on open Forest
+          Preserve land at least 150 ft from roads, trails and water, which cannot all be
+          checked here.
+
+  white-mountains-nh:
+    label: White Mountain National Forest, New Hampshire
+    authority: {name: USDA Forest Service, White Mountain National Forest, short: WMNF}
+    # The region's ingestion box (backend/pipeline/regions.yml). It also takes in some
+    # state and private land; there these rules only ever make a verdict more cautious.
+    area: {bbox: [-72.00, 43.85, -70.95, 44.55]}
+    sources:
+      wmnf_backcountry:
+        title: "White Mountain National Forest: Backcountry Camping Regulations and Guide (USDA Forest Service)"
+        url: https://www.fs.usda.gov/sites/nfs/files/r09/whitemountain/publication/Backcountry%20Camping%20Regulations%20%26%20Guide%20%28Web%20Version%29.pdf
+        fetched: 2026-10-23
+    designation:
+      # "Designated Sites Managed by Partners": sites run by the AMC, the Harvard
+      # Mountaineering Club and the Randolph Mountain Club, and the Dartmouth Outing
+      # Club's "first come-first served free designated backcountry sites".
+      operators:
+        - {match: AppalachianMountainClub, basis: mapped as run by the Appalachian Mountain Club in OpenStreetMap}
+        - {match: RandolphMountainClub, basis: mapped as run by the Randolph Mountain Club in OpenStreetMap}
+        - {match: HarvardMountaineeringClub, basis: mapped as run by the Harvard Mountaineering Club in OpenStreetMap}
+        - {match: DartmouthOutingClub, basis: mapped as run by the Dartmouth Outing Club in OpenStreetMap}
+    rules:
+      # Areas closed to camping. Only those PAD-US names as a parcel; the Cutler River
+      # Drainage (Tuckerman and Huntington Ravines) and Zeta Pass are not, so they are
+      # listed under `unchecked` below.
+      - id: wmnf_no_camping_scenic_experimental
+        kind: no_camping
+        where: {land_name_in: [Bartlett Experimental Forest, Rocky Gorge Scenic Area]}
+        text: "Experimental Forests, Research Natural & Scenic Area Regulations. No Camping: Bartlett Experimental Forest; Rocky Gorge Scenic Area."
+        source: wmnf_backcountry
+      - id: wmnf_chocorua
+        kind: no_camping
+        where: {land_name_in: [Mount Chocorua Scenic Area]}
+        text: "Mount Chocorua Scenic Area: No camping except at Jim Liberty Cabin and Camp Penacook Shelter."
+        source: wmnf_backcountry
+      # Setbacks that hold except at designated sites. Designated sites in Wilderness "may
+      # not appear on any maps", so a site inside a setback is Unknown, never Not permitted.
+      - id: wmnf_wilderness_200ft_trail
+        kind: setback
+        from: trail
+        distance: {value: 200, unit: ft}
+        where: {land_name_in: [Pemigewasset Wilderness, Presidential Range-Dry River Wilderness, Great Gulf Wilderness]}
+        text: "Pemigewasset/Presidential Dry River Wilderness Regulations: No camping, wood, or charcoal fires within 200ft of any trail except at designated sites. Great Gulf Wilderness Regulations: No camping within 200ft of any trail except at designated sites."
+        source: wmnf_backcountry
+      - id: wmnf_fpa_200ft_trails
+        kind: setback
+        from: trail
+        distance: {value: 200, unit: ft}
+        # OpenStreetMap names the Liberty Springs Trail "Liberty Spring Trail"; both match.
+        where: {trail_name_in: [Ammonoosuc Ravine Trail, Falling Waters Trail, Liberty Springs Trail, Liberty Spring Trail, Old Bridle Path]}
+        text: "200 ft FPA regulations apply to the following areas (except at designated sites): Trails: Ammonoosuc Ravine Trail; Falling Waters Trail; Liberty Springs Trail; Old Bridle Path."
+        source: wmnf_backcountry
+      - id: wmnf_fpa_200ft_water
+        kind: setback
+        from: water
+        distance: {value: 200, unit: ft}
+        where: {water_name_in: [Black Mountain Pond]}
+        text: "200 ft FPA regulations apply to the following areas (except at designated sites): Waterbodies: Black Mountain Pond."
+        source: wmnf_backcountry
+      - id: wmnf_fpa_quarter_mile_water
+        kind: setback
+        from: water
+        distance: {value: 0.25, unit: mi}
+        where: {water_name_in: [Black Pond, East Pond, Greeley Ponds, Kiah Pond, Long Pond, Thoreau Falls, Unknown Pond, Champney Falls, "Diana's Baths", Sabbaday Falls, Sawyer Ponds, Little Sawyer Pond]}
+        text: "1/4 mile FPA regulations apply to the following areas (except at designated sites): Waterbodies: Black Pond, East Pond, Greeley Ponds, Kiah Pond, Long Pond, Thoreau Falls (Pemigewasset District); Unknown Pond (Androscoggin District); Champney Falls, Diana's Baths, Sabbaday Falls, Sawyer Ponds including Little Sawyer Pond (Saco District)."
+        source: wmnf_backcountry
+      - id: wmnf_fpa_quarter_mile_developed
+        kind: undesignated
+        text: "1/4 mile FPA regulations apply to the following areas (except at designated sites): Developed Sites: Any hut, shelter, developed tent site, cabin, picnic area, developed day use site, or campground; Any Trailhead."
+        source: wmnf_backcountry
+        reason: >-
+          Not a designated site we can confirm. In the White Mountain National Forest,
+          camping is not allowed within 1/4 mile of huts, shelters, tent sites, campgrounds
+          and trailheads, or in the alpine zone above treeline, except at designated sites.
+          Those cannot all be checked here.
+    # Cited rules the data cannot check: they never make a verdict Permitted or Not
+    # permitted, and docs/scoring.md lists them so the gap is visible.
+    unchecked:
+      - id: wmnf_alpine_zone
+        text: "Camping Regulations in the Alpine Zone (This is a high elevation zone with fragile plants & trees less than 8ft tall.): No camping except on 2 or more feet of snow."
+        source: wmnf_backcountry
+        why: There is no treeline or tree-height layer, and no official elevation for treeline.
+      - id: wmnf_cutler_river
+        text: "Cutler River Drainage Regulations: No camping except at Hermit Lake Shelters (year-round) and Harvard Mountaineering Club Cabin (December 1- March 31 only). Above treeline areas of the Cutler River Drainage which include Tuckerman and Huntington Ravines, Alpine Garden, and East Snowfields are closed to camping regardless of snow cover."
+        source: wmnf_backcountry
+        why: The drainage is not a parcel in PAD-US.
+      - id: wmnf_fpa_partial_segments
+        text: "FPA regulations on parts of trails and rivers: the Appalachian Trail corridor from the summit of Mt. Moosilauke to the Connecticut River; the East Branch of the Pemigewasset River; the Great Gulf Trail, Valley Way, Wild River Trail and Champney Falls Trail between named points; Virginia Lake's southern shoreline; Zeta Pass."
+        source: wmnf_backcountry
+        why: The rule covers part of a trail or river between named points, which the data cannot locate.
