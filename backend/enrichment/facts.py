@@ -17,7 +17,7 @@ from analysis.base import AnalysisError
 from enrichment.models import CampsiteFacts
 from geodata.distance import nearest
 from geodata.models import Campsite, PublicLand, Trail, TrailRoute, WaterFeature
-from scoring.stored import as_results, evaluate_stored, factors_digest
+from scoring.stored import as_results, evaluate_stored, factors_digest, terrain_results
 
 #: Bump when any derivation below changes meaning; stored with every row.
 METHOD_VERSION = "1"
@@ -234,4 +234,5 @@ def stored_factor_results(campsite, facts: CampsiteFacts) -> dict:
         CampsiteFacts.objects.filter(pk=facts.pk).update(
             factor_results=facts.factor_results, factor_digest=digest
         )
-    return as_results(facts.factor_results)
+    # TM05-143: plus the terrain factors, read from the site's terrain facts now.
+    return {**as_results(facts.factor_results), **terrain_results(campsite)}

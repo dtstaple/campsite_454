@@ -76,7 +76,7 @@ def _sites(stop_ids):
         raise PlanError("Each campsite can be a stop only once.")
     candidates = [CandidateStop(i) for i in stop_ids if i.startswith(CANDIDATE_PREFIX)]
     mapped = [i for i in stop_ids if not i.startswith(CANDIDATE_PREFIX)]
-    sites = list(Campsite.objects.filter(source_id__in=mapped).select_related("facts"))
+    sites = list(Campsite.objects.filter(source_id__in=mapped).select_related("facts", "terrain"))
     missing = sorted(set(mapped) - {site.source_id for site in sites})
     if missing:
         raise PlanError(f"No campsite with id {', '.join(missing)}.")

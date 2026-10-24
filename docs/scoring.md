@@ -10,11 +10,12 @@ has two parts:
 
 ---
 
-## 1. Output contract (version 1, revision 1.1)
+## 1. Output contract (version 1, revision 1.2)
 
-Revision 1.1 (TM05-76) added `suitability_score` and `legal_status`. It only adds fields,
-so `contract` is still `1` and every contract-1 consumer keeps working (see the change log
-at the end of this section).
+Revision 1.1 (TM05-76) added `suitability_score` and `legal_status`. Revision 1.2
+(TM05-143) added three factor keys: `drainage`, `shelter` and `view`. Both revisions only
+add, so `contract` is still `1` and every contract-1 consumer keeps working (see the
+change log at the end of this section).
 
 A score is a JSON object. Every field below is always present; nothing is omitted when
 empty, it is `null` or `[]` instead, so a consumer never has to test for a missing key.
@@ -396,6 +397,7 @@ New factor keys may appear. Anything breaking bumps `contract`.
 |---|---|---|
 | 1.0 | TM05-43 | The contract as first published. |
 | 1.1 | TM05-76 | Added `suitability_score` and `legal_status`. Additive only, so `contract` stays `1`. A consumer that rejects any `contract` other than `1` (as the campsite panel's `parseScore` does) keeps working. |
+| 1.2 | TM05-143 | Added the factor keys `drainage`, `shelter` and `view` (model 1.3.0). No field changed. Each is `not_available` until `make terrain` has covered the site, so a consumer that knew only the six earlier keys renders them from `label` and `explanation`, as the campsite panel does. |
 
 ---
 
@@ -417,20 +419,25 @@ A weighted mean rather than a weighted sum, so weights are *relative*: they need
 to 1, and a factor that cannot be evaluated drops out without distorting the scale. Factors
 appear in the output in the order of `weights` in `config.yml`.
 
-### Weights (model 1.2.0)
+### Weights (model 1.3.0)
 
 | Factor | Weight | Share today | Why |
 |---|---|---|---|
-| `water` | 0.35 | 32% | The thing a backcountry site most depends on. |
-| `legal` | 0.30 | 27% | Whether you may camp there at all. Also the only factor that can cap. |
-| `trail` | 0.20 | 18% | Reachability. Matters, but a short bushwhack is fine. |
-| `weather` | 0.15 | 14% | Tonight's conditions. Real, but it changes daily and does not make a place better or worse. |
-| `slope` | 0.10 | 9% | Whether there is flat ground to sleep on (TM05-64). |
+| `water` | 0.35 | 27% | The thing a backcountry site most depends on. |
+| `legal` | 0.30 | 23% | Whether you may camp there at all. Also the only factor that can cap. |
+| `trail` | 0.20 | 15% | Reachability. Matters, but a short bushwhack is fine. |
+| `weather` | 0.15 | 12% | Tonight's conditions. Real, but it changes daily and does not make a place better or worse. |
+| `slope` | 0.10 | 8% | Whether there is flat ground to sleep on (TM05-64). |
 | `land_cover` | 0.05 | — | Placeholder; counts once Sentinel-2 lands. |
+| `drainage` | 0.10 | 8% | Whether rain pools where you sleep (TM05-143, terrain model). |
+| `shelter` | 0.05 | 4% | Out of the wind, or on an exposed rise (TM05-143). |
+| `view` | 0.05 | 4% | A modest bonus for what you can see, and water in view (TM05-143). |
 
-"Share today" is the effective weight while land cover is `not_available` (0.35 / 1.10
-and so on). Model 1.0.0 (TM05-43) had no weather; 1.1.0 (TM05-44) added it; 1.2.0
-(TM05-64) replaced the slope placeholder with a real factor. Change a weight by editing
+"Share today" is the effective weight while land cover is `not_available` (0.35 / 1.30
+and so on), for a site the terrain pipeline has covered. A site it hasn't reached scores
+as in model 1.2.0: the three terrain factors are `not_available` and drop out. History:
+model 1.0.0 (TM05-43) had no weather; 1.1.0 (TM05-44) added it; 1.2.0 (TM05-64) replaced
+the slope placeholder with a real factor; 1.3.0 (TM05-143) added the terrain factors. Change a weight by editing
 `config.yml`; no code changes, and the
 `config_digest` on every score changes with it.
 
@@ -543,6 +550,38 @@ Explanation, e.g. "Ground is gently sloping: 6° (10%) across 20 m."
 
 **Caveat:** 3DEP is hydro-flattened. A site whose mapped point falls on a pond or lake
 (Marcy Dam's does) reads exactly 0° — water, not ground.
+
+### Terrain: drainage, shelter and view (TM05-143)
+
+These three come from the terrain pipeline (TM05-141, docs/terrain-analysis.md): GeoLibre
+over USGS 3DEP. Each explanation ends "Terrain-model estimate from bare-earth elevation."
+
+| Factor | Sub-score | From |
+|---|---|---|
+| `drainage` | low 100, medium 60, high 10 | Water pooling risk: the wetness index and sink depth. High is the penalty. |
+| `shelter` | sheltered 100, moderate 75, exposed 35 | Deviation from mean elevation over about 1 km. |
+| `view` | visible km² → 40 (0) / 55 (2) / 70 (10) / 80 (30), plus 20 with water in view | The site's viewshed: eye height 1.7 m, out to 10 km. |
+
+**Where the values come from.** A campsite's facts are read from its `TerrainFacts` when it
+is scored (`scoring/stored.py`, `terrain_results`). They are not stored with the
+vector-data factor results, because enrichment writes those before `make terrain` runs.
+For any other point, such as a potential spot, the factor looks for a campsite's facts at
+that exact spot. `drainage` also checks the pooling-risk zones, and inside one it scores
+10. Otherwise the factor is `not_available`, and the total renormalises without it.
+
+**Legality stays separate.** None of the three is part of `legal_status`, which is
+computed from the `legal` factor alone, so terrain never decides whether you may camp.
+
+**Measured.** On the 743 Adirondack campsites, model 1.2.0 → 1.3.0 with default weights:
+
+| | Mean | p10 | Median | p90 | A | B | C | D | F |
+|---|---|---|---|---|---|---|---|---|---|
+| Before | 75.3 | 57 | 78 | 88 | 58 | 277 | 217 | 103 | 88 |
+| After | 76.0 | 61 | 79 | 88 | 39 | 297 | 231 | 124 | 52 |
+
+Per site, the score moved by −9 to +11: 395 up, 244 down and 104 unchanged. It is a
+nudge, not a reordering. Sheltered, well-drained sites gain, the F band shrinks, and
+exposed or wet sites lose a few points.
 
 ### Placeholder: land cover
 

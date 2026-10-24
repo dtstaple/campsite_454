@@ -409,3 +409,131 @@ class SlopeFactor(Factor):
 class LandCoverFactor(PlaceholderFactor):
     key = "land_cover"
     label = "Land cover"
+
+
+# --- terrain (TM05-143) --------------------------------------------------------------
+#
+# Drainage, shelter and view come from the terrain pipeline's per-site facts (TM05-141,
+# terrain.models.TerrainFacts). A campsite's facts are read when it is scored
+# (scoring/stored.py terrain_results), so a `make terrain` run shows up at once. They are
+# never stored with the vector-data results, which enrichment writes before terrain runs.
+# For an arbitrary point, evaluate() looks for a campsite's facts at that exact spot.
+# Drainage can also use the pooling-risk zones. Otherwise the factor is not_available
+# and drops out, like weather.
+
+TERRAIN_NOTE = "Terrain-model estimate from bare-earth elevation."
+
+
+class TerrainFactor(Factor):
+    def facts_at(self, lon, lat):
+        from terrain.models import TerrainFacts
+
+        point = Point(lon, lat, srid=4326)
+        return (
+            TerrainFacts.objects.filter(campsite__geom__dwithin=(point, 1e-6))
+            .order_by("campsite_id")
+            .first()
+        )
+
+    def evaluate(self, lon, lat):
+        facts = self.facts_at(lon, lat)
+        if facts is not None:
+            return self.from_facts(facts)
+        return self.unavailable()
+
+    def unavailable(self) -> FactorResult:
+        return self.result(NOT_AVAILABLE, None, None, "No terrain facts for this spot yet.")
+
+    def from_facts(self, facts) -> FactorResult:
+        raise NotImplementedError
+
+
+@register
+class DrainageFactor(TerrainFactor):
+    """Water pooling risk at the site: low ground or a hollow water drains into scores low."""
+
+    key = "drainage"
+    label = "Drainage"
+
+    def from_facts(self, facts):
+        if not facts.pooling:
+            return self.unavailable()
+        score = self.settings["scores"][facts.pooling]
+        reason = facts.pooling_reason or ""
+        return self.result(
+            SCORED,
+            score,
+            {"pooling": facts.pooling, "twi": facts.values.get("twi")},
+            f"Water pooling risk {facts.pooling}. {reason} {TERRAIN_NOTE}".replace("  ", " "),
+        )
+
+    def evaluate(self, lon, lat):
+        facts = self.facts_at(lon, lat)
+        if facts is not None:
+            return self.from_facts(facts)
+        # A point with no site facts (a potential spot): only the zones can speak for it.
+        from terrain.models import TerrainZone
+
+        point = Point(lon, lat, srid=4326)
+        if TerrainZone.objects.filter(
+            layer="pooling-risk", tile="", geom__intersects=point
+        ).exists():
+            return self.result(
+                SCORED,
+                self.settings["scores"]["high"],
+                {"pooling": "high", "zone": True},
+                f"Inside a high water pooling risk zone. {TERRAIN_NOTE}",
+            )
+        return self.unavailable()
+
+
+@register
+class ShelterFactor(TerrainFactor):
+    """Shelter from wind: lower than the surrounding ground scores higher."""
+
+    key = "shelter"
+    label = "Shelter"
+
+    def from_facts(self, facts):
+        if not facts.shelter:
+            return self.unavailable()
+        words = {"sheltered": "Sheltered", "moderate": "Moderate shelter", "exposed": "Exposed"}
+        return self.result(
+            SCORED,
+            self.settings["scores"][facts.shelter],
+            {"shelter": facts.shelter, "dev": facts.values.get("dev")},
+            f"{words[facts.shelter]}. {facts.shelter_reason} {TERRAIN_NOTE}".replace("  ", " "),
+        )
+
+
+@register
+class ViewFactor(TerrainFactor):
+    """A modest bonus for a view: more visible ground, and water in sight, score higher."""
+
+    key = "view"
+    label = "View"
+
+    def from_facts(self, facts):
+        if facts.view_area_km2 is None:
+            return self.unavailable()
+        s = self.settings
+        score = piecewise(facts.view_area_km2, s["area_curve"])
+        if facts.water_view:
+            score += s["water_bonus"]
+        direction = facts.view_direction
+        where = (
+            ""
+            if not direction
+            else (", all around" if direction == "all around" else f", mostly {direction}")
+        )
+        water = " with water in view" if facts.water_view else ""
+        return self.result(
+            SCORED,
+            score,
+            {
+                "area_km2": facts.view_area_km2,
+                "direction": direction or None,
+                "water_view": facts.water_view,
+            },
+            f"{facts.view_area_km2:.1f} km² in view{where}{water}. {TERRAIN_NOTE}",
+        )
