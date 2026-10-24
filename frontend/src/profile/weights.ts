@@ -15,6 +15,10 @@ export const FACTORS = [
   { key: "weather", label: "Good weather", hint: "Today's forecast at the site" },
   { key: "slope", label: "Flat ground", hint: "How level the terrain is" },
   { key: "land_cover", label: "Land cover", hint: "Forest, meadow or open ground" },
+  // TM05-143: from the terrain model (make terrain).
+  { key: "drainage", label: "Drains well", hint: "Low water pooling risk in rain" },
+  { key: "shelter", label: "Sheltered", hint: "Lower than the ground around it, out of the wind" },
+  { key: "view", label: "A view", hint: "How much you can see, and water in view" },
 ] as const;
 
 export type FactorKey = (typeof FACTORS)[number]["key"];

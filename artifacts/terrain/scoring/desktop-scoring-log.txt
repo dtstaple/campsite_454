@@ -1,0 +1,13 @@
+score breakdown: Water 97 77 m from perennial stream (Marcy Brook) Trail access 53 3 m from the nearest trail Weather Not available No recent forecast stored for here. Slope 69 Ground slope 6° (11%) Land cover Not available Land cover isn't measured yet. Drainage 100 Water pooling risk low. Water drains away from here (wetness index 7.2). Terrain-model estimate from bare-earth elevation. Shelter 75 Moderate shelter. About level with the ground around it. Terrain-model estimate from bare-earth elevation. View 85 7.1 km² in view, all around with water in view. Terrain-model estimate from bare-earth elevation.
+Phelps Trail, Water view: 0 of 27 rows (0 of 27 match · Terrain-model estimate from bare-earth elevation. Trees, buildings and recent changes aren't counted.)
+Phelps Trail, Sheltered: 8 of 27 rows (8 of 27 match · Terrain-model estimate from bare-earth elevation. Trees, buildings and recent changes aren't counted.)
+Phelps Trail, Low pooling risk: 12 of 27 rows (12 of 27 match · Terrain-model estimate from bare-earth elevation. Trees, buildings and recent changes aren't counted.)
+opened: Deer Pond Trail
+Deer Pond Trail: 6 potential spots, 0 with badges
+  mi 0.0 Potential spot (unverified) 426 m off trail · 5° slope 78
+  mi 0.6 Potential spot (unverified) 60 m off trail · 2° slope 98
+  mi 1.6 Potential spot (unverified) 60 m off trail · 5° slope 93
+  mi 2.3 Potential spot (unverified) 195 m off trail · 1° slope 85
+  mi 2.8 Potential spot (unverified) 200 m off trail · 1° slope 95
+  mi 3.4 Potential spot (unverified) 150 m off trail · 0° slope 95
+first spot's checks: Potential spot (unverified) Computed mi 0.0 426 m off trail computed score 78 CHECKS IT PASSED ✓ On public land with open access (Saranac Lakes Wild Forest). ✓ At least 150 ft from any mapped trail (nearest 275 m). ✓ At least 150 ft from mapped water (nearest 418 m). ✓ Not in a high water pooling risk zone (terrain model). ✓ About 1,730 ft, below the 4,000 ft DEC limit. ✓ Gentle ground: 4.7° (limit 5°). Road distance isn't checked; verify current rules on the ground. “Camping is prohibited within 150 feet of any road, trail, spring, stream, pond or other body of water except at areas designated by a 'Camp Here' disk.” NYS DEC ×

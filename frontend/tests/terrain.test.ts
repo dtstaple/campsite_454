@@ -2,11 +2,13 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   area,
+  passesQuickFilters,
   TERRAIN_NOTE,
   terrainBadges,
   terrainLines,
   type TerrainPayload,
 } from "../src/terrain/terrain.ts";
+import { measurementText, parseScore } from "../src/score/breakdown.ts";
 
 const FULL: TerrainPayload = {
   pooling: { level: "low", reason: "Water drains away from here (wetness index 6.3)." },
@@ -79,4 +81,48 @@ test("badges show only what is worth a glance on a list row", () => {
 test("the honest label says what the model can't see", () => {
   assert.match(TERRAIN_NOTE, /bare-earth/);
   assert.match(TERRAIN_NOTE, /Trees, buildings and recent changes aren't counted/);
+});
+
+test("quick filters keep only rows known to qualify; unknown facts never pass", () => {
+  const lake = { pooling: "low", shelter: "sheltered", water_view: true } as const;
+  const ridge = { pooling: "medium", shelter: "exposed", water_view: false } as const;
+  const spot = { pooling: null, shelter: null, water_view: null }; // a potential spot
+  const on = (...keys: ("water_view" | "sheltered" | "low_pooling")[]) => new Set(keys);
+  assert.equal(passesQuickFilters(lake, on()), true);
+  assert.equal(passesQuickFilters(null, on()), true); // no filter: everything shows
+  assert.equal(passesQuickFilters(lake, on("water_view", "sheltered", "low_pooling")), true);
+  assert.equal(passesQuickFilters(ridge, on("water_view")), false);
+  assert.equal(passesQuickFilters(ridge, on("low_pooling")), false);
+  assert.equal(passesQuickFilters(spot, on("water_view")), false);
+  assert.equal(passesQuickFilters(spot, on("low_pooling")), false);
+  assert.equal(passesQuickFilters(null, on("sheltered")), false);
+});
+
+test("an exposed site or spot gets an Exposed badge", () => {
+  assert.deepEqual(
+    terrainBadges({ pooling: null, shelter: "exposed", water_view: null }).map((b) => [b.text, b.tone]),
+    [["Exposed", "warn"]],
+  );
+});
+
+test("the score breakdown shows a terrain factor in the engine's own words", () => {
+  const score = parseScore({
+    contract: 1,
+    score: 81,
+    caps: [],
+    factors: [
+      {
+        key: "drainage",
+        label: "Drainage",
+        status: "scored",
+        score: 100,
+        contribution: 9.1,
+        measurement: { pooling: "low", twi: 7.2 },
+        explanation: "Water pooling risk low. Water drains away from here (wetness index 7.2).",
+      },
+    ],
+  });
+  assert.ok(score);
+  assert.equal(score.factors[0].label, "Drainage");
+  assert.match(measurementText(score.factors[0]), /^Water pooling risk low/);
 });

@@ -4,9 +4,10 @@
  */
 
 import type { CampsiteAlong } from "./api";
+import type { TerrainBadges } from "../terrain/terrain";
 
 export interface CandidateCheck {
-  key: "public_land" | "trail" | "water" | "elevation" | "slope";
+  key: "public_land" | "trail" | "water" | "pooling" | "elevation" | "slope";
   passed: boolean;
   label: string;
 }
@@ -28,6 +29,8 @@ export interface Candidate {
   confidence: { level: "computed"; label: string; reason: string };
   elevation_m: number;
   slope_deg: number;
+  /** TM05-143: what the terrain zones say (exposure); absent from an older API. */
+  terrain?: TerrainBadges | null;
 }
 
 export interface CandidateSearch {
