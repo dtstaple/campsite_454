@@ -1,0 +1,40 @@
+Preparing the runtime and DEM
+0 tasks for 6 tools on 3 workers (130 already done)
+
+adirondacks: 743 campsites, 98.4 s total (prepare 2.8 s, zones 39.7 s, classify 55.8 s), peak RSS 273.2 MB
+  wetness         0.0 s over 0 tasks (1 reused), peak WASM 0 MB
+  sink            0.0 s over 0 tasks (35 reused), peak WASM 0 MB
+  slope           0.0 s over 0 tasks (35 reused), peak WASM 0 MB
+  aspect          0.0 s over 0 tasks (35 reused), peak WASM 0 MB
+  position        0.0 s over 0 tasks (9 reused), peak WASM 0 MB
+  viewshed        0.0 s over 0 tasks (15 reused), peak WASM 0 MB
+  twi            737 (99.2%)
+  sink_depth_m   742 (99.9%)
+  slope_deg      742 (99.9%)
+  aspect_deg     726 (97.7%)
+  dev            742 (99.9%)
+  pooling        742 (99.9%)
+  facing         742 (99.9%)
+  shelter        742 (99.9%)
+  viewshed       742 (99.9%)
+  water_view     535 (72.0%)
+  zones pooling-risk: {'high': 16676}
+  zones exposure: {'high': 18715}
+       99.61 real         3.12 user         0.56 sys
+           286425088  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+               64053  page reclaims
+                2733  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                2339  messages sent
+                5050  messages received
+                   0  signals received
+                1274  voluntary context switches
+                9146  involuntary context switches
+         23442766058  instructions retired
+          8138752019  cycles elapsed
+           412075064  peak memory footprint

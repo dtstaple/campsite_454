@@ -382,3 +382,37 @@ def test_every_layer_is_simplified_only_below_its_full_detail_zoom():
     for layer in TILE_LAYERS.values():
         assert "ST_Simplify" in tile_sql(layer, layer.full_detail_zoom - 1)
         assert "ST_Simplify" not in tile_sql(layer, layer.full_detail_zoom)
+
+
+# --- terrain zones (TM05-141) ---------------------------------------------------------
+
+
+def test_terrain_zone_layers_serve_only_merged_zones_of_their_layer(client):
+    from terrain.models import TerrainZone
+
+    square = Polygon.from_bbox((LON - 0.005, LAT - 0.005, LON + 0.005, LAT + 0.005))
+    square.srid = 4326
+    shape = MultiPolygon(square, srid=4326)
+    kept = TerrainZone.objects.create(
+        region="adirondacks", layer="pooling-risk", zone_class="high", area_m2=1, geom=shape
+    )
+    # A tile piece still waiting to be merged, and another layer's zone: neither served.
+    TerrainZone.objects.create(
+        region="adirondacks",
+        layer="pooling-risk",
+        zone_class="high",
+        tile="0-0",
+        area_m2=1,
+        geom=shape,
+    )
+    TerrainZone.objects.create(
+        region="adirondacks", layer="exposure", zone_class="high", area_m2=1, geom=shape
+    )
+
+    [feature] = decode_tile(get_tile(client, "pooling-risk", 12).content)["pooling-risk"][
+        "features"
+    ]
+    assert feature["id"] == kept.pk
+    assert feature["properties"] == {"zone_class": "high"}
+    assert len(decode_tile(get_tile(client, "exposure", 12).content)["exposure"]["features"]) == 1
+    assert get_tile(client, "exposure", 7).status_code == 204  # below the zones' minzoom

@@ -8,6 +8,11 @@ For *why* the pipeline is shaped the way it is — why we persist vector data bu
 imagery on demand — see [architecture.md](architecture.md). This document is about
 operating it.
 
+Raster terrain analysis (pooling risk, sun, shelter, viewshed) is not an ingest source. It
+is a derived step that runs after enrichment (`make terrain`, the last step of
+`make data` and `make refresh`). It is documented in
+[terrain-analysis.md](terrain-analysis.md#the-pipeline-tm05-141).
+
 ---
 
 ## 1. What it does

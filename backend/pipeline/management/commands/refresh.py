@@ -49,6 +49,8 @@ DERIVED_STEPS: tuple[tuple[str, str], ...] = (
     ("route-profiles", "build_route_profiles"),
     ("enrich", "enrich_campsites"),
     ("route-facts", "enrich_routes"),
+    # TM05-141: terrain facts and zones (make terrain), after enrichment.
+    ("terrain", "terrain"),
 )
 
 OK, SKIPPED, FAILED = "ok", "skipped", "FAILED"
