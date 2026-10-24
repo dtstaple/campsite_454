@@ -1,0 +1,3 @@
+outcome: routed after 1.4 s
+trails on this route: TRAILS ON THIS ROUTE Big Pond Trail: 4.9 mi Hoffman Notch Trail: 6.1 mi Blue Ridge Road: 36 ftroad walk Branch Road: 231 ftroad walk Branch Road: 2.6 mi Unnamed path: 2.5 mi Boreas Trail: 18 ft Lumber Road: 0.5 mitrack Elk Lake - Marcy Trail: 4.4 mi Pinnacle Ridge Trail: 388 ft Includes 0.1 mi of road walk and 0.5 mi of track.
+stats: DISTANCE 21.1 mi GAIN 2,948 ft LOSS 2,119 ft HIGH POINT 2,637 ft MAX GRADE 25% DIFFICULTY Hard TYPE Point to point (est.) TIME ≈ 8 h 20 min
