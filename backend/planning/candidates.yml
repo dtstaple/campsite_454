@@ -15,6 +15,9 @@ rule_distance_m: 45.72
 # Gentle ground. The slope factor's curve (scoring/config.yml) is ideal to 3 degrees and
 # halves by 8; 5 degrees keeps candidates where a tent pitches comfortably.
 max_slope_deg: 5
+# TM05-143: skip points inside a high water pooling risk zone (make terrain). Only where
+# the terrain pipeline has run; elsewhere each candidate says it wasn't checked.
+reject_pooling_risk: true
 # Ground slope is measured on a 3x3 stencil this far apart, as for campsites (TM05-64).
 stencil_m: 10
 

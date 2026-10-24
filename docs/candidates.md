@@ -26,6 +26,7 @@ search.
    | `public_land` | Inside public land whose access is **open**. Where parcels overlap, the most restrictive access wins, as in the legal factor. | PostGIS `ST_Intersects` against PAD-US |
    | `trail` | At least **150 ft (45.72 m)** from *any* mapped trail | Indexed `ST_DWithin` on `geom_m` |
    | `water` | At least **150 ft** from any mapped water | Indexed `ST_DWithin` on `geom_m` |
+   | `pooling` | **Not** inside a high water pooling risk zone from the terrain model (TM05-143, `reject_pooling_risk`). Checked only where `make terrain` has run for the trail's region; elsewhere every candidate's check reads "Water pooling risk not checked: no terrain data here yet." | Indexed `ST_Intersects` on the merged `pooling-risk` zones' `geom_m` |
    | `elevation` | Clear of the DEC limits encoded in TM05-76: 4,000 ft in the Adirondacks, and 3,500 ft in the High Peaks Wilderness. It needs the verdict's 50 ft margin **below** each limit; a point within the margin is rejected, not guessed. | One 3DEP sample per point |
    | `terrain` | 3DEP has elevation and slope there | The 3DEP sampler |
    | `slope` | At or below **5°** (`max_slope_deg`) | The campsites' 3×3 Horn stencil, 10 m apart (TM05-64), through the `site_terrain` cache |
@@ -34,6 +35,15 @@ search.
    (`designated_150` in `scoring/verdict.py`). Elevation is checked before slope because
    it costs one 3DEP sample per point, against nine for slope, and it removes most points
    on a High Peaks trail.
+   **Terrain badges.** Each candidate carries `terrain`: `{"pooling": null, "shelter":
+   "exposed" or null, "water_view": null}`. A potential spot has no site-level terrain
+   facts, only the zones. So it can be known to be exposed (inside an exposure zone), and
+   known not to be high pooling risk (the filter), but its water view and its low-versus-
+   medium pooling risk are unknown, and they stay null rather than guessed. Find
+   campsites' quick filters treat unknown as not matching.
+
+   **Caching.** The cache key includes the latest finished terrain run, so a new
+   `make terrain` re-filters cached searches.
 3. **Score.** The flattest survivor at each sample station is scored with the existing
    engine (`score_location`), at most `max_scored` (60) of them, evenly along the trail.
    Scoring costs about 0.1 s a point, and the next step keeps one per half mile anyway.

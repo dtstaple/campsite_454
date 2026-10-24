@@ -969,6 +969,18 @@ for a trail can take 15–35 s (3DEP), and later ones about 5 ms.
 - an `unknown` legality labelled the same
 - the unverified-stop `warning`
 
+**Terrain (TM05-143).**
+
+- **The pooling check.** Each candidate's `checks` include `pooling`: "Not in a high water
+  pooling risk zone (terrain model)." Where `make terrain` hasn't run, it reads "Water
+  pooling risk not checked: no terrain data here yet."
+- **Rejections.** `counts.rejected.pooling` counts the points the zones removed.
+- **Badges.** Each candidate carries
+  `"terrain": {"pooling": null, "shelter": "exposed" | null, "water_view": null}`: only
+  what the zones can say about a point with no site facts. docs/candidates.md explains why.
+- **Scoring.** Campsite scores (model 1.3.0) gain the optional `drainage`, `shelter` and
+  `view` factors (docs/scoring.md). They appear in `score_breakdown` like any other factor.
+
 ## Saved trails (TM05-100)
 
 | Method and path | What it does | Success |
