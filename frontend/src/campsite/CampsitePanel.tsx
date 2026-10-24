@@ -23,6 +23,7 @@ import ScoreBreakdown from "./ScoreBreakdown";
 import LegalityVerdict from "./LegalityVerdict";
 import Sheet from "../components/Sheet";
 import { withoutLegalFactor } from "./legality";
+import TerrainSection from "./TerrainSection";
 
 export type CampsiteState =
   | { status: "loading" }
@@ -41,6 +42,8 @@ interface Props {
   /** The Save button, built by the page so it shares the map's saved list and session. */
   saveButton: ReactNode;
   onClose: () => void;
+  /** "Show what I can see" (TM05-142): whether the viewshed is drawn, and the toggle. */
+  viewshed?: { showing: boolean; onToggle: () => void };
 }
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
@@ -52,7 +55,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-export default function CampsitePanel({ state, score, saveButton, onClose }: Props) {
+export default function CampsitePanel({ state, score, saveButton, onClose, viewshed }: Props) {
   return (
     <Sheet className="panel trail-panel campsite-panel" label="Campsite">
       <header className="trail-header">
@@ -69,7 +72,9 @@ export default function CampsitePanel({ state, score, saveButton, onClose }: Pro
         </button>
       </header>
       {state.status === "error" && <div className="trail-status is-error">{state.message}</div>}
-      {state.status === "ready" && <Body detail={state.detail} score={score} saveButton={saveButton} />}
+      {state.status === "ready" && (
+        <Body detail={state.detail} score={score} saveButton={saveButton} viewshed={viewshed} />
+      )}
     </Sheet>
   );
 }
@@ -93,10 +98,12 @@ function Body({
   detail,
   score,
   saveButton,
+  viewshed,
 }: {
   detail: CampsiteDetail;
   score: CampsiteScore;
   saveButton: ReactNode;
+  viewshed?: Props["viewshed"];
 }) {
   const facts = detail.facts;
   const shelter = shelterLabel(facts?.amenities.shelter_kind ?? null);
@@ -169,6 +176,14 @@ function Body({
           <CopyCoordinates text={coordinates(detail)} />
         </Row>
       </dl>
+
+      {detail.terrain && (
+        <TerrainSection
+          terrain={detail.terrain}
+          showing={viewshed?.showing ?? false}
+          onToggleView={() => viewshed?.onToggle()}
+        />
+      )}
 
       {description && <p className="campsite-description">{description}</p>}
     </>

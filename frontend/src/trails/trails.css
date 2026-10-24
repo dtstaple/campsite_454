@@ -768,3 +768,29 @@
   background: var(--live-dot);
   border-radius: var(--radius-pill);
 }
+
+/* --- Terrain badges on campsite rows (TM05-142) ---------------------------------------- */
+.terrain-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
+}
+
+.terrain-chip {
+  padding: 0 var(--space-xs);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  line-height: var(--leading-snug);
+}
+
+.terrain-chip.is-good {
+  border-color: var(--terrain-good);
+  color: var(--terrain-good);
+}
+
+.terrain-chip.is-warn {
+  border-color: var(--terrain-warn);
+  color: var(--terrain-warn);
+}

@@ -21,6 +21,8 @@ import { BANDS } from "../slope/slope";
 import { SLOPE_MIN_ZOOM, slopeSupported } from "../slope/slopeLayer";
 import { PHONE_QUERY } from "./snaps";
 import { bandLabel, GRADES, gradeToken } from "../score/grade";
+import { TERRAIN_NOTE } from "../terrain/terrain";
+import { ZONES, type ZoneOverlay, type ZoneSpec } from "../terrain/zones";
 
 interface Props {
   mode: ActivityMode;
@@ -41,7 +43,25 @@ interface Props {
   onSlope: (on: boolean) => void;
   slopeOpacity: number;
   onSlopeOpacity: (opacity: number) => void;
+  /** TM05-142: the terrain zone overlays. */
+  zones: Record<ZoneOverlay, boolean>;
+  onZone: (zone: ZoneOverlay, on: boolean) => void;
   onRegion: (region: Region) => void;
+}
+
+/** TM05-142: what a terrain zone means, and the bare-earth caveat. */
+function ZoneLegend({ zone }: { zone: ZoneSpec }) {
+  return (
+    <div className="slope-legend terrain-legend">
+      <ul aria-label={`${zone.label} legend`}>
+        <li>
+          <span className="swatch terrain-swatch" style={{ background: `var(${zone.token})` }} />
+          {zone.legend}
+        </li>
+      </ul>
+      <p className="slope-note">{TERRAIN_NOTE}</p>
+    </div>
+  );
 }
 
 /** What the campsite marker colours mean (TM05-48). Shown while the layer is on. */
@@ -115,6 +135,8 @@ export default function LayerPanel({
   onSlope,
   slopeOpacity,
   onSlopeOpacity,
+  zones,
+  onZone,
   onRegion,
 }: Props) {
   // TM05-103: on a phone the layer list starts folded, so the map is visible.
@@ -217,6 +239,23 @@ export default function LayerPanel({
               {slope && <SlopeLegend opacity={slopeOpacity} onOpacity={onSlopeOpacity} />}
             </>
           )}
+          {ZONES.map((zone) => (
+            <Fragment key={zone.id}>
+              <label className={`row${zones[zone.id] ? "" : " off"}`}>
+                <input
+                  type="checkbox"
+                  checked={zones[zone.id]}
+                  onChange={(event) => onZone(zone.id, event.target.checked)}
+                />
+                <span className="swatch terrain-swatch" style={{ background: `var(${zone.token})` }} />
+                {zone.label}
+                <span className="count">
+                  {zones[zone.id] && zoom < zone.minzoom ? `zoom ${zone.minzoom}+` : ""}
+                </span>
+              </label>
+              {zones[zone.id] && <ZoneLegend zone={zone} />}
+            </Fragment>
+          ))}
 
           {/* Data sits in a few regions hundreds of miles apart, so free panning mostly
               finds empty map. These jump straight to the places that have something. */}

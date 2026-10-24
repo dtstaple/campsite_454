@@ -1,0 +1,18 @@
+campsite: Marcy Dam #5 Lean-to
+terrain section: TERRAIN WATER POOLING RISK Low Water drains away from here (wetness index 7.2). SUN Faces southeast: morning and midday sun WIND Moderate shelter About level with the ground around it. VIEW 7.1 km², all around · water view Show what I can see Terrain-model estimate from bare-earth elevation. Trees, buildings and recent changes aren't counted.
+score breakdown: Water 97 77 m from perennial stream (Marcy Brook) Trail access 53 3 m from the nearest trail Weather Not available No recent forecast stored for here. Slope 69 Ground slope 6° (11%) Land cover Not available Land cover isn't measured yet.
+viewshed button pressed: true
+Water pooling risk legend: High: low ground that water drains into Terrain-model estimate from bare-earth elevation. Trees, buildings and recent changes aren't counted.
+Exposure legend: High: ground that stands above its surroundings, open to wind Terrain-model estimate from bare-earth elevation. Trees, buildings and recent changes aren't counted.
+Phelps Trail rows: 27
+  mi 0.2 Potential spot (unverified) 187 m off trail · 3° slope 83
+  mi 0.8 Campsite near Bear Brook 31 m off trail 82
+  mi 0.9 Potential spot (unverified) 59 m off trail · 2° slope 97
+  mi 1.2 Campsite near Phelps Trail 24 m off trail 81
+  mi 1.2 Deer Brook Lean-to 95 m off trail 72
+  mi 1.6 Potential spot (unverified) 60 m off trail · 3° slope 99
+rows with badges: 8
+  badged: mi 3.2 Goodwin Lean-To 54 m off trail Sheltered 55
+  badged: mi 3.3 Myers Lean-To 34 m off trail Sheltered Pooling risk 81
+  badged: mi 3.3 Crandall Lean-to 56 m off trail Sheltered 58
+  badged: mi 4.9 Campsite near Phelps Trail 12 m off trail Sheltered 87

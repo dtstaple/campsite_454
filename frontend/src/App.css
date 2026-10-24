@@ -918,3 +918,14 @@
 .banner.warn a {
   color: var(--text-primary);
 }
+
+/* TM05-142: terrain zone swatches, filled like the overlay with its outline. */
+.terrain-swatch {
+  opacity: 0.8;
+}
+
+/* The legend wraps to the panel's width instead of widening it with the caveat. */
+.terrain-legend {
+  width: 0;
+  min-width: 100%;
+}

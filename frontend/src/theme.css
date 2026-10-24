@@ -409,3 +409,21 @@
   /* TM05-137: road walks, tracks and bridged gaps in a planned route. */
   --route-off-trail: var(--accent);
 }
+
+/* --- Terrain insights (TM05-142) ---------------------------------------------------------
+ * Zone overlays are a translucent fill with a solid outline, which reads on the dark
+ * basemap and on satellite imagery. The hues are kept apart from water (blue), trails
+ * (orange), public land (green) and the slope bands. The viewshed is a pale wash under
+ * the campsite markers. */
+:root {
+  --terrain-pooling: #818cf8;
+  --terrain-pooling-fill-opacity: 0.4;
+  --terrain-exposure: #fb7185;
+  --terrain-exposure-fill-opacity: 0.35;
+  --terrain-zone-line-width: 1;
+  --terrain-zone-line-opacity: 0.9;
+  --terrain-viewshed: #fde68a;
+  --terrain-viewshed-fill-opacity: 0.3;
+  --terrain-good: var(--success);
+  --terrain-warn: var(--danger);
+}

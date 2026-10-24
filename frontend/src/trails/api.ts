@@ -8,6 +8,7 @@ import type { Connection } from "./connections";
 import { API_BASE_URL, type Bbox } from "../api";
 import { authHeaders, storedSession } from "../auth";
 import { routingPath, type Cost, type PlannedBlock, type RouteSuggestion } from "../routing/planned";
+import type { TerrainBadges } from "../terrain/terrain";
 
 export interface RouteSummary {
   osm_id: number;
@@ -71,6 +72,8 @@ export interface CampsiteAlong {
   score: number | null;
   score_status?: "scored" | "pending" | "not_available";
   score_breakdown: ScoreSummary | null;
+  /** TM05-142: terrain badges; null before `make terrain`, absent from an older API. */
+  terrain?: TerrainBadges | null;
 }
 
 /** TM05-82: Shenandoah-rated difficulty, from the profile. Null when there is no profile. */

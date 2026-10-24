@@ -9,7 +9,13 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import type * as maplibregl from "maplibre-gl";
-import { CampsiteApiError, fetchCampsiteDetail, type CampsiteDetail as Detail } from "./api";
+import {
+  CampsiteApiError,
+  fetchCampsiteDetail,
+  fetchViewshed,
+  type CampsiteDetail as Detail,
+} from "./api";
+import { showViewshed } from "../terrain/zonesLayer";
 import CampsitePanel, { type CampsiteScore, type CampsiteState } from "./CampsitePanel";
 import SelectedCampsite from "./SelectedCampsite";
 import type { CampsiteSelection } from "./selection";
@@ -38,6 +44,26 @@ export default function CampsiteDetail({ map, selection, onClose, renderSave }: 
   const campsiteId = selection?.id ?? null;
   const [state, setState] = useState<CampsiteState>({ status: "loading" });
   const [loadedId, setLoadedId] = useState<string | null>(null);
+  // "Show what I can see" (TM05-142): the site whose viewshed is drawn, if any.
+  const [viewOf, setViewOf] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!map) return;
+    if (!viewOf || viewOf !== campsiteId) {
+      showViewshed(map, null);
+      return;
+    }
+    const controller = new AbortController();
+    fetchViewshed(viewOf, controller.signal)
+      .then((feature) => showViewshed(map, feature))
+      .catch(() => {
+        if (!controller.signal.aborted) setViewOf(null);
+      });
+    return () => controller.abort();
+  }, [map, viewOf, campsiteId]);
+
+  // The viewshed belongs to the open site: closing the panel clears it.
+  useEffect(() => () => setViewOf(null), [campsiteId]);
 
   useEffect(() => {
     if (!campsiteId) return;
@@ -81,6 +107,10 @@ export default function CampsiteDetail({ map, selection, onClose, renderSave }: 
         score={panelScore(shown, selection)}
         saveButton={shown.status === "ready" ? renderSave(shown.detail) : null}
         onClose={onClose}
+        viewshed={{
+          showing: viewOf === campsiteId,
+          onToggle: () => setViewOf((current) => (current === campsiteId ? null : campsiteId)),
+        }}
       />
       <SelectedCampsite
         map={map}

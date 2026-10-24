@@ -5,7 +5,9 @@
 
 import { API_BASE_URL } from "../api";
 import { authHeaders, storedSession } from "../auth";
+import type { Feature } from "geojson";
 import type { Legality } from "./legality";
+import type { TerrainPayload } from "../terrain/terrain";
 
 export interface CampsiteFactsPayload {
   public_land: {
@@ -53,9 +55,20 @@ export interface CampsiteDetail {
   confidence?: CampsiteConfidence | null;
   /** The legality verdict shown above the score (TM05-76 follow-up). */
   legality?: Legality | null;
+  /** Terrain-model facts (TM05-142); null before `make terrain` has reached the site. */
+  terrain?: TerrainPayload | null;
 }
 
 export class CampsiteApiError extends Error {}
+
+/** What the terrain lets you see from the site (TM05-142), or null when there is none. */
+export async function fetchViewshed(id: string, signal?: AbortSignal): Promise<Feature | null> {
+  const path = id.split("/").map(encodeURIComponent).join("/");
+  const response = await fetch(`${API_BASE_URL}/api/campsites/${path}/viewshed/`, { signal });
+  if (response.status === 404) return null;
+  if (!response.ok) throw new CampsiteApiError(`HTTP ${response.status}`);
+  return (await response.json()) as Feature;
+}
 
 /** The id contains a slash ("node/5759412256"); each part is encoded, the slash kept. */
 export function detailUrl(id: string): string {
