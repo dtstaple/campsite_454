@@ -42,6 +42,8 @@ def steps(region: str) -> list[tuple[str, list[str]]]:
         ("enrich", ["enrich_campsites", region]),
         # TM05-85: the Discover filters' stored facts; needs the profiles above.
         ("route-facts", ["enrich_routes", region]),
+        # TM05-141: terrain facts and zones (make terrain), after enrichment.
+        ("terrain", ["terrain", region]),
     ]
 
 

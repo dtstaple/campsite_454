@@ -275,3 +275,169 @@ None of this is committed:
     on demand, so the 2 GB 10 m raster never sits on disk.
 - **Database.** Only derived answers go in: per-site facts and simplified zone polygons,
   with a provenance record, as CLAUDE.md requires for raster sources.
+
+## The pipeline (TM05-141)
+
+```
+make terrain REGION=adirondacks            # or: manage.py terrain adirondacks
+manage.py terrain adirondacks --only wetness,viewshed --workers 4
+manage.py terrain adirondacks --fresh      # recompute every tile
+```
+
+`make data` and `make refresh` run it as their last step, after enrichment.
+
+The code is in `backend/terrain/`:
+
+| Module | Does |
+|---|---|
+| `tools.yml` | The registry: runtime pin, DEM source, grids, tools, and classification thresholds |
+| `registry.py` | Loads and validates `tools.yml`. A typo fails at load, naming the tool. |
+| `runtime.py` | Runs a GeoLibre tool in-process (wasmtime). Checks the runtime's sha256, caches the compiled module, and reports each call's peak memory. |
+| `dem.py` | 3DEP source tiles (downloaded once, re-fetched when Last-Modified changes), the region VRT and mosaics, and grid tiles cut with GDAL warp |
+| `grid.py` | Tiling: cores that partition the region, plus overlap |
+| `worker.py` | One tool on one tile, or the viewshed for a batch of sites (in worker processes) |
+| `mappers.py` | Sampling facts around a site, and the classes and reasons the app shows |
+| `pipeline.py` | The run: tasks, storage, resume, zone merge, classification, provenance |
+| `models.py` | `TerrainRun`, `TerrainFacts`, `TerrainZone`, `TerrainTile` |
+
+### What a run does
+
+1. **Prepare.**
+   - Check the runtime against `runtime.sha256`, fetching it on first use.
+   - HEAD each 3DEP tile for the region. Download any that are missing or changed.
+   - Build the region VRT and each untiled or zone-making grid's mosaic. The mosaics are
+     named by the source digest, so they are rebuilt only when a source tile changes.
+2. **Tiles.** For every tool, the grid is cut into tiles: cores that partition the
+   region, each padded by `overlap_m` on every side. A worker process:
+   1. warps the padded DEM tile
+   2. runs the tool's chain of GeoLibre steps
+   3. samples each fact for the campsites whose point is in the core (median, max or
+      circular mean within `radius_m`)
+   4. reclassifies and polygonises the zone classes inside the core, in pieces of at most
+      2,500² cells
+
+   Grids marked `sites_only` skip tiles with no campsite in their core.
+3. **Per-site tools.** The viewshed runs on a 30 m window of `radius_m` around each site,
+   in batches of 50. It records the visible area, the compass sector with the most visible
+   ground beyond 200 m, and the visible outline.
+4. **Merge zones.** Each layer's tile pieces are unioned per class, simplified
+   (`simplify_m`), and anything under `min_area_m2` is dropped. The merged polygons are
+   what `/api/tiles/pooling-risk/…` and `/api/tiles/exposure/…` serve.
+5. **Classify.** Each site's values become the app's classes:
+   - pooling risk, from sink depth and the wetness index (the higher wins)
+   - facing and sun, from aspect, or "flat" under 4°
+   - shelter, from DEV
+   - water view: at least 5,000 m² of NHD lake or pond inside the viewshed
+
+**Idempotent and resumable.**
+
+- Each finished tile is a `TerrainTile` row, keyed by the config digest and the DEM
+  digest. A re-run skips those tiles.
+- Facts are merged per campsite, and zone pieces are replaced per tile.
+- An interrupted run therefore resumes where it stopped. A finished run, run again, only
+  re-merges and re-classifies.
+- Changing `tools.yml` or a source tile changes a digest, so the affected work is redone.
+
+**Only derived results are stored.** Rasters exist only in worker memory and GeoLibre's
+temporary `/work`. The database gets numbers and classes per site, polygons, and a
+`TerrainRun` that records:
+
+- geolibre-wasm, runtime and wasmtime versions, and the runtime's sha256
+- the DEM tiles, with URLs, Last-Modified and sizes
+- `tools.yml` as run
+- per-tool CPU time, task counts and peak WASM memory
+- campsite coverage per fact
+- zone counts per layer and class
+- the peak RSS of the run
+
+### Adding a terrain tool
+
+A tool is one entry under `tools:`. For example, terrain roughness at 30 m as a per-site
+fact:
+
+```yaml
+  roughness:
+    grid: coarse                       # hydrology (45 m, whole region), coarse (30 m) or fine (10 m)
+    steps:                             # GeoLibre calls in order; {dem} or {<earlier step id>}
+      - {id: tri, tool: ruggedness_index, args: {input: "{dem}"}}
+    facts:                             # sampled into TerrainFacts.values
+      roughness: {sample: median, radius_m: 30}
+```
+
+That is the whole change: the value appears in `TerrainFacts.values["roughness"]` for
+every campsite on the next run. To also draw it as a map layer, add `zones`:
+
+```yaml
+    zones:
+      layer: rough-ground              # the vector tile layer name
+      classes:                         # ascending; a cell takes the highest class it reaches
+        - {class: high, min: 2.5}
+      min_area_m2: 50000
+      simplify_m: 30
+```
+
+Then add a `TileLayer` for `rough-ground` in `backend/api/tiles.py`, like `exposure`.
+
+A new **class** shown in the app (like `pooling` or `shelter`) needs one small function in
+`mappers.py`, plus a column on `TerrainFacts` if scoring or filtering reads it. A new
+sampling method or per-site mapper is added to `SAMPLE_METHODS` or `MAPPERS` in
+`registry.py`.
+
+A grid's `overlap_m` must be at least the widest neighbourhood any of its tools reads.
+`tests/test_terrain.py::test_tiling_with_overlap_has_no_seams` shows what happens
+otherwise.
+
+### Measured: the Adirondacks (2026-10-23)
+
+These figures are from a full `--fresh` run on 3 workers (8-core laptop), with the DEM
+already cached. Logs are in `artifacts/terrain/pipeline/` (run-fresh-tiles.txt, run-resume-merge-classify.txt).
+
+| Step | Tasks | CPU time | Peak WASM memory |
+|---|---|---|---|
+| `wetness` (45 m, whole region: fill, D∞, slope, TWI, plus zones) | 1 | 93 s | 1,267 MB |
+| `sink` (10 m) | 35 tiles | 233 s | 578 MB |
+| `slope` (10 m) | 35 tiles | 346 s | 350 MB |
+| `aspect` (10 m) | 35 tiles | 297 s | 349 MB |
+| `position` (30 m DEV, plus zones) | 9 tiles | 56 s | 373 MB |
+| `viewshed` (30 m, 10 km, per site) | 15 batches of 50 | 689 s | 26 MB |
+| **All tiles** | 130 | 1,714 s | **603 s wall** |
+| Zone merge (both layers) | | | 40 s |
+| Classify (incl. the water-view intersections) | | | 56 s |
+
+**Totals and outputs.**
+
+- **Total:** about 12 minutes for a fresh run once the DEM is cached. The one-time setup
+  adds the 2.6 GB download (about 1 min) and the mosaics (about 1.5 min).
+- **Re-runs:** a finished run, run again, reuses all 130 tasks and takes 98 s, which is
+  the merge plus classify.
+- **Peak memory:** about 1.3 GB, the hydrology worker. The others stay under 600 MB.
+- **Coverage** of the region's 743 campsites:
+  - pooling, shelter, facing and viewshed: 742 each (99.9%)
+  - aspect direction: 726 (97.7%; the rest are flat)
+  - wetness index: 737 (99.2%)
+  - The one site with nothing, Iroquois Municipal Campground, falls on nodata. Its
+    viewshed failed with "no station points intersect valid DEM cells", which a run
+    records in `counts.failed_sites`, and the run carries on.
+- **Classes:**
+  - pooling: 55 high, 265 medium, 422 low
+  - shelter: 22 exposed, 533 moderate, 187 sheltered
+  - water in view (1 ha or more within 2 km): 535 (72%). Most Adirondack lean-tos face
+    a pond or lake.
+- **Zones:** 16,676 pooling-risk polygons and 18,715 exposure polygons, each at least 5 ha
+  (2 ha for pooling), simplified.
+
+**Judgment calls** made while running it on real data:
+
+- **A hollow alone is only medium pooling risk.** Sink depths under campsites ran to
+  metres (90th percentile 1.4 m), which is DEM artefacts: culverts under road
+  embankments, and flattened ponds. High now needs water draining in as well
+  (`sink_high_needs_twi`).
+- **"Sheltered" means DEV below −0.75**, about a quarter of sites. At −0.5 it was half of
+  them, because campsites sit mostly in valleys.
+- **Water view counts lakes within 2 km only.** Over the whole 10 km viewshed, bare
+  earth "sees" some lake from 77% of sites.
+- **Zones aren't unioned across tiles.** See `merge_zones` for why. The fills draw
+  seamlessly.
+- **GDAL cuts are written to real temporary files, not /vsimem/.** Blocks left unwritten
+  there read as zeros in GeoLibre, which gave plateaus at 0 m and made
+  `fill_depressions` run for 10+ minutes instead of 11 s.

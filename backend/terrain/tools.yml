@@ -1,0 +1,144 @@
+# Terrain tool registry (TM05-141). docs/terrain-analysis.md explains each choice.
+#
+# `make terrain REGION=<region>` runs every tool below over that region's DEM and writes
+# two kinds of output, both derived (rasters are never stored in the database):
+#
+#   facts  per-campsite values (TerrainFacts.facts), sampled from a tool's raster
+#   zones  classified polygons (TerrainZone), served as vector tiles
+#
+# Adding a tool: a `tools` entry here, and a mapper in terrain/mappers.py only if the
+# output needs one that doesn't exist yet. See "Adding a terrain tool" in
+# docs/terrain-analysis.md.
+
+runtime:
+  # The GeoLibre WASM runtime, fetched once and checked against this checksum
+  # (the release's SHA256SUMS.txt). GEOLIBRE_WASM may point at a local copy instead.
+  version: v1.7.1
+  url: https://github.com/opengeos/geolibre-rust/releases/download/v1.7.1/geolibre-cli-v1.7.1.wasm
+  sha256: 1bbd170210e1c25fc76f4edeccc68ea9ceb34fbf141cea48d68172fd4e34feca
+
+dem:
+  # USGS 3DEP 1/3 arc-second (about 10 m), 1x1 degree COG tiles from The National Map.
+  name: USGS 3DEP 1/3 arc-second
+  tile_url: https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/13/TIFF/current/{tile}/USGS_13_{tile}.tif
+  nodata: -999999
+  # Every grid is EPSG:5070 (METRIC_SRID), so tools measure in metres.
+  srid: 5070
+
+# A grid is a resolution and how the region is cut into tiles. `tile_cells` is the tile
+# core in cells (about 25 M cells is the most one GeoLibre call can hold); `overlap_m` is
+# added on every side and must be at least the widest neighbourhood a tool on the grid
+# reads. No `tile_cells` means the whole region in one piece.
+grids:
+  hydrology:
+    resolution_m: 45
+  coarse:
+    resolution_m: 30
+    tile_cells: 3000
+    overlap_m: 1500
+  fine:
+    resolution_m: 10
+    tile_cells: 3000
+    overlap_m: 1000
+    # Only tiles with a campsite in their core: nothing on this grid makes zones.
+    sites_only: true
+
+# Each tool is a chain of GeoLibre calls on one grid. `{dem}` is the grid's DEM tile and
+# `{<step>}` an earlier step's output; the last step's output is the tool's raster.
+tools:
+  wetness:
+    grid: hydrology
+    steps:
+      - {id: filled, tool: fill_depressions, args: {dem: "{dem}"}}
+      - {id: sca, tool: dinf_flow_accum, args: {input: "{filled}", out_type: sca}}
+      - {id: slope, tool: slope, args: {input: "{dem}", units: degrees}}
+      - {id: twi, tool: wetness_index, args: {sca: "{sca}", slope: "{slope}"}}
+    facts:
+      twi: {sample: median, radius_m: 30}
+    zones:
+      layer: pooling-risk
+      classes:
+        - {class: high, min: 12.5}
+      min_area_m2: 20000
+      simplify_m: 45
+
+  sink:
+    grid: fine
+    steps:
+      - {id: depth, tool: depth_in_sink, args: {dem: "{dem}", zero_background: true}}
+    facts:
+      sink_depth_m: {sample: max, radius_m: 15}
+
+  slope:
+    grid: fine
+    steps:
+      - {id: slope, tool: slope, args: {input: "{dem}", units: degrees}}
+    facts:
+      slope_deg: {sample: median, radius_m: 15}
+
+  aspect:
+    grid: fine
+    steps:
+      - {id: aspect, tool: aspect, args: {input: "{dem}"}}
+    facts:
+      aspect_deg: {sample: circular_mean, radius_m: 15}
+
+  position:
+    grid: coarse
+    steps:
+      # Deviation from mean elevation over a 33-cell (about 1 km) window: how many
+      # standard deviations the ground stands above (+) or below (-) its surroundings.
+      - {id: dev, tool: deviation_from_mean_elevation, args: {input: "{dem}", filter_size_x: 33, filter_size_y: 33}}
+    facts:
+      dev: {sample: median, radius_m: 30}
+    zones:
+      layer: exposure
+      # The same threshold as a site's "exposed" class, so the map and the panel agree.
+      classes:
+        - {class: high, min: 1.0}
+      min_area_m2: 50000
+      simplify_m: 30
+
+  viewshed:
+    grid: coarse
+    # One viewshed per campsite on a window around it, not a tiled raster.
+    per_site:
+      radius_m: 10000
+      eye_height_m: 1.7
+    facts:
+      view: {mapper: viewshed}
+
+# Classes built from the facts above, shown in the app and used by scoring.
+classify:
+  pooling:
+    # High: low ground water drains into, or a hollow that water also drains into.
+    # A hollow alone is medium (terrain/mappers.py says why).
+    sink_depth_m: {high: 0.3, medium: 0.1}
+    twi: {high: 12.5, medium: 10.0}
+    sink_high_needs_twi: 10.0
+  sun:
+    # Below this slope the ground faces nowhere in particular.
+    flat_below_deg: 4
+    # 8 sectors, clockwise from north.
+    sectors:
+      - {facing: north, sun: little direct sun}
+      - {facing: northeast, sun: early morning sun}
+      - {facing: east, sun: morning sun}
+      - {facing: southeast, sun: morning and midday sun}
+      - {facing: south, sun: sun most of the day}
+      - {facing: southwest, sun: afternoon sun}
+      - {facing: west, sun: afternoon and evening sun}
+      - {facing: northwest, sun: evening sun}
+  shelter:
+    # On `dev`, standard deviations above the surrounding terrain.
+    exposed_from: 1.0
+    sheltered_below: -0.75
+  view:
+    # Visible cells within this distance of the site don't count towards its direction.
+    near_m: 200
+    # A single direction is named only when it holds this share of the visible area.
+    direction_share: 0.3
+    # Water is "in view" when at least this much lake or pond is visible within
+    # `water_within_m` of the site: a glimpse of a lake 9 km off doesn't count.
+    water_within_m: 2000
+    water_min_m2: 10000

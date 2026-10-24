@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     "analysis",
     "enrichment",
     "planning",
+    "terrain",
     "routing",
 ]
 

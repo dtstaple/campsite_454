@@ -33,6 +33,7 @@ from django.db import connection
 from django.http import Http404, HttpResponse
 
 from geodata.models import PublicLand, Trail, WaterFeature
+from terrain.models import TerrainZone
 
 #: Tile coordinate space (ST_AsMVT's default): 4096 units across a tile.
 EXTENT = 4096
@@ -69,12 +70,16 @@ class TileLayer:
     thin: tuple[tuple[int, str], ...] = ()
     #: From this zoom up, geometry is not simplified beyond the tile grid.
     full_detail_zoom: int = 13
+    #: A constant SQL condition picking this layer's rows, for a model that holds more
+    #: than one layer (terrain zones).
+    where: str = ""
 
     def attributes_at(self, z: int) -> list[str]:
         return [name for start, names in self.attributes if z >= start for name in names]
 
     def conditions_at(self, z: int) -> list[str]:
-        return [condition for below, condition in self.thin if z < below]
+        thinned = [condition for below, condition in self.thin if z < below]
+        return [self.where, *thinned] if self.where else thinned
 
 
 TILE_LAYERS: dict[str, TileLayer] = {
@@ -106,6 +111,23 @@ TILE_LAYERS: dict[str, TileLayer] = {
             (0, ("source_id", "name", "public_access")),
             (10, ("manager", "designation", "gap_status")),
         ),
+        full_detail_zoom=12,
+    ),
+    # TM05-141: terrain zones, merged and simplified by `make terrain`.
+    "pooling-risk": TileLayer(
+        name="pooling-risk",
+        model=TerrainZone,
+        minzoom=8,
+        attributes=((0, ("zone_class",)),),
+        where="layer = 'pooling-risk' AND tile = ''",
+        full_detail_zoom=12,
+    ),
+    "exposure": TileLayer(
+        name="exposure",
+        model=TerrainZone,
+        minzoom=8,
+        attributes=((0, ("zone_class",)),),
+        where="layer = 'exposure' AND tile = ''",
         full_detail_zoom=12,
     ),
 }

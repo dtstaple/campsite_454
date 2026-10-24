@@ -103,6 +103,7 @@ def test_refresh_runs_ingests_then_profiles_then_enrichment(steps):
         ("build_route_profiles", "adirondacks"),
         ("enrich_campsites", "adirondacks"),
         ("enrich_routes", "adirondacks"),
+        ("terrain", "adirondacks"),  # TM05-141: terrain facts and zones
     ]
 
 
@@ -169,7 +170,7 @@ def test_ridb_is_skipped_without_a_key_and_the_refresh_continues(steps, monkeypa
 
     assert ("ingest", "ridb", "adirondacks") not in steps.calls
     assert summary_row(output, "ridb").split()[:2] == ["ridb", "skipped"]
-    assert steps.calls[-1] == ("enrich_routes", "adirondacks")
+    assert steps.calls[-1] == ("terrain", "adirondacks")
 
 
 @pytest.mark.django_db

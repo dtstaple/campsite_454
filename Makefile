@@ -6,6 +6,7 @@
 #   make restore DUMP=<path-or-url>   load a database dump (fast data path)
 #   make data      rebuild all Adirondacks data from the sources (slow data path)
 #   make refresh REGION=<region>   refresh one region, with record counts per step
+#   make terrain REGION=<region>   terrain facts and zones with GeoLibre (resumable)
 #   make dev       run the backend (:8000) and frontend (:5173) together
 #   make dev-phone the same over HTTPS on the LAN, to test on a phone (TM05-103)
 #   make prewarm   cache the campsite search for the demo trails (TRAILS="A,B")
@@ -38,7 +39,7 @@ PYTHON312 := $(shell command -v python3.12 2>/dev/null)
 PERSONAL_TABLES := auth_user auth_user_groups auth_user_user_permissions authtoken_token \
 	'accounts_*' 'planning_*' django_session django_admin_log
 
-.PHONY: help setup doctor dev backend frontend data refresh restore dump dev-phone prewarm
+.PHONY: help setup doctor dev backend frontend data refresh terrain restore dump dev-phone prewarm
 
 help:
 	@sed -n '4,13p' Makefile | sed 's/^# //'
@@ -117,6 +118,11 @@ data:
 # Stops at the first failure and prints time and IngestRun record counts per step.
 refresh:
 	$(VPY) backend/manage.py refresh $(REGION)
+
+# TM05-141: GeoLibre terrain facts per campsite and zone polygons, over 3DEP. The DEM and
+# runtime are cached outside git (TERRAIN_CACHE_DIR); finished tiles are reused.
+terrain:
+	$(VPY) backend/manage.py terrain $(REGION)
 
 dump:
 	@mkdir -p $(dir $(OUT))
