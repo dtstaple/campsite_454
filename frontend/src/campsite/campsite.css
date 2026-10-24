@@ -391,3 +391,48 @@
 .campsite-verdict-rule a {
   color: var(--text-secondary);
 }
+
+/* --- Terrain section (TM05-142) -------------------------------------------------------- */
+.campsite-terrain {
+  display: grid;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+
+.terrain-value {
+  display: inline-block; /* so ::first-letter below applies */
+  color: var(--text-primary);
+}
+
+.terrain-value.is-high,
+.terrain-value.is-exposed {
+  color: var(--terrain-warn);
+}
+
+.terrain-value.is-low,
+.terrain-value.is-sheltered {
+  color: var(--terrain-good);
+}
+
+.terrain-value.is-high::first-letter,
+.terrain-value.is-medium::first-letter,
+.terrain-value.is-low::first-letter {
+  text-transform: uppercase;
+}
+
+.terrain-view-button {
+  justify-self: start;
+  padding: var(--space-xs) var(--space-md);
+  font-size: var(--text-sm);
+}
+
+.terrain-view-button[aria-pressed="true"] {
+  border-color: var(--terrain-viewshed);
+}
+
+.terrain-note {
+  margin: 0;
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+  line-height: var(--leading-snug);
+}

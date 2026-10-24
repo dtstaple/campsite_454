@@ -23,6 +23,7 @@ import {
 } from "./format";
 import { alongResults, searchSummary, type Candidate, type CandidateSearch } from "./candidates";
 import { byMile, junctionMiles, type Connection } from "./connections";
+import { TERRAIN_NOTE, terrainBadges, type TerrainBadges } from "../terrain/terrain";
 import { gpxFilename, gpxPath } from "./gpx";
 import SaveTrail from "./SaveTrail";
 import Sheet from "../components/Sheet";
@@ -532,6 +533,7 @@ function AlongList({
                     {campsiteName(row.site).text}
                   </span>
                   <span className="trail-campsite-off">{campsitePlace(row.site).off}</span>
+                  <TerrainChips badges={row.site.terrain} />
                 </span>
                 {row.site.score !== null && (
                   <span
@@ -583,5 +585,21 @@ function AlongList({
         )}
       </ol>
     </>
+  );
+}
+
+
+/** TM05-142: compact terrain badges on a campsite row. */
+function TerrainChips({ badges }: { badges: TerrainBadges | null | undefined }) {
+  const chips = terrainBadges(badges);
+  if (chips.length === 0) return null;
+  return (
+    <span className="terrain-chips" title={TERRAIN_NOTE}>
+      {chips.map((chip) => (
+        <span key={chip.key} className={`terrain-chip is-${chip.tone}`}>
+          {chip.text}
+        </span>
+      ))}
+    </span>
   );
 }

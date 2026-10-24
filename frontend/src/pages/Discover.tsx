@@ -36,6 +36,8 @@ import {
 import { popupContent } from "../map/popups";
 import { sourceIdOf, withSourceIds } from "../map/featureIds";
 import { isTiled } from "../map/tileLayers";
+import { setZoneVisible, ZONES, type ZoneOverlay } from "../terrain/zones";
+import { addTerrainOverlays } from "../terrain/zonesLayer";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useSession } from "../session";
 import ModeSwitcher from "../modes/ModeSwitcher";
@@ -155,6 +157,23 @@ export default function Discover() {
       applySlopeOpacity(map.current, slopeOpacity);
     }
   }, [slope, slopeOpacity]);
+
+  // Terrain zones (TM05-142): pooling risk and exposure, off until asked for.
+  const [zones, setZones] = useState<Record<ZoneOverlay, boolean>>({
+    "pooling-risk": false,
+    exposure: false,
+  });
+  const zonesRef = useRef(zones);
+  useEffect(() => {
+    zonesRef.current = zones;
+    if (map.current && styleReady.current) {
+      for (const zone of ZONES) setZoneVisible(map.current, zone.id, zones[zone.id]);
+    }
+  }, [zones]);
+  const toggleZone = useCallback(
+    (zone: ZoneOverlay, on: boolean) => setZones((previous) => ({ ...previous, [zone]: on })),
+    [],
+  );
 
   const switchMode = useCallback((id: ModeId) => {
     const next = modeById(id);
@@ -403,6 +422,7 @@ export default function Discover() {
       addSlopeLayer(instance, slopeRef.current.on, slopeRef.current.opacity);
       addMapSources(instance);
       addMapLayers(instance);
+      addTerrainOverlays(instance, zonesRef.current);
 
       styleReady.current = true;
       setMapInstance(instance);
@@ -542,6 +562,8 @@ export default function Discover() {
           onSlope={setSlope}
           slopeOpacity={slopeOpacity}
           onSlopeOpacity={setSlopeOpacity}
+          zones={zones}
+          onZone={toggleZone}
           onRegion={flyToRegion}
         />
         {/* Keyed by session: signing in or out starts the waypoints afresh. */}
