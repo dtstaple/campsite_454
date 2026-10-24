@@ -43,6 +43,7 @@ from planning.queries import as_gpx, waypoints_near
 from scoring.config import ScoringConfig
 from scoring.config import load as load_scoring_config
 from scoring.verdict import legality_verdict
+from terrain import payload as terrain_payload
 
 DEFAULT_ROUTE_LIMIT = 200
 MAX_ROUTE_LIMIT = 1000
@@ -237,7 +238,7 @@ def route_detail(route: TrailRoute, within: int, scoring: ScoringConfig | None =
         located = cursor.fetchall()
     truncated = len(located) > MAX_CAMPSITES
     located = located[:MAX_CAMPSITES]
-    sites = Campsite.objects.select_related("facts").in_bulk([row[0] for row in located])
+    sites = Campsite.objects.select_related("facts", "terrain").in_bulk([row[0] for row in located])
 
     config = scoring or load_scoring_config()
     along_settings = route_config()["along"]
@@ -268,6 +269,8 @@ def route_detail(route: TrailRoute, within: int, scoring: ScoringConfig | None =
                 "legality": legality_verdict(
                     site, facts, result["legal_status"] if result else None
                 ),
+                # TM05-142: badges for the row (water view, sheltered, pooling risk).
+                "terrain": terrain_payload.badges(site),
             }
         )
 

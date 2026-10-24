@@ -31,6 +31,7 @@ from geodata.models import Campsite
 from scoring.config import ScoringConfig
 from scoring.engine import ScoringError, score_campsite
 from scoring.verdict import legality_verdict
+from terrain import payload as terrain_payload
 
 SCORED = "scored"
 PENDING = "pending"
@@ -139,7 +140,7 @@ def stored_scores(ids: list[int], config: ScoringConfig | None = None) -> dict[i
 def campsite_detail_view(request, source_id: str):
     site = (
         Campsite.objects.filter(source_id=source_id)
-        .select_related("facts", "last_run")
+        .select_related("facts", "last_run", "terrain")
         .order_by("pk")
         .first()
     )
@@ -167,5 +168,26 @@ def campsite_detail_view(request, source_id: str):
             "confidence": confidence_payload(site),
             # The legality verdict shown above the score (TM05-76 follow-up).
             "legality": legality_verdict(site, facts, result["legal_status"] if result else None),
+            # Terrain-model facts from `make terrain` (TM05-142); null before it has run.
+            "terrain": terrain_payload.detail(site),
         }
     )
+
+
+@api_view(["GET"])
+@authentication_classes([OptionalTokenAuthentication])
+@permission_classes([AllowAny])
+def campsite_viewshed_view(request, source_id: str):
+    """GET /api/campsites/<source_id>/viewshed/ -- what the terrain lets you see from the
+    site, as a GeoJSON Feature (TM05-142). Its own request: the outline is the one large
+    part of the terrain facts, and the panel only needs it on "Show what I can see"."""
+    site = (
+        Campsite.objects.filter(source_id=source_id)
+        .select_related("terrain")
+        .order_by("pk")
+        .first()
+    )
+    feature = terrain_payload.viewshed_feature(site) if site else None
+    if feature is None:
+        raise Http404(f"No viewshed for campsite {source_id!r}")
+    return Response(feature)

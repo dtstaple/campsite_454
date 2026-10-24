@@ -1,6 +1,6 @@
 from django.urls import path
 
-from api.campsite_detail import campsite_detail_view
+from api.campsite_detail import campsite_detail_view, campsite_viewshed_view
 from api.regions_view import regions_view
 from api.route_search import route_search_view
 from api.routes import (
@@ -18,6 +18,7 @@ urlpatterns = [
     path("campsites/", layer_view, {"layer": "campsites"}, name="campsites"),
     # <path:> because a source_id contains a slash; the trailing /detail/ anchors it.
     path("campsites/<path:source_id>/detail/", campsite_detail_view, name="campsite-detail"),
+    path("campsites/<path:source_id>/viewshed/", campsite_viewshed_view, name="campsite-viewshed"),
     path("trails/", layer_view, {"layer": "trails"}, name="trails"),
     path("water/", layer_view, {"layer": "water"}, name="water"),
     path("public-land/", layer_view, {"layer": "public-land"}, name="public-land"),

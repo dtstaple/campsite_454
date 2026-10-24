@@ -24,6 +24,7 @@ weights ([Scoring weights](#scoring-weights-tm05-46)).
 | `GET /api/map-data/` | The first four at once, for the initial load; peaks and trailheads on request with `layers=` |
 | `GET /api/tiles/<layer>/<z>/<x>/<y>.mvt` | Trails, water and public land as Mapbox Vector Tiles, which is what the map draws them from. See [Vector tiles](#vector-tiles-tm05-140) |
 | `GET /api/campsites/<id>/detail/` | One campsite with its derived facts — see [Campsite detail](#campsite-detail-tm05-64) |
+| `GET /api/campsites/<id>/viewshed/` | What the terrain lets you see from a campsite — see [Terrain facts](#terrain-facts-tm05-142) |
 | `GET /api/routes/` | Named hiking routes in a bbox — see [Named routes](#named-routes-tm05-60) |
 | `GET /api/routes/<osm_id>/` | One route: stats, elevation profile, campsites along it with scores |
 | `GET /api/saved-campsites/` | The signed-in user's saved campsites, with names, scores and land units — see [Saved campsites list](#saved-campsites-list-tm05-87) |
@@ -1327,6 +1328,63 @@ cache with no request at all. The GeoJSON path re-requested any viewport that mi
 40-entry cache. A cold tile costs 1–10 ms of database time from zoom 11 up, and
 50–160 ms for the densest zoom 9 tiles (`tests/test_api_tiles.py` covers correctness,
 not timing).
+
+## Terrain facts (TM05-142)
+
+These come from the terrain pipeline (`make terrain`, docs/terrain-analysis.md). They are
+precomputed, so they cost nothing per request.
+
+### In `GET /api/campsites/<id>/detail/`: `terrain`
+
+```json
+"terrain": {
+  "pooling": {"level": "low", "reason": "Water drains away from here (wetness index 7.2)."},
+  "sun": {"facing": "southeast", "label": "morning and midday sun"},
+  "shelter": {"level": "moderate", "reason": "About level with the ground around it."},
+  "view": {"area_km2": 7.1, "direction": "all around", "water": true},
+  "has_viewshed": true,
+  "note": "Terrain-model estimate from bare-earth elevation. Trees, buildings and recent changes aren't counted.",
+  "computed_at": "2026-10-24T01:45:53Z"
+}
+```
+
+Each part is null when that fact is unknown; `view.direction` and `view.water` can be null
+on their own. `terrain` itself is null for a campsite `make terrain` hasn't reached. The
+values the app shows:
+
+| Field | Values |
+|---|---|
+| `pooling.level` | `low`, `medium` or `high` |
+| `sun.facing` | `north`, `northeast`, `east`, … or `flat` |
+| `shelter.level` | `sheltered`, `moderate` or `exposed` |
+| `view.direction` | a compass sector, or `all around` |
+| `view.water` | 1 ha or more of lake or pond visible within 2 km |
+
+Show `note` with them: the model sees bare earth only.
+
+### `GET /api/campsites/<id>/viewshed/`
+
+What the terrain lets you see from the site (eye height 1.7 m, out to 10 km), as a GeoJSON
+Feature: a MultiPolygon in EPSG:4326, simplified to 15 m. Its properties are `area_km2`,
+`direction`, `water_view` and `note`. It is a separate request because the outline is the
+one large part, and the panel only needs it on "Show what I can see". It returns **404**
+when the site has no viewshed.
+
+### On a route's campsite rows: `terrain`
+
+Each item of `campsites.items` in `GET /api/routes/<osm_id>/` and
+`GET /api/trails/<source_id>/trail/` carries the compact form for badges:
+
+```json
+"terrain": {"pooling": "high", "shelter": "sheltered", "water_view": false}
+```
+
+It is null for a campsite without terrain facts.
+
+### Map layers
+
+`/api/tiles/pooling-risk/…` and `/api/tiles/exposure/…` serve the zones, with the
+`zone_class` attribute, from zoom 8. See [Vector tiles](#vector-tiles-tm05-140).
 
 ## Not included yet
 
