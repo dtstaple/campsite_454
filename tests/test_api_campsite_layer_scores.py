@@ -19,7 +19,7 @@ from enrichment.facts import enrich
 from enrichment.models import CampsiteFacts
 from geodata.models import Campsite, WaterFeature
 from scoring.config import load, parse
-from scoring.stored import factors_digest
+from scoring.stored import NOT_STORED, factors_digest
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
@@ -190,10 +190,8 @@ def test_enrich_stores_the_vector_factor_results():
     surroundings()
     facts = enrich(campsite())
 
-    assert {entry["key"] for entry in facts.factor_results} == set(load().weights) - {
-        "slope",
-        "weather",
-    }
+    # Slope and weather (analysis cache) and the terrain factors (TM05-143) aren't stored.
+    assert {entry["key"] for entry in facts.factor_results} == set(load().weights) - NOT_STORED
     assert facts.factor_digest == factors_digest()
 
 

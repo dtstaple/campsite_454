@@ -23,7 +23,14 @@ import {
 } from "./format";
 import { alongResults, searchSummary, type Candidate, type CandidateSearch } from "./candidates";
 import { byMile, junctionMiles, type Connection } from "./connections";
-import { TERRAIN_NOTE, terrainBadges, type TerrainBadges } from "../terrain/terrain";
+import {
+  passesQuickFilters,
+  QUICK_FILTERS,
+  TERRAIN_NOTE,
+  terrainBadges,
+  type QuickFilter,
+  type TerrainBadges,
+} from "../terrain/terrain";
 import { gpxFilename, gpxPath } from "./gpx";
 import SaveTrail from "./SaveTrail";
 import Sheet from "../components/Sheet";
@@ -489,9 +496,21 @@ function AlongList({
   onCursor: (distance: number | null) => void;
   onCampsiteHover?: (campsite: CampsiteAlong | null) => void;
 }) {
-  const rows = alongResults(campsites, search?.candidates ?? []);
+  const [filters, setFilters] = useState<ReadonlySet<QuickFilter>>(new Set());
+  const all = alongResults(campsites, search?.candidates ?? []);
+  const terrainOf = (row: (typeof all)[number]) =>
+    row.kind === "campsite" ? row.site.terrain : row.candidate.terrain;
+  const rows = all.filter((row) => passesQuickFilters(terrainOf(row), filters));
+  const hasTerrain = all.some((row) => terrainOf(row));
   const within = withinM < 1000 ? `${withinM} m` : `${withinM / 1000} km`;
-  if (rows.length === 0 && search) {
+  const toggleFilter = (key: QuickFilter) =>
+    setFilters((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  if (all.length === 0 && search) {
     return (
       <div className="trail-empty">
         No mapped campsites or potential spots within {within} of this trail.
@@ -501,6 +520,26 @@ function AlongList({
   return (
     <>
       <div className="trail-find-summary">{searchSummary(campsites.length, search)}</div>
+      {hasTerrain && (
+        <div className="terrain-filters" role="group" aria-label="Terrain filters">
+          {QUICK_FILTERS.map((filter) => (
+            <button
+              key={filter.key}
+              type="button"
+              className={`terrain-filter${filters.has(filter.key) ? " is-on" : ""}`}
+              aria-pressed={filters.has(filter.key)}
+              onClick={() => toggleFilter(filter.key)}
+            >
+              {filter.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {filters.size > 0 && (
+        <div className="trail-find-summary">
+          {rows.length} of {all.length} match · {TERRAIN_NOTE}
+        </div>
+      )}
       <ol className="trail-campsite-list">
         {rows.map((row) =>
           row.kind === "campsite" ? (
@@ -570,6 +609,7 @@ function AlongList({
                     {Math.round(row.candidate.distance_from_route_m)} m off trail ·{" "}
                     {row.candidate.slope_deg.toFixed(0)}° slope
                   </span>
+                  <TerrainChips badges={row.candidate.terrain} />
                 </span>
                 {row.candidate.score !== null && (
                   <span className="trail-score trail-candidate-score" title="Computed score, 0-100">

@@ -1,0 +1,100 @@
+{
+ "Phelps Trail": {
+  "off": {
+   "sampled": 630,
+   "rejected_pooling": 0,
+   "passed": 18,
+   "kept": 6,
+   "ids": [
+    "candidate/-73.822028,44.186833",
+    "candidate/-73.829183,44.180112",
+    "candidate/-73.838375,44.174595",
+    "candidate/-73.848670,44.170197",
+    "candidate/-73.854165,44.163611",
+    "candidate/-73.871287,44.152036"
+   ],
+   "exposed": 0
+  },
+  "on": {
+   "sampled": 630,
+   "rejected_pooling": 0,
+   "passed": 18,
+   "kept": 6,
+   "ids": [
+    "candidate/-73.822028,44.186833",
+    "candidate/-73.829183,44.180112",
+    "candidate/-73.838375,44.174595",
+    "candidate/-73.848670,44.170197",
+    "candidate/-73.854165,44.163611",
+    "candidate/-73.871287,44.152036"
+   ],
+   "exposed": 0
+  }
+ },
+ "Calamity Brook Trail": {
+  "off": {
+   "sampled": 440,
+   "rejected_pooling": 0,
+   "passed": 33,
+   "kept": 7,
+   "ids": [
+    "candidate/-74.061419,44.088887",
+    "candidate/-74.053217,44.095027",
+    "candidate/-74.044164,44.101884",
+    "candidate/-74.025186,44.102052",
+    "candidate/-74.004600,44.111107",
+    "candidate/-73.996326,44.117243",
+    "candidate/-73.982969,44.119937"
+   ],
+   "exposed": 1
+  },
+  "on": {
+   "sampled": 440,
+   "rejected_pooling": 0,
+   "passed": 33,
+   "kept": 7,
+   "ids": [
+    "candidate/-74.061419,44.088887",
+    "candidate/-74.053217,44.095027",
+    "candidate/-74.044164,44.101884",
+    "candidate/-74.025186,44.102052",
+    "candidate/-74.004600,44.111107",
+    "candidate/-73.996326,44.117243",
+    "candidate/-73.982969,44.119937"
+   ],
+   "exposed": 1
+  }
+ },
+ "Deer Pond Trail": {
+  "off": {
+   "sampled": 290,
+   "rejected_pooling": 0,
+   "passed": 89,
+   "kept": 6,
+   "ids": [
+    "candidate/-74.402163,44.247747",
+    "candidate/-74.406437,44.254032",
+    "candidate/-74.397215,44.266016",
+    "candidate/-74.383925,44.261945",
+    "candidate/-74.373524,44.261964",
+    "candidate/-74.362340,44.261600"
+   ],
+   "exposed": 0
+  },
+  "on": {
+   "sampled": 290,
+   "rejected_pooling": 1,
+   "passed": 88,
+   "kept": 6,
+   "ids": [
+    "candidate/-74.402163,44.247747",
+    "candidate/-74.406437,44.254032",
+    "candidate/-74.397215,44.266016",
+    "candidate/-74.383925,44.261945",
+    "candidate/-74.373524,44.261964",
+    "candidate/-74.362340,44.261600"
+   ],
+   "exposed": 0
+  }
+ }
+}

@@ -252,6 +252,7 @@ def test_every_candidate_is_labelled_unverified_with_its_checks(route):
             "public_land",
             "trail",
             "water",
+            "pooling",
             "elevation",
             "slope",
         ]
@@ -373,3 +374,89 @@ def test_a_candidate_with_no_mapped_trail_nearby_still_reads_cleanly(terrain):
     found = find()["candidates"]
     assert found
     assert found[0]["checks"][1]["label"] == "At least 150 ft from any mapped trail."
+
+
+# --- terrain (TM05-143) ---------------------------------------------------------------
+
+
+def terrain_run():
+    from django.utils import timezone
+
+    from terrain.models import TerrainRun
+
+    return TerrainRun.objects.create(
+        region="adirondacks",
+        started_at=timezone.now(),
+        finished_at=timezone.now(),
+        config_digest="c",
+        dem_digest="d",
+    )
+
+
+def zone(layer, x0, y0, x1, y1):
+    from terrain.models import TerrainZone
+
+    return TerrainZone.objects.create(
+        region="adirondacks", layer=layer, zone_class="high", area_m2=1,
+        geom=polygon(x0, y0, x1, y1),
+    )  # fmt: skip
+
+
+def test_no_candidate_lies_in_a_high_pooling_risk_zone(route):
+    land()
+    terrain_run()
+    # Everything north of the trail is wet ground.
+    zone("pooling-risk", -2000, 1, LENGTH + 2000, 2000)
+    body = find(500)
+    assert body["candidates"]
+    assert all(offset_of(c) < 0 for c in body["candidates"])
+    assert body["counts"]["rejected"]["pooling"] > 0
+    check = next(c for c in body["candidates"][0]["checks"] if c["key"] == "pooling")
+    assert check["passed"] and "pooling risk zone" in check["label"]
+
+
+def test_without_a_terrain_run_pooling_is_not_checked_and_says_so(route):
+    land()
+    zone("pooling-risk", -2000, 1, LENGTH + 2000, 2000)  # zones, but no run for the region
+    body = find(500)
+    assert body["counts"]["rejected"]["pooling"] == 0
+    assert any(offset_of(c) > 0 for c in body["candidates"])
+    check = next(c for c in body["candidates"][0]["checks"] if c["key"] == "pooling")
+    assert check["label"] == "Water pooling risk not checked: no terrain data here yet."
+
+
+def test_the_filter_can_be_switched_off_in_config(route, monkeypatch):
+    land()
+    terrain_run()
+    zone("pooling-risk", -2000, 1, LENGTH + 2000, 2000)
+    settings = {**config(), "reject_pooling_risk": False}
+    result = search.find_candidates(route.geom, 500, settings)
+    assert result["counts"]["rejected"]["pooling"] == 0
+
+
+def test_when_every_spot_is_wet_the_reason_says_so(route):
+    land()
+    terrain_run()
+    zone("pooling-risk", -2000, -2000, LENGTH + 2000, 2000)
+    body = find(500)
+    assert body["candidates"] == []
+    assert "high water pooling risk" in body["reason"]
+
+
+def test_candidates_carry_the_terrain_badges_they_can_honestly_know(route):
+    land()
+    terrain_run()
+    zone("exposure", -2000, -2000, LENGTH + 2000, 0)  # south of the trail is exposed
+    body = find(500)
+    for candidate in body["candidates"]:
+        badges = candidate["terrain"]
+        assert badges["pooling"] is None and badges["water_view"] is None
+        assert badges["shelter"] == ("exposed" if offset_of(candidate) < 0 else None)
+
+
+def test_a_new_terrain_run_is_a_new_cache_key(route):
+    land()
+    before = search.TrailCandidates().canonical_params({"within_m": 500})
+    terrain_run()
+    after = search.TrailCandidates().canonical_params({"within_m": 500})
+    assert before["terrain"] == "none" and after["terrain"] != "none"

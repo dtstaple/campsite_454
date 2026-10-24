@@ -68,7 +68,7 @@ CONFIG_PATH = Path(__file__).with_name("candidates.yml")
 
 LABEL = "Potential spot (unverified)"
 ROAD_NOTE = "Road distance isn't checked; verify current rules on the ground."
-FILTERS = ["public_land", "trail", "water", "elevation", "terrain", "slope"]
+FILTERS = ["public_land", "trail", "water", "pooling", "elevation", "terrain", "slope"]
 
 
 @lru_cache(maxsize=1)
@@ -176,6 +176,50 @@ def near(table: str, samples: list[dict], indices: list[int], distance_m: float)
     return {row[0] for row in rows}
 
 
+def in_zone(layer: str, samples: list[dict], indices: list[int]) -> set[int]:
+    """The points inside a merged terrain zone of `layer` (TM05-143; indexed, metric)."""
+    rows = _query(
+        """
+        SELECT pts.i FROM pts
+        WHERE EXISTS (
+            SELECT 1 FROM terrain_terrainzone z
+            WHERE z.layer = %s AND z.tile = '' AND ST_Intersects(z.geom_m, pts.g)
+        )
+        """,
+        samples,
+        indices,
+        layer,
+    )
+    return {row[0] for row in rows}
+
+
+def terrain_checked(route_geom: GEOSGeometry) -> bool:
+    """Whether `make terrain` has run for a region containing the route, so "not in a
+    pooling zone" means something there. Elsewhere the check is skipped and says so."""
+    from pipeline.regions import RegionConfigError, get_region
+    from terrain.models import TerrainRun
+
+    centre = route_geom.centroid
+    for region in (
+        TerrainRun.objects.exclude(finished_at=None).values_list("region", flat=True).distinct()
+    ):
+        try:
+            west, south, east, north = get_region(region).bbox
+        except RegionConfigError:
+            continue
+        if west <= centre.x <= east and south <= centre.y <= north:
+            return True
+    return False
+
+
+def terrain_digest() -> str:
+    """Identifies the terrain zones a cached search used: the latest finished run."""
+    from terrain.models import TerrainRun
+
+    latest = TerrainRun.objects.exclude(finished_at=None).order_by("-finished_at").first()
+    return f"{latest.pk}:{latest.dem_digest}:{latest.config_digest}" if latest else "none"
+
+
 def nearest_m(table: str, x: float, y: float) -> float | None:
     with connection.cursor() as cursor:
         cursor.execute(
@@ -255,6 +299,10 @@ def empty_reason(counts: dict, within_m: float, settings: dict) -> str:
         "public_land": f"No public land with open access within {within} of this trail.",
         "trail": f"No open public land at least 150 ft from every trail within {within}.",
         "water": (f"No open public land at least 150 ft from trails and water within {within}."),
+        "pooling": (
+            f"Every open spot within {within} lies where the terrain model puts a high "
+            "water pooling risk."
+        ),
         "terrain": "Elevation data is unavailable right now, so slope could not be checked.",
         "elevation": f"No open public land below the DEC elevation limits within {within}.",
         "slope": (
@@ -282,6 +330,13 @@ def find_candidates(route_geom: GEOSGeometry, within_m: float, settings: dict) -
         too_close = near(table, samples, alive, rule) if alive else set()
         counts["rejected"][key] = len(too_close)
         alive = [i for i in alive if i not in too_close]
+
+    # TM05-143: not where the terrain model puts a high water pooling risk.
+    pooling_checked = bool(settings.get("reject_pooling_risk")) and terrain_checked(route_geom)
+    if pooling_checked and alive:
+        wet = in_zone("pooling-risk", samples, alive)
+        counts["rejected"]["pooling"] = len(wet)
+        alive = [i for i in alive if i not in wet]
 
     points = to_wgs84(samples, alive)
     # Elevation first, one 3DEP sample per point: the DEC limits remove most points on a
@@ -369,6 +424,7 @@ def find_candidates(route_geom: GEOSGeometry, within_m: float, settings: dict) -
         )
     kept = spread(scored, float(settings["min_spacing_m"]), int(settings["max_results"]))
     counts["kept"] = len(kept)
+    exposed = in_zone("exposure", samples, [c["index"] for c in kept]) if kept else set()
 
     candidates = []
     for candidate in kept:
@@ -406,6 +462,13 @@ def find_candidates(route_geom: GEOSGeometry, within_m: float, settings: dict) -
                         if water_m is not None
                         else "No mapped water nearby.",
                     },
+                    {
+                        "key": "pooling",
+                        "passed": True,
+                        "label": "Not in a high water pooling risk zone (terrain model)."
+                        if pooling_checked
+                        else "Water pooling risk not checked: no terrain data here yet.",
+                    },
                     {"key": "elevation", "passed": True, "label": elevation_notes[i]},
                     {
                         "key": "slope",
@@ -419,6 +482,13 @@ def find_candidates(route_geom: GEOSGeometry, within_m: float, settings: dict) -
                 "slope_deg": round(slope, 1),
                 "nearest_trail_m": trail_m,
                 "nearest_water_m": water_m,
+                # TM05-143: the badges a potential spot can honestly carry: the zones say
+                # high pooling risk (filtered out above) and exposure; nothing more is known.
+                "terrain": {
+                    "pooling": None,
+                    "shelter": "exposed" if i in exposed else None,
+                    "water_view": None,
+                },
             }
         )
     return {
@@ -445,12 +515,14 @@ class TrailCandidates(Analysis):
             "within_m": int(params.get("within_m", 500)),
             "config": config_digest(config()),
             "scoring": load_scoring_config().digest,
+            # TM05-143: a new `make terrain` run means new pooling zones to filter on.
+            "terrain": terrain_digest(),
         }
 
     def compute(self, geom, window, params) -> Computed:
         value = find_candidates(geom, params["within_m"], config())
         provenance = {
-            "sources": ["padus", "osm-trails", "nhd", "usgs-3dep"],
+            "sources": ["padus", "osm-trails", "nhd", "usgs-3dep", "terrain-zones"],
             "sampled": value["counts"]["sampled"],
             "kept": value["counts"]["kept"],
         }

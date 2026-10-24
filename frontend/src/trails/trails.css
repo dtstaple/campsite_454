@@ -794,3 +794,23 @@
   border-color: var(--terrain-warn);
   color: var(--terrain-warn);
 }
+
+/* --- Find campsites quick filters (TM05-143) -------------------------------------------- */
+.terrain-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin: var(--space-xs) 0;
+}
+
+.terrain-filter {
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-sm);
+}
+
+.terrain-filter.is-on {
+  border-color: var(--accent);
+  color: var(--accent);
+}

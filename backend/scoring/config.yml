@@ -4,7 +4,7 @@
 # config_digest reported with every score, so cached scores from the old config are
 # recognisably stale. Bump model_version when the *meaning* of a factor changes.
 
-model_version: "1.2.0"
+model_version: "1.3.0"
 
 # Relative weights. They need not sum to 1: the engine renormalises over the factors
 # that could be evaluated, so a factor that is not_available drops out cleanly.
@@ -15,6 +15,11 @@ weights:
   weather: 0.15
   slope: 0.10
   land_cover: 0.05
+  # TM05-143: from the terrain pipeline. Optional -- a site `make terrain` hasn't reached
+  # is scored without them -- and light, so they adjust the score rather than lead it.
+  drainage: 0.10
+  shelter: 0.05
+  view: 0.05
 
 factors:
   water:
@@ -110,3 +115,15 @@ factors:
 
   land_cover:
     placeholder: "Land cover isn't measured yet."
+
+  # --- terrain (TM05-143; facts from TM05-141, docs/terrain-analysis.md) ---
+  drainage:
+    # By water pooling risk. High is a penalty: a tent there floods in rain.
+    scores: {low: 100, medium: 60, high: 10}
+  shelter:
+    # By the site's height against its surroundings (DEV over about 1 km).
+    scores: {sheltered: 100, moderate: 75, exposed: 35}
+  view:
+    # A modest bonus: visible area in km² -> sub-score, plus a bonus for water in view.
+    area_curve: [[0, 40], [2, 55], [10, 70], [30, 80]]
+    water_bonus: 20

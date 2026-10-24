@@ -103,7 +103,7 @@ export function terrainLines(terrain: TerrainPayload | null | undefined): Terrai
 }
 
 export interface Badge {
-  key: "water_view" | "sheltered" | "pooling";
+  key: "water_view" | "sheltered" | "pooling" | "exposed";
   text: string;
   /** For styling: "good" or "warn". */
   tone: "good" | "warn";
@@ -116,5 +116,32 @@ export function terrainBadges(badges: TerrainBadges | null | undefined): Badge[]
   if (badges.water_view) out.push({ key: "water_view", text: "Water view", tone: "good" });
   if (badges.shelter === "sheltered") out.push({ key: "sheltered", text: "Sheltered", tone: "good" });
   if (badges.pooling === "high") out.push({ key: "pooling", text: "Pooling risk", tone: "warn" });
+  if (badges.shelter === "exposed") out.push({ key: "exposed", text: "Exposed", tone: "warn" });
   return out;
+}
+
+/** Find campsites' quick filters (TM05-143). */
+export type QuickFilter = "water_view" | "sheltered" | "low_pooling";
+
+export const QUICK_FILTERS: readonly { key: QuickFilter; label: string }[] = [
+  { key: "water_view", label: "Water view" },
+  { key: "sheltered", label: "Sheltered" },
+  { key: "low_pooling", label: "Low pooling risk" },
+];
+
+/**
+ * Whether a row's terrain passes every active quick filter. A fact that is unknown
+ * fails: a filter shows what is known to qualify, never a guess. That includes a
+ * potential spot's water view, and whether its pooling risk is low rather than medium.
+ */
+export function passesQuickFilters(
+  badges: TerrainBadges | null | undefined,
+  active: ReadonlySet<QuickFilter>,
+): boolean {
+  if (active.size === 0) return true;
+  if (!badges) return false;
+  if (active.has("water_view") && badges.water_view !== true) return false;
+  if (active.has("sheltered") && badges.shelter !== "sheltered") return false;
+  if (active.has("low_pooling") && badges.pooling !== "low") return false;
+  return true;
 }

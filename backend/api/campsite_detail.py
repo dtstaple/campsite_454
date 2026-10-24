@@ -130,7 +130,7 @@ def score_payload(site: Campsite, config: ScoringConfig | None = None) -> dict:
 
 def stored_scores(ids: list[int], config: ScoringConfig | None = None) -> dict[int, dict]:
     """score_payload() for each Campsite primary key in `ids`."""
-    sites = Campsite.objects.filter(pk__in=ids).select_related("facts")
+    sites = Campsite.objects.filter(pk__in=ids).select_related("facts", "terrain")
     return {site.pk: score_payload(site, config) for site in sites}
 
 

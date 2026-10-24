@@ -127,7 +127,18 @@ class TestPeakCurve:
 class TestConfig:
     def test_shipped_config_loads_with_every_factor(self):
         config = shipped()
-        assert set(config.weights) == {"water", "legal", "trail", "weather", "slope", "land_cover"}
+        assert set(config.weights) == {
+            "water",
+            "legal",
+            "trail",
+            "weather",
+            "slope",
+            "land_cover",
+            # TM05-143: the optional terrain factors.
+            "drainage",
+            "shelter",
+            "view",
+        }
         assert config.factor("water")["ideal_m"] == 60
 
     def test_capacity_is_not_a_factor(self):
