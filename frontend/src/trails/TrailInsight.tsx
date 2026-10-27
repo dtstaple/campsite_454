@@ -147,11 +147,12 @@ export default function TrailInsight({
   }, [map, hoveredJunctions]);
 
   // --- TM05-100: open a saved trail or plan, once ------------------------------------
-  const requestHandled = useRef(false);
+  // Each request object is handled once; a new one (TM05-121's tray) opens its trail too.
+  const requestHandled = useRef<typeof openRequest>(null);
   const pendingPlan = useRef<number | null>(null);
   useEffect(() => {
-    if (!map || !openRequest || requestHandled.current) return;
-    requestHandled.current = true;
+    if (!map || !openRequest || requestHandled.current === openRequest) return;
+    requestHandled.current = openRequest;
     pendingPlan.current = openRequest.kind === "plan" ? openRequest.planId : null;
     // Loading is set here, from the request, as a map click sets it from its event.
     setState({ status: "loading", name: openRequest.name });

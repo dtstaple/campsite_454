@@ -7,8 +7,9 @@
 
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useSession } from "./session";
+import { CompareToggle } from "./trails/CompareTray";
 
-export default function Header() {
+export default function Header({ comparing, onCompare }: { comparing: boolean; onCompare: () => void }) {
   const { session, signOut } = useSession();
   const navigate = useNavigate();
   // Over the map the header shrinks to a slim strip so the terrain gets the screen.
@@ -35,6 +36,8 @@ export default function Header() {
         <NavLink to="/discover" className="nav-link">
           Map
         </NavLink>
+        {/* TM05-121: shown once a trail is added to the comparison. */}
+        <CompareToggle open={comparing} onToggle={onCompare} />
       </nav>
 
       <div className="site-account">

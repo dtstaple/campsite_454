@@ -352,15 +352,20 @@ export default function Discover() {
   const [simulate] = useState(canSimulate);
 
   // TM05-100: an item clicked on the Profile page arrives as router state. It is taken
-  // once, and the history entry is replaced so a reload does not open it again.
+  // once, and the history entry is replaced so a reload does not open it again. TM05-121:
+  // the comparison tray sends one while the map is already open, so every new history
+  // entry is read, not only the first.
   const location = useLocation();
   const navigate = useNavigate();
-  const [openRequest] = useState<OpenRequest | null>(() => requestFromState(location.state));
+  const [openRequest, setOpenRequest] = useState<OpenRequest | null>(() => requestFromState(location.state));
   useEffect(() => {
-    if (openRequest) navigate(location.pathname, { replace: true, state: null });
-    // Only on arrival.
+    const request = requestFromState(location.state);
+    if (!request) return;
+    setOpenRequest(request);
+    navigate(location.pathname, { replace: true, state: null });
+    // Once per history entry.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [location.key]);
   const openedCampsite = useRef(false);
   useEffect(() => {
     if (!mapInstance || openRequest?.kind !== "campsite" || openedCampsite.current) return;
