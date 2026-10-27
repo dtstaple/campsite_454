@@ -1,0 +1,152 @@
+/* Compare trails (TM05-121). Tokens from theme.css. */
+
+.compare-tray {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  z-index: 4;
+  width: min(var(--content-max), calc(100% - 2 * var(--space-base)));
+  max-height: var(--compare-tray-max-height);
+  overflow-y: auto;
+  transform: translateX(-50%);
+  padding: var(--space-md) var(--space-base) var(--space-base);
+  background: var(--bg-floating);
+  backdrop-filter: blur(var(--blur-floating));
+  border: 1px solid var(--border-subtle);
+  border-top: none;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  box-shadow: var(--shadow-overlay);
+}
+
+.compare-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.compare-head h2 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--text-lg);
+}
+
+.compare-hint {
+  margin-right: auto;
+  color: var(--text-tertiary);
+  font-size: var(--text-sm);
+}
+
+.compare-head .link-button {
+  font-size: var(--text-sm);
+}
+
+/* Side by side: one column per trail. */
+.compare-columns {
+  display: grid;
+  grid-template-columns: repeat(var(--compare-count), minmax(var(--compare-column-min), 1fr));
+  gap: var(--space-md);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.compare-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.compare-open {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-md);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--transition);
+}
+
+.compare-open:hover {
+  border-color: var(--accent);
+}
+
+.compare-open:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.compare-name {
+  margin-bottom: var(--space-xs);
+  color: var(--text-primary);
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-snug);
+}
+
+.compare-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding-top: var(--space-xs);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.compare-label {
+  color: var(--text-tertiary);
+  font-size: var(--text-sm);
+}
+
+.compare-value {
+  color: var(--text-primary);
+  text-align: right;
+}
+
+.compare-remove {
+  align-self: flex-start;
+  font-size: var(--text-sm);
+}
+
+.compare-toggle {
+  background: none;
+  border-top: none;
+  border-inline: none;
+  font-family: var(--font-sans);
+  cursor: pointer;
+}
+
+/* Phone (PHONE_MAX_WIDTH, components/snaps.ts): stacked cards across the full width. */
+@media (max-width: 640px) {
+  .compare-tray {
+    width: 100%;
+    padding-left: max(var(--space-base), env(safe-area-inset-left));
+    padding-right: max(var(--space-base), env(safe-area-inset-right));
+    border-inline: none;
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  }
+
+  .compare-hint {
+    display: none;
+  }
+
+  .compare-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .compare-head h2 {
+    margin-right: auto;
+  }
+
+  /* Touch targets: at least 40px tall where a finger has to hit them. */
+  .compare-remove,
+  .compare-toggle {
+    min-height: 40px;
+  }
+}

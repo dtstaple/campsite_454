@@ -33,6 +33,8 @@ import {
 } from "../terrain/terrain";
 import { gpxFilename, gpxPath } from "./gpx";
 import SaveTrail from "./SaveTrail";
+import { CompareButton } from "./CompareTray";
+import { fromDetail } from "./compare";
 import Sheet from "../components/Sheet";
 import { gradeAt, nearestIndex } from "./profile";
 import { duration as plannedDuration, offTrailNote, stretch } from "../routing/planned";
@@ -427,6 +429,8 @@ function GpxDownload({ detail, withinM }: { detail: RouteDetail; withinM: number
       {/* Signed out, a plain link: the API answers with Content-Disposition: attachment, so
           the browser saves the file (the download attribute is ignored across origins). */}
       <SaveTrail detail={detail} />
+      {/* TM05-121: side by side with up to two other trails. */}
+      <CompareButton trail={fromDetail(detail)} />
       <a className="trail-3d-button trail-gpx" href={url} download onClick={download}>
         Download GPX
       </a>

@@ -9,7 +9,8 @@
  *
  * Everything is the TM05-74/85 search endpoint with `region`, `sort`, `offset` and `cards`
  * (docs/api.md). Results come 24 at a time with "Show more". A card opens the map with
- * that trail's panel, and the panel fits the view to it.
+ * that trail's panel, and the panel fits the view to it. "Compare" under a card adds it to
+ * the comparison tray (TM05-121).
  */
 
 import { useEffect, useMemo, useState } from "react";
@@ -18,6 +19,8 @@ import { FilterForm } from "../trails/TrailSearch";
 import { fetchRegions, searchRoutes, type Region, type RouteHit, type RouteSearch } from "../trails/api";
 import { campsitesLine, cardFacts, nearPoint, sparklinePoints } from "../trails/cards";
 import { NO_FILTERS, activeFilterCount, filterParams, unknownNote, type TrailFilters } from "../trails/filters";
+import { CompareButton } from "../trails/CompareTray";
+import { fromHit } from "../trails/compare";
 import { OPEN_STATE_KEY, type OpenRequest } from "../profile/openRequest";
 import "../trails/trails.css";
 import "../browse/browse.css";
@@ -196,8 +199,9 @@ export default function BrowseTrails() {
           </p>
           <ul className="browse-grid">
             {page.hits.map((hit) => (
-              <li key={hit.osm_id}>
+              <li key={hit.osm_id} className="browse-item">
                 <TrailCard hit={hit} onOpen={() => open(hit)} />
+                <CompareButton trail={fromHit(hit)} />
               </li>
             ))}
           </ul>

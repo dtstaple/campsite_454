@@ -427,3 +427,10 @@
   --terrain-good: var(--success);
   --terrain-warn: var(--danger);
 }
+
+/* --- Compare trails (TM05-121) ----------------------------------------------------------- */
+:root {
+  /* The tray drops from the header over the page, at most this much of the screen. */
+  --compare-tray-max-height: 70vh;
+  --compare-column-min: 200px;
+}

@@ -16,6 +16,7 @@
  * what lets the header sign out from anywhere.
  */
 
+import { useState } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import "./App.css";
 import "./phone.css";
@@ -27,14 +28,18 @@ import Discover from "./pages/Discover";
 import Profile from "./pages/Profile";
 import BrowseTrails from "./pages/BrowseTrails";
 import { SessionProvider } from "./session";
+import CompareTray from "./trails/CompareTray";
 
 export default function App() {
+  // TM05-121: the comparison tray, opened from the header over any page.
+  const [comparing, setComparing] = useState(false);
   return (
     <SessionProvider>
       <BrowserRouter>
         <div className="shell">
-          <Header />
+          <Header comparing={comparing} onCompare={() => setComparing((open) => !open)} />
           <div className="shell-body">
+            <CompareTray open={comparing} onClose={() => setComparing(false)} />
             <Routes>
               <Route path="/" element={<Landing />} />
               <Route path="/login" element={<Login />} />

@@ -145,3 +145,19 @@
   display: block;
   margin: var(--space-lg) auto;
 }
+
+/* TM05-121: "Compare" sits under its card. */
+.browse-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.browse-item .browse-card {
+  flex: 1;
+  height: auto;
+}
+
+.browse-item .compare-button {
+  align-self: flex-start;
+}
