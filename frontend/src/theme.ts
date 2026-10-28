@@ -83,3 +83,19 @@ export function mapHillshade() {
     exaggeration: numericToken("--map-hillshade-exaggeration", 0.45),
   };
 }
+
+/**
+ * Peak and trailhead icon and label colours (TM05-122), for the dark map or for satellite
+ * imagery, where the labels take the heavier --map-landmark-*-imagery halo.
+ */
+export function landmarkColors(basemap: "standard" | "satellite") {
+  const suffix = basemap === "satellite" ? "-imagery" : "";
+  return {
+    peak: token("--map-peaks") || "#f1ead8",
+    trailhead: token("--map-trailheads") || "#b48cff",
+    ring: token("--map-landmark-ring") || "#15130f",
+    label: token(`--map-landmark-label${suffix}`) || "#f1ead8",
+    halo: token(`--map-landmark-label-halo${suffix}`) || "rgba(21, 19, 15, 0.85)",
+    haloWidth: numericToken(`--map-landmark-label-halo-width${suffix}`, 1.4),
+  };
+}

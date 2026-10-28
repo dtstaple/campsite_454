@@ -8,8 +8,8 @@
 
 import { Fragment, useState } from "react";
 import {
+  layerMinZoom,
   layerVisibleAtZoom,
-  MIN_ZOOM_FOR_LINEWORK,
   type LayerName,
   type Metadata,
 } from "../api";
@@ -189,7 +189,7 @@ export default function LayerPanel({
                   {layer.label}
                   <span className="count">
                     {on && zoomedOut
-                      ? `zoom ${MIN_ZOOM_FOR_LINEWORK}+`
+                      ? `zoom ${layerMinZoom(layer.name)}+`
                       : on
                         ? countLabel(meta[layer.name])
                         : ""}

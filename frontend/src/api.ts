@@ -12,10 +12,18 @@
 
 import type { Feature } from "geojson";
 import { authHeaders, storedSession } from "./auth";
+import { PEAK_MIN_ZOOM, TRAILHEAD_MIN_ZOOM } from "./map/landmarks";
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
 
-export type LayerName = "campsites" | "trails" | "water" | "public-land";
+export type LayerName =
+  | "campsites"
+  | "trails"
+  | "water"
+  | "public-land"
+  // TM05-89's opt-in landmark layers, drawn since TM05-122.
+  | "peaks"
+  | "trailheads";
 
 export interface Metadata {
   layer: LayerName;
@@ -59,14 +67,22 @@ export function simplifyForZoom(zoom: number): number | null {
  */
 export const MIN_ZOOM_FOR_LINEWORK = 9;
 
-export function layerVisibleAtZoom(layer: LayerName, zoom: number): boolean {
+/** The zoom a layer is fetched and drawn from. */
+export function layerMinZoom(layer: LayerName): number {
   // Points and polygons stay legible at any zoom. The threshold exists for linework,
   // where an individual stream or trail falls under a pixel wide and the request is
   // all cost and no picture. A public land parcel is measured in miles, so zooming
   // out makes it *more* readable, not less -- and it is the layer that tells you
   // which part of an empty-looking map is even campable.
-  if (layer === "campsites" || layer === "public-land") return true;
-  return zoom >= MIN_ZOOM_FOR_LINEWORK;
+  if (layer === "campsites" || layer === "public-land") return 0;
+  // Peak and trailhead labels (TM05-122) crowd out the place names when zoomed out.
+  if (layer === "peaks") return PEAK_MIN_ZOOM;
+  if (layer === "trailheads") return TRAILHEAD_MIN_ZOOM;
+  return MIN_ZOOM_FOR_LINEWORK;
+}
+
+export function layerVisibleAtZoom(layer: LayerName, zoom: number): boolean {
+  return zoom >= layerMinZoom(layer);
 }
 
 /**

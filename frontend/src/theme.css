@@ -314,6 +314,24 @@
   --map-contour-label-size: 10;
 }
 
+/* --- Peaks and trailheads (TM05-122) ----------------------------------------------------
+ * Peaks are a pale summit triangle, trailheads a violet marker no other layer uses. Both
+ * icons carry a dark ring and both labels a dark halo, which is what keeps them readable
+ * on the dark map and on bright imagery alike; over imagery the halo is heavier. */
+:root {
+  --map-peaks: #f1ead8;
+  --map-trailheads: #b48cff;
+  --map-landmark-ring: #15130f;
+  --map-landmark-label: #f1ead8;
+  --map-landmark-label-halo: rgba(21, 19, 15, 0.85);
+  --map-landmark-label-imagery: #ffffff;
+  --map-landmark-label-halo-imagery: rgba(10, 10, 8, 0.95);
+  --map-landmark-label-halo-width: 1.4;
+  --map-landmark-label-halo-width-imagery: 2;
+  --map-landmark-label-size: 12;
+  --map-landmark-icon-size: 14;
+}
+
 /* --- The user's location (TM05-78) ------------------------------------------------------
  * The familiar blue dot: a colour no data layer uses, with a white ring for both basemaps. */
 :root {
