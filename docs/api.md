@@ -84,6 +84,11 @@ example `layers=campsites,peaks,trailheads`, so the default first paint is uncha
 peak carries `name` and `elevation_m` (metres, `null` when OpenStreetMap has no usable
 `ele`); a trailhead carries `name`. Either name may be empty.
 
+The map (TM05-122) asks for them while their layer-panel toggles are on: peaks from zoom
+10, labelled "Name · 4,322 ft" (just the name when `elevation_m` is null), and trailheads
+from zoom 12, with a signpost icon and their name. The labels are built in
+`frontend/src/map/landmarks.ts`, the symbol layers in `map/landmarkLayers.ts`.
+
 Use it to skip layers you will not draw. Below zoom 9 an individual stream is well under
 a pixel, and asking for `layers=campsites` over the whole park is **223 bytes in 70 ms**
 against 138 kB in 416 ms for all three. An unknown name is a 400.
