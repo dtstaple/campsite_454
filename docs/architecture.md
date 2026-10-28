@@ -393,6 +393,7 @@ The parts are also stored as columns (`analysis`, `version`, `geom`, `window_sta
 | Analysis | TTL | Grid | Why |
 |---|---|---|---|
 | `weather` (Open-Meteo) | **1 hour** | 0.05° (~5 km) | Open-Meteo refreshes hourly; its models answer per grid cell anyway (two points 2 km apart came back as the same cell). |
+| `weather-alerts` (NWS, TM05-120) | **5 minutes** | 0.01° (~1 km) | A warning can be issued at any time, so an older answer could hide one. Alerts are issued per county or forecast zone, so nearby points share an answer. |
 | `site_terrain` (3DEP, TM05-64) | 1 year | none (exact point; params canonicalised) | Elevation and slope at a campsite; shared by enrichment and the slope factor. See docs/enrichment.md. |
 | `route_profile` (3DEP, TM05-59) | 1 year | none (keyed by route geometry) | Terrain does not change; a changed route geometry is a new key. See docs/elevation.md. |
 | slope / aspect (3DEP, planned) | 1 year | none | Terrain does not change; a year bounds how long a bad answer could survive. |
@@ -506,6 +507,7 @@ backend/analysis/
   base.py                         the Analysis contract: cache key, hit/miss, expiry
   models.py                       AnalysisResult, the answer cache with provenance
   analyses/weather.py             Open-Meteo forecast, the first analysis
+  analyses/alerts.py              NWS active weather alerts (TM05-120)
 
 backend/geodata/
   models.py                       the four data tables and the run record
