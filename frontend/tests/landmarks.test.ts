@@ -8,10 +8,13 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { FeatureCollection } from "geojson";
 import {
+  elevationDetail,
   elevationLabel,
   LABEL_PROPERTY,
   metresToFeet,
+  PEAK_MIN_ZOOM,
   peakLabel,
+  TRAILHEAD_MIN_ZOOM,
   trailheadLabel,
   withLabels,
 } from "../src/map/landmarks.ts";
@@ -88,4 +91,16 @@ test("withLabels adds the label property to each layer's features and keeps the 
   const labelledTrailheads = withLabels(trailheads, "trailheads");
   assert.equal(labelledTrailheads.features[0].properties?.[LABEL_PROPERTY], "Garden Trailhead");
   assert.equal(labelledTrailheads.features[1].properties?.[LABEL_PROPERTY], "");
+});
+
+test("the popup elevation gives feet with the source metres, or null when missing", () => {
+  assert.equal(elevationDetail(1629), "5,344 ft (1,629 m)");
+  assert.equal(elevationDetail(null), null);
+  assert.equal(elevationDetail(undefined), null);
+});
+
+test("peaks show from a regional zoom, trailheads once the trails are drawn", () => {
+  // Trails are tiled from zoom 9 (tileLayers.ts); both landmark layers start after it.
+  assert.ok(PEAK_MIN_ZOOM >= 9 && PEAK_MIN_ZOOM <= 12);
+  assert.ok(TRAILHEAD_MIN_ZOOM >= PEAK_MIN_ZOOM);
 });

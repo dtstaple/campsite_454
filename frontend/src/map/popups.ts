@@ -8,6 +8,7 @@
  */
 
 import type { ClickableLayer } from "./layers";
+import { elevationDetail } from "./landmarks";
 
 type Properties = Record<string, unknown> | null;
 
@@ -63,6 +64,10 @@ function popupFor(layer: ClickableLayer, properties: Properties): string {
       return trailPopup(properties);
     case "water":
       return waterPopup(properties);
+    case "peaks":
+      return peakPopup(properties);
+    case "trailheads":
+      return trailheadPopup(properties);
   }
 }
 
@@ -117,6 +122,22 @@ function waterPopup(properties: Properties): string {
       perennial === true ? "Year-round" : perennial === false ? "Intermittent" : "Unknown",
       perennial !== true && perennial !== false,
     ),
+  ]);
+}
+
+/** TM05-122. A missing elevation is "Unknown", never a guess. */
+function peakPopup(properties: Properties): string {
+  const elevation = elevationDetail(properties?.elevation_m);
+  return popup("Peak", (properties?.name as string) || "Unnamed peak", [
+    row("Elevation", elevation ?? "Unknown", elevation === null, true),
+    row("Source", "OpenStreetMap", false),
+  ]);
+}
+
+function trailheadPopup(properties: Properties): string {
+  return popup("Trailhead", (properties?.name as string) || "Unnamed trailhead", [
+    row("Type", "Trailhead", false),
+    row("Source", "OpenStreetMap", false),
   ]);
 }
 

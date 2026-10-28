@@ -17,6 +17,7 @@ import mlcontour from "maplibre-contour";
 import * as maplibregl from "maplibre-gl";
 import { numericToken, token } from "../theme";
 import { TERRAIN_TILES } from "./layers";
+import { labelFont } from "./fonts";
 import {
   CONTOUR_MIN_ZOOM,
   CONTOUR_THRESHOLDS_FT,
@@ -45,16 +46,6 @@ function dem() {
     demSource.setupMaplibre(maplibregl);
   }
   return demSource;
-}
-
-/** A font the style's glyph server has: the first one its own labels use. */
-function labelFont(map: maplibregl.Map): string[] {
-  for (const layer of map.getStyle().layers ?? []) {
-    if (layer.type !== "symbol") continue;
-    const font = layer.layout?.["text-font"];
-    if (Array.isArray(font) && font.every((f) => typeof f === "string")) return font as string[];
-  }
-  return ["Stadia Regular"];
 }
 
 function firstSymbolLayerId(map: maplibregl.Map): string | undefined {

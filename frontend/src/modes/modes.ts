@@ -42,9 +42,17 @@ export const MODES: readonly ActivityMode[] = [
     enabled: true,
     // Hiking is about the trail network. Campsites start off so they do not crowd it;
     // one click brings them back.
-    layers: { trails: true, water: true, "public-land": true, campsites: false },
+    // TM05-122: peaks and trailheads are how a hiker reads the map, so they start on.
+    layers: {
+      trails: true,
+      water: true,
+      "public-land": true,
+      campsites: false,
+      peaks: true,
+      trailheads: true,
+    },
     terrain: true,
-    emphasis: ["trails", "water", "public-land", "campsites"],
+    emphasis: ["trails", "trailheads", "peaks", "water", "public-land", "campsites"],
   },
   {
     id: "camping",
@@ -53,18 +61,32 @@ export const MODES: readonly ActivityMode[] = [
     enabled: true,
     // TM05-99: mapped campsites start off in every mode. Hikers find places to camp
     // with the trail panel's "Find campsites along this trail"; the layer is one click away.
-    layers: { trails: true, water: true, "public-land": true, campsites: false },
+    layers: {
+      trails: true,
+      water: true,
+      "public-land": true,
+      campsites: false,
+      peaks: true,
+      trailheads: false,
+    },
     terrain: true,
-    emphasis: ["campsites", "water", "public-land", "trails"],
+    emphasis: ["campsites", "water", "public-land", "trails", "peaks", "trailheads"],
   },
   {
     id: "backcountry-ski",
     label: "Backcountry Ski",
     icon: "ski",
     enabled: false,
-    layers: { trails: true, water: false, "public-land": true, campsites: false },
+    layers: {
+      trails: true,
+      water: false,
+      "public-land": true,
+      campsites: false,
+      peaks: true,
+      trailheads: true,
+    },
     terrain: true,
-    emphasis: ["trails", "public-land", "water", "campsites"],
+    emphasis: ["trails", "peaks", "trailheads", "public-land", "water", "campsites"],
   },
 ];
 

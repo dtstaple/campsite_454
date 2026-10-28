@@ -35,6 +35,8 @@ import {
 } from "../map/layers";
 import { popupContent } from "../map/popups";
 import { sourceIdOf, withSourceIds } from "../map/featureIds";
+import { withLabels } from "../map/landmarks";
+import { setLandmarkBasemap } from "../map/landmarkLayers";
 import { isTiled } from "../map/tileLayers";
 import { setZoneVisible, ZONES, type ZoneOverlay } from "../terrain/zones";
 import { addTerrainOverlays } from "../terrain/zonesLayer";
@@ -146,6 +148,11 @@ export default function Discover() {
     }
   }, [contours, basemap]);
 
+  // Peak and trailhead labels (TM05-122): a heavier halo over satellite imagery.
+  useEffect(() => {
+    if (mapInstance) setLandmarkBasemap(mapInstance, basemap);
+  }, [mapInstance, basemap]);
+
   // Slope-angle shading (TM05-84): off until asked for, with its own opacity.
   const [slope, setSlope] = useState(false);
   const [slopeOpacity, setSlopeOpacity] = useState(defaultSlopeOpacity);
@@ -247,9 +254,10 @@ export default function Discover() {
   }, [session]);
 
   /**
-   * Fetch the viewport's campsites and push them into their source. Trails, water and
-   * public land are vector tiles the map loads itself (TM05-140), so only campsites,
-   * whose colours depend on the user's weights, still come from /api/map-data/.
+   * Fetch the viewport's campsites, peaks and trailheads and push them into their sources.
+   * Trails, water and public land are vector tiles the map loads itself (TM05-140), so
+   * only the point layers still come from /api/map-data/. Peaks and trailheads (TM05-122)
+   * are opt-in there, and get their map label added before setData().
    */
   const refresh = useCallback(async () => {
     const current = map.current;
@@ -297,7 +305,10 @@ export default function Discover() {
         const source = current.getSource(name) as maplibregl.GeoJSONSource | undefined;
         const collection = data.layers[name];
         if (shown(name) && collection) {
-          source?.setData(withSourceIds(collection as unknown as GeoJsonFeatureCollection));
+          const features = withSourceIds(collection as unknown as GeoJsonFeatureCollection);
+          source?.setData(
+            name === "peaks" || name === "trailheads" ? withLabels(features, name) : features,
+          );
           setMeta((previous) => ({ ...previous, [name]: collection.metadata }));
         } else {
           source?.setData(EMPTY);

@@ -41,6 +41,13 @@ export function elevationLabel(elevationM: unknown): string | null {
   return metres === null ? null : `${metresToFeet(metres).toLocaleString("en-US")} ft`;
 }
 
+/** The popup's elevation row: "5,344 ft (1,629 m)", or null when there is none. */
+export function elevationDetail(elevationM: unknown): string | null {
+  const metres = elevationOf(elevationM);
+  if (metres === null) return null;
+  return `${elevationLabel(metres)} (${Math.round(metres).toLocaleString("en-US")} m)`;
+}
+
 /**
  * A peak's map label: "Mount Marcy · 5,344 ft". With no elevation, just the name; with
  * no name, just the elevation; with neither, empty, so nothing is drawn.

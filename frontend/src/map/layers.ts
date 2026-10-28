@@ -27,12 +27,16 @@ import {
   type TiledLayer,
 } from "./tileLayers";
 import type { ActivityMode } from "../modes/modes";
+import { addLandmarkLayers, PEAKS_LAYER, TRAILHEADS_LAYER } from "./landmarkLayers";
+import { labelFont } from "./fonts";
 
 export const LAYERS: readonly { name: LayerName; label: string }[] = [
   { name: "public-land", label: "Public land" },
   { name: "water", label: "Water" },
   { name: "trails", label: "Trails" },
   { name: "campsites", label: "Campsites" },
+  { name: "peaks", label: "Peaks" },
+  { name: "trailheads", label: "Trailheads" },
 ];
 
 export type LayerEntry = (typeof LAYERS)[number];
@@ -67,6 +71,8 @@ export type ClickableLayer = Exclude<LayerName, "public-land">;
 
 export const CLICKABLE: readonly { id: string; layer: ClickableLayer }[] = [
   { id: "campsites-point", layer: "campsites" },
+  { id: TRAILHEADS_LAYER, layer: "trailheads" },
+  { id: PEAKS_LAYER, layer: "peaks" },
   { id: "trails-hit", layer: "trails" },
   { id: "water-line-hit", layer: "water" },
   { id: "water-fill", layer: "water" },
@@ -76,7 +82,7 @@ export const CLICKABLE_IDS: string[] = CLICKABLE.map((entry) => entry.id);
 
 /**
  * One source per layer: a vector tile source for each tiled layer, and a GeoJSON source
- * for campsites, which the API output goes into unmodified.
+ * for campsites, peaks and trailheads, which the API output goes into.
  */
 export function addMapSources(map: maplibregl.Map): void {
   for (const layer of LAYERS) {
@@ -87,7 +93,8 @@ export function addMapSources(map: maplibregl.Map): void {
     map.addSource(layer.name, {
       type: "geojson",
       data: EMPTY,
-      // TM05-69: campsites are keyed by source_id so feature-state can mark the selected one.
+      // TM05-69: campsites are keyed by source_id so feature-state can mark the selected
+      // one. Peaks and trailheads carry it too, which does no harm.
       promoteId: SOURCE_ID_PROPERTY,
     });
   }
@@ -112,8 +119,9 @@ export function setTiledLayerVisible(
 }
 
 /**
- * Every draw layer, bottom to top: public land, water, trails, then campsite markers.
- * Each `-hit` layer sits directly above the line it widens.
+ * Every draw layer, bottom to top: public land, water, trails, campsite markers, then
+ * trailhead and peak symbols (TM05-122). Each `-hit` layer sits directly above the line
+ * it widens.
  */
 export function addMapLayers(map: maplibregl.Map): void {
   const colour = mapColors();
@@ -213,6 +221,8 @@ export function addMapLayers(map: maplibregl.Map): void {
       "circle-stroke-color": highlight.strokeColor,
     },
   });
+
+  addLandmarkLayers(map, labelFont(map));
 }
 
 // --- terrain -----------------------------------------------------------------------
