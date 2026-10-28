@@ -434,3 +434,12 @@
   --compare-tray-max-height: 70vh;
   --compare-column-min: 200px;
 }
+
+/* --- Conditions (TM05-120) --------------------------------------------------------------- */
+/* Weather alerts in the trail and campsite panels: Extreme and Severe in the danger hue,
+ * everything else NWS issues (advisories, statements) in the accent. */
+:root {
+  --conditions-alert: var(--accent);
+  --conditions-alert-severe: var(--danger);
+  --conditions-alert-bar-width: 3px;
+}
