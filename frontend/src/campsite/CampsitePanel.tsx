@@ -24,6 +24,7 @@ import LegalityVerdict from "./LegalityVerdict";
 import Sheet from "../components/Sheet";
 import { withoutLegalFactor } from "./legality";
 import TerrainSection from "./TerrainSection";
+import ConditionsSection from "../conditions/ConditionsSection";
 
 export type CampsiteState =
   | { status: "loading" }
@@ -184,6 +185,8 @@ function Body({
           onToggleView={() => viewshed?.onToggle()}
         />
       )}
+
+      <ConditionsSection point={{ lat: detail.lat, lon: detail.lon }} />
 
       {description && <p className="campsite-description">{description}</p>}
     </>

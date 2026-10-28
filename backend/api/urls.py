@@ -1,6 +1,7 @@
 from django.urls import path
 
 from api.campsite_detail import campsite_detail_view, campsite_viewshed_view
+from api.conditions import conditions_view
 from api.regions_view import regions_view
 from api.route_search import route_search_view
 from api.routes import (
@@ -29,6 +30,8 @@ urlpatterns = [
     path("routes/", routes_view, name="routes"),
     path("routes/search/", route_search_view, name="route-search"),
     path("regions/", regions_view, name="regions"),
+    # TM05-120: forecast and NWS alerts for a point (api/conditions.py).
+    path("conditions/", conditions_view, name="conditions"),
     path("routes/<int:osm_id>/", route_detail_view, name="route-detail"),
     path("routes/<int:osm_id>/gpx/", route_gpx_view, name="route-gpx"),
     # <path:> because a source_id contains a slash ("way/20074658"); TM05-97.

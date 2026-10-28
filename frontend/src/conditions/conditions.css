@@ -1,0 +1,100 @@
+/* Conditions section (TM05-120), in the trail and campsite panels. Tokens: theme.css. */
+
+.conditions {
+  display: grid;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+
+.conditions-block {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.conditions-note,
+.conditions-source {
+  margin: 0;
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+  line-height: var(--leading-snug);
+}
+
+.conditions-status {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.conditions-status.is-error {
+  color: var(--danger);
+}
+
+.conditions-sub {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.conditions-alerts,
+.conditions-days {
+  display: grid;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.conditions-alert {
+  padding: var(--space-xs) var(--space-sm);
+  border-left: var(--conditions-alert-bar-width) solid var(--conditions-alert);
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  font-size: var(--text-sm);
+}
+
+.conditions-alert.is-severe {
+  border-left-color: var(--conditions-alert-severe);
+}
+
+.conditions-alert summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-sm);
+  align-items: baseline;
+  cursor: pointer;
+}
+
+.conditions-alert-event {
+  color: var(--conditions-alert);
+  font-weight: var(--weight-semibold);
+}
+
+.conditions-alert.is-severe .conditions-alert-event {
+  color: var(--conditions-alert-severe);
+}
+
+.conditions-alert p {
+  margin: var(--space-xs) 0 0;
+  color: var(--text-secondary);
+  line-height: var(--leading-snug);
+}
+
+.conditions-alert-text {
+  white-space: pre-line;
+}
+
+.conditions-day {
+  display: grid;
+  grid-template-columns: minmax(0, 5em) minmax(0, 1fr);
+  gap: 0 var(--space-sm);
+  font-size: var(--text-sm);
+}
+
+.conditions-day-name {
+  grid-row: span 3;
+  color: var(--text-secondary);
+  font-weight: var(--weight-medium);
+}
+
+.conditions-day-temp {
+  color: var(--text-primary);
+}

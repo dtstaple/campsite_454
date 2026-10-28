@@ -33,6 +33,8 @@ import {
 } from "../terrain/terrain";
 import { gpxFilename, gpxPath } from "./gpx";
 import SaveTrail from "./SaveTrail";
+import ConditionsSection from "../conditions/ConditionsSection";
+import { trailPoint } from "../conditions/conditions";
 import { CompareButton } from "./CompareTray";
 import { fromDetail } from "./compare";
 import Sheet from "../components/Sheet";
@@ -203,6 +205,7 @@ function Ready({
 }: Omit<Props, "state" | "onClose"> & { detail: RouteDetail }) {
   const profile = detail.profile;
   const campsites = detail.campsites;
+  const conditionsAt = trailPoint(detail.line.coordinates);
 
   return (
     <>
@@ -253,6 +256,8 @@ function Ready({
           {miles(detail.line.length_m)}.
         </div>
       )}
+
+      {conditionsAt && <ConditionsSection point={conditionsAt} note="Midway along the trail." />}
 
       {detail.planned && (
         <section className="trail-planned" aria-label="Trails on this route">

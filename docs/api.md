@@ -28,6 +28,7 @@ weights ([Scoring weights](#scoring-weights-tm05-46)).
 | `GET /api/routes/` | Named hiking routes in a bbox — see [Named routes](#named-routes-tm05-60) |
 | `GET /api/routes/<osm_id>/` | One route: stats, elevation profile, campsites along it with scores |
 | `GET /api/saved-campsites/` | The signed-in user's saved campsites, with names, scores and land units — see [Saved campsites list](#saved-campsites-list-tm05-87) |
+| `GET /api/conditions/?lat=&lon=` | The 3-day forecast and active NWS weather alerts for a point — see [Conditions](#conditions-tm05-120) |
 | `GET`/`PUT`/`DELETE /api/auth/me/weights/` | The signed-in user's factor weights — see [Scoring weights](#scoring-weights-tm05-46) |
 
 There is one endpoint per layer so you can fetch only what the user has toggled on, and a
@@ -1397,6 +1398,88 @@ It is null for a campsite without terrain facts.
 
 `/api/tiles/pooling-risk/…` and `/api/tiles/exposure/…` serve the zones, with the
 `zone_class` attribute, from zoom 8. See [Vector tiles](#vector-tiles-tm05-140).
+
+## Conditions (TM05-120)
+
+### `GET /api/conditions/?lat=&lon=`
+
+This is the short forecast and the active official weather alerts for one point. It backs
+the **Conditions** section of the trail panel and the campsite panel. The campsite panel
+asks for the site itself. The trail panel asks for the middle vertex of the trail's line
+and says so ("Midway along the trail").
+
+| Parameter | |
+|---|---|
+| `lat` | Required. Decimal degrees, between -90 and 90. |
+| `lon` | Required. Decimal degrees, between -180 and 180. |
+
+A missing, non-numeric, non-finite or out-of-range value is a **400**:
+`{"error": "lat must be between -90 and 90"}`.
+
+```json
+{
+  "location": {"lat": 44.18, "lon": -73.95},
+  "forecast": {
+    "source": "Open-Meteo",
+    "source_url": "https://api.open-meteo.com/v1/forecast",
+    "status": "ok",
+    "fetched_at": "2026-10-28T12:26:00+00:00",
+    "expires_at": "2026-10-28T13:26:00+00:00",
+    "cached": true,
+    "timezone": "America/New_York",
+    "days": [
+      {"date": "2026-10-28", "temperature_min_c": 3.3, "temperature_max_c": 12.2,
+       "precipitation_mm": 3.1, "precipitation_probability_pct": 40,
+       "wind_max_kmh": 14.5, "gust_max_kmh": 33.8}
+    ]
+  },
+  "alerts": {
+    "source": "US National Weather Service",
+    "source_url": "https://api.weather.gov/alerts/active",
+    "status": "ok",
+    "fetched_at": "2026-10-28T12:29:10+00:00",
+    "expires_at": "2026-10-28T12:34:10+00:00",
+    "cached": false,
+    "items": [
+      {"id": "urn:oid:...", "event": "Frost Advisory", "headline": "...",
+       "severity": "Minor", "urgency": "Expected", "certainty": "Likely",
+       "effective": "...", "onset": "...", "expires": "...", "ends": "...",
+       "sender_name": "NWS Albany NY", "area": "Hamilton",
+       "description": "...", "instruction": "..."}
+    ]
+  }
+}
+```
+
+**Sections.**
+- **Forecast.** Up to 3 days, today first, in °C, mm, km/h and %. The panel converts them
+  to °F, inches and mph.
+- **Alerts.** Most severe first (Extreme, Severe, Moderate, Minor, Unknown). An empty
+  `items` list means there are no active alerts for the point.
+
+**Each section stands alone.** Each section carries its own `source`, `source_url` and
+`status`, and on success its `fetched_at`.
+- If either upstream fails (unreachable, an error status, or an unexpected response
+  shape), that section is `{"source", "source_url", "status": "error", "message"}` with
+  no data, and the other section is still returned.
+- The response is a **200** in either case, so the panel can say which source is down.
+- NWS covers the US only. A point outside it gets an `error` alerts section.
+
+**Sources.**
+- **Forecast.** The Open-Meteo analysis from TM05-44, with `{"days": 3}`. This is the
+  same cache entry the weather factor scores from, so opening a panel also warms the
+  score.
+- **Alerts.** `GET https://api.weather.gov/alerts/active?point=lat,lon`, through the
+  `weather-alerts` analysis. It sends a descriptive `User-Agent`, which NWS requires, and
+  the point to 4 decimal places.
+
+**Caching.** Both answers go through the analysis cache (`analysis_analysisresult`).
+- The forecast is kept for **1 hour** and the alerts for **5 minutes** (see
+  docs/architecture.md, "Time-to-live").
+- Expired rows are purged on the next run, so nothing is stored long-term.
+- A failed fetch is never cached.
+- `cached` says whether this response came from the cache, and `fetched_at` says when
+  the source was actually asked.
 
 ## Not included yet
 
