@@ -44,7 +44,8 @@ import { connectionTarget, type Junction } from "./connections";
 import { mileLabel } from "../location/live";
 import ThreeDControls from "./ThreeDControls";
 import { CAMERA, easeBearing, rigFor } from "./camera";
-import { disable3D, enable3D, prefersReducedMotion } from "./terrain3d";
+import { prefersReducedMotion } from "./terrain3d";
+import type { ThreeD } from "../map/useThreeD";
 import type { CampsiteSelection } from "../campsite/selection";
 import { isAlong, isNamedTrail } from "./format";
 import { sourceIdOf } from "../map/featureIds";
@@ -80,6 +81,8 @@ const REDUCED_STEP_MS = 1500;
 
 interface Props {
   map: maplibregl.Map | null;
+  /** TM05-144: the map's 3D terrain, shared with the main map's 3D button. */
+  threeD: ThreeD;
   /** Select a campsite (TM05-66, TM05-69). Without it, a click just flies there. */
   onOpenCampsite?: (selection: CampsiteSelection) => void;
   /** A campsite row is hovered (TM05-69): its source_id, or null. */
@@ -99,6 +102,7 @@ interface Props {
 
 export default function TrailInsight({
   map,
+  threeD,
   onOpenCampsite,
   onHoverCampsite,
   openRequest,
@@ -194,9 +198,9 @@ export default function TrailInsight({
 
   // --- 3D: terrain, scrubber camera, flythrough ----------------------------------------
 
-  const [is3D, setIs3D] = useState(false);
+  // TM05-144: whether the map is in 3D belongs to the map (useThreeD), not to this panel.
+  const { is3D, set3D, fly, panelClosed } = threeD;
   const [playing, setPlaying] = useState(false);
-  const previousMaxPitch = useRef<number | null>(null);
   const rig = useMemo(() => (line ? rigFor(line) : null), [line]);
   const cursorRef = useRef(cursorM);
   useEffect(() => {
@@ -219,17 +223,17 @@ export default function TrailInsight({
   );
 
   const turn3DOn = useCallback(() => {
-    if (!map) return;
-    previousMaxPitch.current = enable3D(map);
-    setIs3D(true);
+    set3D(true);
     placeCamera(cursorRef.current ?? 0, 1);
-  }, [map, placeCamera]);
+  }, [set3D, placeCamera]);
 
   const turn3DOff = useCallback(() => {
     setPlaying(false);
-    if (map) disable3D(map, previousMaxPitch.current ?? 60);
-    setIs3D(false);
-  }, [map]);
+    set3D(false);
+  }, [set3D]);
+
+  // A flythrough needs 3D: turned off from the main map's button, it stops flying too.
+  const flying = playing && is3D;
 
   const scrub = useCallback(
     (distance: number) => {
@@ -240,12 +244,15 @@ export default function TrailInsight({
   );
 
   const play = useCallback(() => {
-    if (!is3D) turn3DOn();
+    if (!is3D) {
+      fly();
+      placeCamera(cursorRef.current ?? 0, 1);
+    }
     setPlaying(true);
-  }, [is3D, turn3DOn]);
+  }, [is3D, fly, placeCamera]);
 
   useEffect(() => {
-    if (!playing || !map || !line) return;
+    if (!flying || !map || !line) return;
     let distance = cursorRef.current ?? 0;
     if (distance >= line.length - 1) distance = 0;
     const speed = Math.min(FLY_MAX_MPS, Math.max(FLY_MIN_MPS, line.length / FLY_TARGET_S));
@@ -283,7 +290,7 @@ export default function TrailInsight({
       window.clearTimeout(timer);
       map.off("dragstart", stop);
     };
-  }, [playing, map, line, placeCamera]);
+  }, [flying, map, line, placeCamera]);
 
   // --- layers and viewport routes ----------------------------------------------------
 
@@ -449,7 +456,9 @@ export default function TrailInsight({
   // --- closing -------------------------------------------------------------------------
 
   const close = useCallback(() => {
-    if (is3D) turn3DOff();
+    // 3D the hiker chose stays on; 3D the flythrough turned on goes with the panel.
+    setPlaying(false);
+    panelClosed();
     onHoverCampsite?.(null);
     setSelected(null);
     setState(null);
@@ -457,7 +466,7 @@ export default function TrailInsight({
     framed.current = null;
     (map?.getSource(SELECTED_SOURCE) as maplibregl.GeoJSONSource | undefined)?.setData(EMPTY);
     (map?.getSource(ALONG_SOURCE) as maplibregl.GeoJSONSource | undefined)?.setData(EMPTY);
-  }, [map, is3D, turn3DOff, onHoverCampsite]);
+  }, [map, panelClosed, onHoverCampsite]);
 
   useEffect(() => {
     if (!selected) return;
@@ -604,7 +613,7 @@ export default function TrailInsight({
       controls={
         <ThreeDControls
           is3D={is3D}
-          playing={playing}
+          playing={flying}
           reducedMotion={prefersReducedMotion()}
           onToggle3D={is3D ? turn3DOff : turn3DOn}
           onPlay={play}

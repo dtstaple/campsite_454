@@ -53,6 +53,7 @@ import { placement } from "../waypoints/placement";
 import BasemapToggle from "../basemap/BasemapToggle";
 import SatelliteLayers from "../basemap/SatelliteLayers";
 import { useBasemap } from "../basemap/useBasemap";
+import { useThreeD } from "../map/useThreeD";
 import { isRouteHit } from "../trails/mapLayers";
 import { isNamedTrail } from "../trails/format";
 import { selectionFromFeature, type CampsiteSelection } from "../campsite/selection";
@@ -125,6 +126,8 @@ export default function Discover() {
   const [terrain, setTerrain] = useState(() => modeById(DEFAULT_MODE_ID).terrain);
   // Standard or satellite basemap, remembered across reloads (TM05-65).
   const [basemap, setBasemap] = useBasemap();
+  // TM05-144: 3D terrain for the whole map, shared with the trail panel's 3D controls.
+  const threeD = useThreeD(mapInstance);
   const terrainRef = useRef(terrain);
   useEffect(() => {
     terrainRef.current = terrain;
@@ -634,6 +637,7 @@ export default function Discover() {
 
       <TrailInsight
         map={mapInstance}
+        threeD={threeD}
         userPosition={hikePosition ?? userPosition}
         hike={{
           busy: hiking,
@@ -694,7 +698,17 @@ export default function Discover() {
         </div>
       )}
       <SatelliteLayers map={mapInstance} basemap={basemap} terrain={terrain} />
-      <BasemapToggle value={basemap} onChange={setBasemap} />
+      <BasemapToggle value={basemap} onChange={setBasemap}>
+        <button
+          type="button"
+          className="basemap-button"
+          aria-pressed={threeD.is3D}
+          disabled={!mapInstance}
+          onClick={() => threeD.set3D(!threeD.is3D, { tilt: true })}
+        >
+          3D
+        </button>
+      </BasemapToggle>
     </div>
   );
 }
