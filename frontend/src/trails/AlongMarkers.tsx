@@ -17,7 +17,7 @@ import { createPortal } from "react-dom";
 import * as maplibregl from "maplibre-gl";
 import type { PlanStop } from "../plans/api";
 import { numericToken } from "../theme";
-import type { Candidate } from "./candidates";
+import { signedPoints, type Candidate } from "./candidates";
 import { prefersReducedMotion } from "./terrain3d";
 
 interface Props {
@@ -116,6 +116,29 @@ export function CandidateDetail({
         <span>{Math.round(candidate.distance_from_route_m)} m off trail</span>
         {candidate.score !== null && <span>computed score {candidate.score}</span>}
       </div>
+      {candidate.terrain_reasons && (
+        <>
+          <div className="candidate-detail-title">Terrain</div>
+          {candidate.terrain_reasons.length > 0 ? (
+            <ul className="candidate-checks">
+              {candidate.terrain_reasons.map((reason) => (
+                <li key={reason.key}>
+                  <span
+                    className={`candidate-points ${reason.points > 0 ? "is-good" : "is-warn"}`}
+                  >
+                    {signedPoints(reason.points)}
+                  </span>
+                  {reason.label}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="candidate-rule">
+              No terrain zone set this spot apart: it was chosen on its score and slope.
+            </p>
+          )}
+        </>
+      )}
       <div className="candidate-detail-title">Checks it passed</div>
       <ul className="candidate-checks">
         {candidate.checks.map((check) => (

@@ -1,6 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { alongResults, candidatesPath, searchSummary, type Candidate } from "../src/trails/candidates.ts";
+import {
+  alongResults,
+  candidatesPath,
+  searchSummary,
+  signedPoints,
+  terrainSummary,
+  type Candidate,
+} from "../src/trails/candidates.ts";
 
 const site = (id: string, along: number) => ({ id, distance_along_m: along }) as never;
 const candidate = (id: string, along: number) =>
@@ -29,4 +36,25 @@ test("the search follows the trail's identity", () => {
     "/api/trails/way/9/candidates/?campsites_within_m=1000",
   );
   assert.equal(candidatesPath({ osm_id: null, assembly: null }, 500), null);
+});
+
+test("TM05-153: a candidate's row sums up the terrain that ranked it", () => {
+  const reasons = [
+    { key: "shelter", label: "Sheltered: lower than the ground around it", points: 8 },
+    { key: "damp", label: "Damp ground: water collects nearby", points: -8 },
+    { key: "view", label: "High ground: likely a view", points: 3 },
+  ];
+  assert.equal(terrainSummary({ terrain_reasons: reasons.slice(0, 1) }), "Terrain +8: sheltered");
+  assert.equal(
+    terrainSummary({ terrain_reasons: reasons }),
+    "Terrain +3: sheltered, damp ground, high ground",
+  );
+  assert.equal(terrainSummary({ terrain_reasons: [] }), null);
+  assert.equal(terrainSummary({}), null); // an older API
+});
+
+test("TM05-153: points read with a real minus sign", () => {
+  assert.equal(signedPoints(8), "+8");
+  assert.equal(signedPoints(-5), "−5");
+  assert.equal(signedPoints(0.2), "0");
 });
