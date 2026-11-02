@@ -44,6 +44,7 @@ from scoring.config import ScoringConfig
 from scoring.config import load as load_scoring_config
 from scoring.verdict import legality_verdict
 from terrain import payload as terrain_payload
+from terrain.along import route_terrain
 
 DEFAULT_ROUTE_LIMIT = 200
 MAX_ROUTE_LIMIT = 1000
@@ -305,6 +306,8 @@ def route_detail(route: TrailRoute, within: int, scoring: ScoringConfig | None =
         "route_type": route_type(route, line_m, profile["elevation_m"] if profiled else None),
         # TM05-101: the named trails this one meets at a junction node, by mile.
         "connections": connections(route, line_m),
+        # TM05-152: exposed and wet stretches, by distance along `line`, with totals.
+        "terrain_along": route_terrain(line_m),
         "campsites": {
             "within_m": within,
             "count": len(campsites),

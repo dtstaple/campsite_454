@@ -8,6 +8,7 @@ import type { Connection } from "./connections";
 import { API_BASE_URL, type Bbox } from "../api";
 import { authHeaders, storedSession } from "../auth";
 import { routingPath, type Cost, type PlannedBlock, type RouteSuggestion } from "../routing/planned";
+import type { TerrainAlong } from "../terrain/along";
 import type { TerrainBadges } from "../terrain/terrain";
 
 export interface RouteSummary {
@@ -115,6 +116,8 @@ export interface RouteDetail extends Omit<RouteSummary, "osm_id"> {
   connections?: Connection[];
   /** TM05-119: set for a route planned across connected trails, named by its id. */
   planned?: PlannedBlock | null;
+  /** TM05-152: exposed and wet stretches along `line`. Optional for an older backend. */
+  terrain_along?: TerrainAlong;
 }
 
 export class RouteApiError extends Error {

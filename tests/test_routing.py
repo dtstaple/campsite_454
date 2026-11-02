@@ -18,7 +18,7 @@ Trail climbs 300 m):
 
 import pytest
 from django.contrib.auth.models import User
-from django.contrib.gis.geos import LineString, MultiLineString, Point
+from django.contrib.gis.geos import LineString, MultiLineString, MultiPolygon, Point, Polygon
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
@@ -28,6 +28,7 @@ from planning.models import TripPlan
 from routing import service
 from routing.build import build_region, cut_points, rise_and_fall, sample_distances
 from routing.models import TrailEdge, TrailGraphBuild
+from terrain.models import TerrainZone
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
@@ -281,6 +282,35 @@ def test_find_campsites_and_gpx_work_on_a_planned_route(network):
     assert gpx.status_code == 200
     assert gpx["Content-Type"].startswith("application/gpx+xml")
     assert b"<trk>" in gpx.content
+
+
+def test_terrain_along_a_planned_route_spans_its_trails(network):
+    """TM05-152: stretches are measured along the planned line, across both trails."""
+
+    def zone(layer, x0, y0, x1, y1):
+        square = Polygon.from_bbox((X0 + x0, Y0 + y0, X0 + x1, Y0 + y1))
+        square.srid = METRIC_SRID
+        TerrainZone.objects.create(
+            region="adirondacks",
+            layer=layer,
+            zone_class="high",
+            area_m2=square.area,
+            geom=MultiPolygon(square, srid=METRIC_SRID).transform(4326, clone=True),
+        )
+
+    zone("pooling-risk", 200, -50, 300, 50)  # on the West Trail
+    zone("exposure", 900, 600, 1100, 800)  # on the Ridge Trail
+    body = {"points": [lonlat(0, 0), lonlat(1000, 1000)], "cost": "naismith"}
+    along = APIClient().post("/api/routing/plan/", body, format="json").json()["terrain_along"]
+    assert along["status"] == "ok"
+    spans = {s["layer"]: (s["start_m"], s["end_m"]) for s in along["stretches"]}
+    assert spans["pooling-risk"] == (pytest.approx(200, abs=1), pytest.approx(300, abs=1))
+    assert spans["exposure"] == (pytest.approx(1600, abs=1), pytest.approx(1800, abs=1))
+    totals = {t["label"]: t["length_m"] for t in along["totals"]}
+    assert totals == {
+        "exposed ridge": pytest.approx(200, abs=1),
+        "wet ground": pytest.approx(100, abs=1),
+    }
 
 
 # --- overnight plans on a planned route --------------------------------------------------

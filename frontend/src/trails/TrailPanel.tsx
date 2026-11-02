@@ -45,6 +45,7 @@ import { CompareButton } from "./CompareTray";
 import { fromDetail } from "./compare";
 import Sheet from "../components/Sheet";
 import { gradeAt, nearestIndex } from "./profile";
+import { chartBands, legendItems, summaryLines, type TerrainAlong } from "../terrain/along";
 import { duration as plannedDuration, offTrailNote, stretch } from "../routing/planned";
 
 export type DetailState =
@@ -248,11 +249,13 @@ function Ready({
               distance: site.distance_along_m,
               label: campsiteName(site).text,
             }))}
+            bands={chartBands(detail.terrain_along, profile.stats.length_m)}
             onHover={onCursor}
             onScrub={onScrub}
             formatDistance={(m) => miles(m)}
             formatHeight={feet}
           />
+          <AlongLegend along={detail.terrain_along} />
           <Readout distances={profile.distance_m} elevations={profile.elevation_m} cursorM={cursorM} />
           {controls}
         </>
@@ -262,6 +265,8 @@ function Ready({
           {miles(detail.line.length_m)}.
         </div>
       )}
+
+      {detail.terrain_along && <TerrainAlongSection along={detail.terrain_along} />}
 
       {conditionsAt && <ConditionsSection point={conditionsAt} note="Midway along the trail." />}
 
@@ -378,6 +383,37 @@ function Ready({
         )}
       </section>
     </>
+  );
+}
+
+/** TM05-152: what the profile's shading means; only the kinds this route crosses. */
+function AlongLegend({ along }: { along: TerrainAlong | undefined }) {
+  const items = legendItems(along);
+  if (items.length === 0) return null;
+  return (
+    <ul className="trail-along-legend" aria-label="Profile shading">
+      {items.map((item) => (
+        <li key={item.layer} title={item.legend}>
+          <span className={`trail-along-swatch is-${item.layer}`} aria-hidden="true" />
+          {item.label}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** TM05-152: "1.2 mi exposed ridge", "0.4 mi wet ground", with the bare-earth caveat. */
+function TerrainAlongSection({ along }: { along: TerrainAlong }) {
+  return (
+    <section className="trail-along" aria-label="Terrain along the route">
+      <div className="panel-subtitle">Terrain along the route</div>
+      <ul>
+        {summaryLines(along, (m) => miles(m)).map((line) => (
+          <li key={line}>{line}</li>
+        ))}
+      </ul>
+      {along.status === "ok" && <p className="trail-along-note">{along.note}</p>}
+    </section>
   );
 }
 
