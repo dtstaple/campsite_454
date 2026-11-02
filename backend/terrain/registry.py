@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -64,14 +65,19 @@ class FactSpec:
 
 @dataclass(frozen=True)
 class ZoneClass:
+    """A range of the tool's raster: from `min` (inclusive) up to `max` (exclusive). A class
+    without `max` runs up to the next class's `min`, or without limit. TM05-153: one
+    without `min` runs down without limit, for zones *below* a value (sheltered ground)."""
+
     name: str
-    min: float
+    min: float | None
+    max: float | None = None
 
 
 @dataclass(frozen=True)
 class ZoneSpec:
     layer: str
-    #: Ascending by `min`: a cell takes the highest class whose minimum it reaches.
+    #: Ascending and non-overlapping; a cell in none of them is in no zone.
     classes: tuple[ZoneClass, ...]
     min_area_m2: float
     simplify_m: float
@@ -149,19 +155,45 @@ def _facts(tool: str, body: dict) -> tuple[FactSpec, ...]:
     return tuple(facts)
 
 
+def class_range(classes, index: int) -> tuple[float, float]:
+    """Class `index`'s [lower, upper) range, unbounded ends as -inf and inf."""
+    zone_class = classes[index]
+    lower = -math.inf if zone_class.min is None else zone_class.min
+    if zone_class.max is not None:
+        upper = zone_class.max
+    elif index + 1 < len(classes) and classes[index + 1].min is not None:
+        upper = classes[index + 1].min
+    else:
+        upper = math.inf
+    return lower, upper
+
+
 def _zones(tool: str, body: dict | None) -> ZoneSpec | None:
     if body is None:
         return None
     where = f"tool {tool}, zones"
-    classes = tuple(
-        ZoneClass(str(_need(c, "class", where)), float(_need(c, "min", where)))
-        for c in _need(body, "classes", where)
-    )
+    classes = []
+    for c in _need(body, "classes", where):
+        if "min" not in c and "max" not in c:
+            raise RegistryError(f"{where}: class needs 'min', 'max' or both")
+        classes.append(
+            ZoneClass(
+                str(_need(c, "class", where)),
+                float(c["min"]) if "min" in c else None,
+                float(c["max"]) if "max" in c else None,
+            )
+        )
     if not classes:
         raise RegistryError(f"{where}: needs at least one class")
-    minimums = [c.min for c in classes]
-    if minimums != sorted(minimums) or len(set(minimums)) != len(minimums):
-        raise RegistryError(f"{where}: classes must have strictly increasing 'min'")
+    previous_upper = None
+    for index, zone_class in enumerate(classes):
+        lower, upper = class_range(classes, index)
+        if zone_class.min is None and index > 0:
+            raise RegistryError(f"{where}: only the first class can leave out 'min'")
+        if not lower < upper or (previous_upper is not None and lower < previous_upper):
+            raise RegistryError(f"{where}: classes must have strictly increasing 'min'")
+        previous_upper = upper
+    classes = tuple(classes)
     return ZoneSpec(
         layer=str(_need(body, "layer", where)),
         classes=classes,
