@@ -1406,6 +1406,49 @@ Each item of `campsites.items` in `GET /api/routes/<osm_id>/` and
 
 It is null for a campsite without terrain facts.
 
+### Along a route: `terrain_along` (TM05-152)
+
+`GET /api/routes/<osm_id>/`, `GET /api/trails/<source_id>/trail/` and the planned-route
+responses (`/api/routing/…`) carry where the route crosses the high `exposure` and
+`pooling-risk` zones, the same merged polygons the map layers draw. Code:
+`backend/terrain/along.py`.
+
+```json
+"terrain_along": {
+  "status": "ok",
+  "reason": null,
+  "stretches": [
+    {"layer": "pooling-risk", "zone_class": "high", "label": "wet ground",
+     "start_m": 310.4, "end_m": 954.0, "length_m": 643.6},
+    {"layer": "exposure", "zone_class": "high", "label": "exposed ridge",
+     "start_m": 9870.2, "end_m": 11373.0, "length_m": 1502.8}
+  ],
+  "totals": [
+    {"layer": "exposure", "zone_class": "high", "label": "exposed ridge",
+     "legend": "Ground that stands above its surroundings, open to wind",
+     "length_m": 1502.8, "stretches": 1, "share_pct": 13.2},
+    {"layer": "pooling-risk", "zone_class": "high", "label": "wet ground",
+     "legend": "Low ground that water drains into",
+     "length_m": 643.6, "stretches": 1, "share_pct": 5.7}
+  ],
+  "note": "Terrain-model estimate from bare-earth elevation. Trees, buildings and recent changes aren't counted."
+}
+```
+
+- **Positions** are metres along `line`, like `profile.distance_m`, so the profile can
+  shade them directly. The line is cut into its segments before it is intersected, so a
+  loop or out-and-back that crosses the same ground twice has a stretch at each pass.
+- **Stretches** are in route order. Pieces within 1 m of each other are one stretch, so a
+  ridge cut by a terrain tile seam isn't counted twice.
+- **Totals** have one entry per kind, including a zero, so "none along this route" is an
+  answer. `share_pct` is of the line's length.
+- **`status: "unavailable"`**, with a `reason` and empty lists, when `make terrain` hasn't
+  stored any zones yet. The rest of the route detail is unaffected.
+
+The trail panel shades the stretches on the elevation profile in the zone overlays'
+colours, with a legend, and lists the totals under "Terrain along the route", for example
+"0.9 mi exposed ridge (1 stretch)", with `note`.
+
 ### Map layers
 
 `/api/tiles/pooling-risk/…` and `/api/tiles/exposure/…` serve the zones, with the
