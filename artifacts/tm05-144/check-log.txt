@@ -1,0 +1,21 @@
+PASS desktop: 3D button sits in the map's floating controls, off by default
+PASS desktop: 3D on from the main map, with no trail panel open
+PASS desktop: the camera tilts (pitch 60°)
+stored: on
+PASS desktop: 3D stays on with the satellite basemap
+PASS desktop: 3D stays on in Camping mode
+PASS desktop: 3D stays on in Hiking mode
+PASS desktop: remembered across a reload
+PASS desktop: comes back tilted after the reload (pitch 60°)
+PASS panel: its 3D button shows the map is already in 3D
+PASS panel: turning 3D off in the panel turns the map's button off
+PASS panel: turning 3D on from the map turns the panel's button on
+PASS panel: closing the panel keeps 3D the hiker chose
+PASS fly: Fly the trail turns 3D on, and the map's button shows it
+PASS fly: a flythrough's 3D is not remembered
+PASS fly: turning 3D off from the map stops the flythrough
+PASS fly: closing the panel after a flythrough returns to 2D
+PASS phone: the 3D button works with a tap
+PASS phone: the 3D button stays visible above the open sheet (button bottom 437, sheet top 448)
+PASS phone: the panel's 3D button agrees
+PASS planned route: "Route via Northville-Placid Trail and Salmon Pond Road" drawn in 3D; map 3D=true, panel 3D=true (desktop-7-planned-route-3d.png)

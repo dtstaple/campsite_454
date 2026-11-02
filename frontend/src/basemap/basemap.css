@@ -15,6 +15,18 @@
   box-shadow: var(--shadow-panel);
 }
 
+.basemap-options,
+.basemap-extra {
+  display: flex;
+  gap: 2px;
+}
+
+/* TM05-144: the 3D button, set apart from the basemap choice it isn't part of. */
+.basemap-extra {
+  padding-left: 2px;
+  border-left: 1px solid var(--border-subtle);
+}
+
 .basemap-button {
   padding: var(--space-xs) var(--space-md);
   background: none;
@@ -37,7 +49,8 @@
   border-color: var(--accent);
 }
 
-.basemap-button.is-active {
+.basemap-button.is-active,
+.basemap-button[aria-pressed="true"] {
   background: var(--bg-raised);
   color: var(--accent);
 }

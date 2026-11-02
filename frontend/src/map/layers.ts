@@ -236,8 +236,9 @@ export function addMapLayers(map: maplibregl.Map): void {
 // Terrarium tiles as Mapbox RGB renders noise without any error. The URL, encoding and
 // curl verification are recorded in artifacts/ui-direction-audit.md.
 //
-// Shading only. No 3D terrain and no elevation sampling -- a visual tile is not a data
-// source; elevation data is 3DEP work for a later sprint.
+// The same source drives 3D terrain (trails/terrain3d.ts, map/useThreeD.ts). It is never
+// used for elevation sampling: a visual tile is not a data source, and elevations come
+// from 3DEP.
 
 export const TERRAIN_SOURCE_ID = "terrain-dem";
 export const HILLSHADE_LAYER_ID = "terrain-hillshade";

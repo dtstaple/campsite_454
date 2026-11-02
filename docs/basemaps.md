@@ -67,7 +67,8 @@ deployed beyond the course.
 - **No hillshade over imagery.** Imagery already contains real shadows, and shading on top
   reads as mud. With satellite on, the hillshade is hidden. Turning satellite off restores
   whatever the Terrain shading toggle says.
-- **3D.** Terrain (TM05-62) drapes the imagery automatically.
+- **3D.** Terrain (TM05-62) drapes the imagery automatically, and the main map's 3D button
+  (TM05-144) stays on across a basemap switch. See docs/terrain.md.
 - **Readability.** Imagery is busy, so:
   - **Brightness and saturation.** The imagery is capped at `--map-imagery-brightness-max`
     (0.85) and desaturated slightly (`--map-imagery-saturation`, −0.1).
