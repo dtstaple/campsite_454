@@ -21,7 +21,13 @@ import {
   percent,
   routeTypeText,
 } from "./format";
-import { alongResults, searchSummary, type Candidate, type CandidateSearch } from "./candidates";
+import {
+  alongResults,
+  searchSummary,
+  terrainSummary,
+  type Candidate,
+  type CandidateSearch,
+} from "./candidates";
 import { byMile, junctionMiles, type Connection } from "./connections";
 import {
   passesQuickFilters,
@@ -618,6 +624,9 @@ function AlongList({
                     {Math.round(row.candidate.distance_from_route_m)} m off trail ·{" "}
                     {row.candidate.slope_deg.toFixed(0)}° slope
                   </span>
+                  {terrainSummary(row.candidate) && (
+                    <span className="trail-campsite-off">{terrainSummary(row.candidate)}</span>
+                  )}
                   <TerrainChips badges={row.candidate.terrain} />
                 </span>
                 {row.candidate.score !== null && (

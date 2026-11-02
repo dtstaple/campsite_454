@@ -82,6 +82,9 @@ def _merge_values(run: TerrainRun, facts: dict[int, dict]) -> None:
     TerrainFacts.objects.bulk_update(update, ["values", "run", "computed_at"])
 
 
+ZONE_INSERT_BATCH = 2000
+
+
 def _store_tile(run: TerrainRun, registry: Registry, region: str, result: dict, stats: Stats):
     tool = registry.tools[result["tool"]]
     with transaction.atomic():
@@ -103,7 +106,10 @@ def _store_tile(run: TerrainRun, registry: Registry, region: str, result: dict, 
                         geom=_multipolygon(geometry),
                     )
                     for name, geometry in result["zones"]
-                ]
+                ],
+                # One INSERT per batch: a whole-region layer can be hundreds of thousands of
+                # pieces, and a single statement that size ran Postgres out of memory.
+                batch_size=ZONE_INSERT_BATCH,
             )
         if "sites" in result:
             _store_views(run, result["sites"])

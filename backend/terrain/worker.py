@@ -20,7 +20,7 @@ from django.contrib.gis.gdal import GDALRaster
 
 from terrain import dem, mappers, runtime
 from terrain.grid import Tile
-from terrain.registry import Tool
+from terrain.registry import Tool, class_range
 
 #: Zones are polygonised in pieces of at most this many cells a side:
 #: raster_to_vector_polygons needs about 145 bytes per cell.
@@ -90,12 +90,24 @@ def sample_sites(raster: GDALRaster, tool: Tool, sites) -> dict[int, dict]:
 
 def reclass_values(tool: Tool) -> str:
     """GeoLibre `reclass` rows ("new,from,to_less_than;...") for a tool's zone classes:
-    0 below the lowest class, then 1, 2, ... in order."""
+    1, 2, ... for the classes in order, and 0 for every value outside them."""
     classes = tool.zones.classes
-    rows = [f"0,-1e30,{classes[0].min!r}"]
-    for index, zone_class in enumerate(classes):
-        upper = classes[index + 1].min if index + 1 < len(classes) else 1e30
-        rows.append(f"{index + 1},{zone_class.min!r},{upper!r}")
+
+    def bound(value: float) -> str:
+        # The raster's own range, so every value lands in exactly one row.
+        if value == -math.inf:
+            return "-1e30"
+        return repr(1e30) if value == math.inf else repr(value)
+
+    rows, cursor = [], -math.inf
+    for index in range(len(classes)):
+        lower, upper = class_range(classes, index)
+        if lower > cursor:
+            rows.append(f"0,{bound(cursor)},{bound(lower)}")
+        rows.append(f"{index + 1},{bound(lower)},{bound(upper)}")
+        cursor = upper
+    if cursor < math.inf:
+        rows.append(f"0,{bound(cursor)},{bound(math.inf)}")
     return ";".join(rows)
 
 

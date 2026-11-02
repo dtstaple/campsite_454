@@ -814,3 +814,18 @@
   border-color: var(--accent);
   color: var(--accent);
 }
+
+/* TM05-153: a terrain reason's points in the candidate popup. */
+.candidate-points {
+  flex: none;
+  min-width: 2.2em;
+  font-variant-numeric: tabular-nums;
+}
+
+.candidate-points.is-good {
+  color: var(--terrain-good);
+}
+
+.candidate-points.is-warn {
+  color: var(--terrain-warn);
+}

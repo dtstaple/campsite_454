@@ -1,0 +1,8 @@
+PASS desktop: candidate rows show a terrain summary (2 of 5)
+  e.g. ["mi 1.3","Potential spot (unverified)","120 m off trail · 1° slope","Terrain +8: sheltered","Sheltered","97"]
+PASS desktop: the popup lists the terrain reasons with their points
+  popup: ["Potential spot (unverified)","Computed","mi 1.3","120 m off trail","computed score 97","TERRAIN","+8","Sheltered: lower than the ground around it"]
+PASS phone: candidate rows show a terrain summary (2 of 5)
+  e.g. ["mi 1.3","Potential spot (unverified)","120 m off trail · 1° slope","Terrain +8: sheltered","Sheltered","97"]
+PASS phone: the popup lists the terrain reasons with their points
+  popup: ["Potential spot (unverified)","Computed","mi 1.3","120 m off trail","computed score 97","TERRAIN","+8","Sheltered: lower than the ground around it"]

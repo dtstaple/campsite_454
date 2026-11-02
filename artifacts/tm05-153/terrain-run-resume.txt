@@ -1,0 +1,36 @@
+Preparing the runtime and DEM
+9 tasks for 8 tools on 3 workers (131 already done)
+  [1/9] viewshed s8: 37.8 s, 19 MB
+  [2/9] viewshed s7: 41.0 s, 19 MB
+  [3/9] viewshed s10: 69.2 s, 20 MB
+  [4/9] viewshed s9: 79.8 s, 19 MB
+  [5/9] viewshed s11: 43.4 s, 19 MB
+  [6/9] damp 0-0: 155.0 s, 1267 MB
+  [7/9] viewshed s12: 46.0 s, 19 MB
+  [8/9] viewshed s13: 31.4 s, 19 MB
+  [9/9] viewshed s14: 39.0 s, 19 MB
+
+adirondacks: 743 campsites, 433.3 s total (prepare 4.1 s, zones 80.1 s, classify 56.3 s), peak RSS 1625.4 MB
+  wetness         0.0 s over 0 tasks (1 reused), peak WASM 0 MB
+  sink            0.0 s over 0 tasks (35 reused), peak WASM 0 MB
+  slope           0.0 s over 0 tasks (35 reused), peak WASM 0 MB
+  aspect          0.0 s over 0 tasks (35 reused), peak WASM 0 MB
+  position        0.0 s over 0 tasks (9 reused), peak WASM 0 MB
+  shelter         0.0 s over 0 tasks (9 reused), peak WASM 0 MB
+  damp          155.0 s over 1 tasks (0 reused), peak WASM 1267 MB
+  viewshed      387.6 s over 8 tasks (7 reused), peak WASM 20 MB
+  twi            737 (99.2%)
+  sink_depth_m   742 (99.9%)
+  slope_deg      742 (99.9%)
+  aspect_deg     726 (97.7%)
+  dev            742 (99.9%)
+  pooling        742 (99.9%)
+  facing         742 (99.9%)
+  shelter        742 (99.9%)
+  viewshed       742 (99.9%)
+  water_view     535 (72.0%)
+  zones pooling-risk: {'high': 16677}
+  zones exposure: {'high': 18715}
+  zones sheltered: {'sheltered': 13830}
+  zones damp-ground: {'medium': 32050}
+exit=0

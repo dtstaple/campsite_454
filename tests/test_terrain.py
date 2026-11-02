@@ -35,7 +35,10 @@ REAL = registry.load()
 
 
 def test_the_shipped_registry_loads():
-    assert set(REAL.tools) == {"wetness", "sink", "slope", "aspect", "position", "viewshed"}
+    assert set(REAL.tools) == {
+        "wetness", "sink", "slope", "aspect", "position", "viewshed",
+        "shelter", "damp",  # TM05-153, zones only, for the potential-campsite search
+    }  # fmt: skip
     assert REAL.tools["wetness"].grid.resolution_m == 45
     assert REAL.tools["wetness"].grid.tile_cells is None  # whole region in one piece
     assert [s.tool for s in REAL.tools["wetness"].steps] == [
@@ -579,6 +582,30 @@ def test_fresh_recomputes_every_tile(synthetic):
 def test_reclass_rows_cover_every_value():
     rows = worker.reclass_values(REAL.tools["position"])
     assert rows == "0,-1e30,1.0;1,1.0,1e+30"
+
+
+def test_zone_classes_can_be_a_band_or_below_a_value():
+    """TM05-153: `sheltered` is below a value and `damp-ground` a band; everything else
+    in the raster is 0, no zone."""
+    assert worker.reclass_values(REAL.tools["shelter"]) == "1,-1e30,-0.75;0,-0.75,1e+30"
+    assert worker.reclass_values(REAL.tools["damp"]) == "0,-1e30,10.0;1,10.0,12.5;0,12.5,1e+30"
+
+
+@pytest.mark.parametrize(
+    ("classes", "message"),
+    [
+        ([{"class": "x"}], "needs 'min', 'max' or both"),
+        ([{"class": "a", "min": 0}, {"class": "b", "max": 5}], "only the first class"),
+        ([{"class": "a", "min": 2, "max": 1}], "strictly increasing"),
+        ([{"class": "a", "min": 0, "max": 3}, {"class": "b", "min": 2}], "strictly increasing"),
+    ],
+)
+def test_malformed_zone_ranges_fail_at_load(tmp_path, classes, message):
+    def change(raw):
+        raw["tools"]["shelter"]["zones"]["classes"] = classes
+
+    with pytest.raises(registry.RegistryError, match=message):
+        registry.load(write_registry(tmp_path, change))
 
 
 def test_chains_pass_each_step_its_inputs(tmp_path, monkeypatch):

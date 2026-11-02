@@ -16,10 +16,14 @@ designated site. It is then scored with the same engine as a mapped campsite.
          terrain       3DEP elevation and slope available (counted with the elevation
                        sample, too, when 3DEP has no value there)
          slope         at or below `max_slope_deg`
-    3. Score the survivors with the scoring engine: the flattest at each station, at most
-       `max_scored`. Weather is left out: it is tonight's forecast, and this answer is
+    3. Score the survivors with the scoring engine: the best ground at each station, at
+       most `max_scored`. Weather is left out: it is tonight's forecast, and this answer is
        cached for weeks.
-    4. Spread: highest score first, each at least `min_spacing_m` (about 0.5 mi) along the
+    4. Rank (TM05-153) on terrain: each `ranking` factor in the config adds points for a
+       sheltered, dry spot or takes them away for an exposed or damp one, read from the
+       terrain zones (`make terrain`). Ranking comes after every filter, so it only orders
+       points that already passed them.
+    5. Spread: highest rank first, each at least `min_spacing_m` (about 0.5 mi) along the
        trail from the ones kept, at most `max_results`. Returned in mile order.
 
 Everything is measured in METRIC_SRID metres. The trail and water checks are indexed
@@ -212,6 +216,79 @@ def terrain_checked(route_geom: GEOSGeometry) -> bool:
     return False
 
 
+def zone_layers() -> set[str]:
+    """The terrain zone layers a run has written (merged), so a ranking factor whose layer
+    isn't there yet counts as not available rather than as "not in that zone"."""
+    from terrain.models import TerrainZone
+
+    return set(TerrainZone.objects.filter(tile="").values_list("layer", flat=True).distinct())
+
+
+def zone_classes(layer: str, samples: list[dict], indices: list[int]) -> dict[int, str]:
+    """Each point inside a merged zone of `layer`, with that zone's class (TM05-153)."""
+    rows = _query(
+        """
+        SELECT DISTINCT ON (pts.i) pts.i, z.zone_class FROM pts
+        JOIN terrain_terrainzone z
+          ON z.layer = %s AND z.tile = '' AND ST_Intersects(z.geom_m, pts.g)
+        ORDER BY pts.i, z.zone_class
+        """,
+        samples,
+        indices,
+        layer,
+    )
+    return dict(rows)
+
+
+def terrain_ranking(
+    samples: list[dict], indices: list[int], settings: dict, layers: set[str]
+) -> tuple[dict[int, dict], dict[str, dict[int, str]]]:
+    """TM05-153: for each point, the points its terrain adds or takes away and why, from
+    the config's `ranking` factors; and the class of every zone layer read, per point.
+
+    A factor counts only where its layer exists. Each layer is one indexed query for all
+    the points, however many factors read it."""
+    factors = settings.get("ranking", {}).get("factors", {})
+    by_layer: dict[str, dict[int, str]] = {}
+    ranking = {i: {"bonus": 0.0, "reasons": []} for i in indices}
+    for key, factor in factors.items():
+        layer = factor["layer"]
+        if layer not in layers:
+            continue
+        if layer not in by_layer:
+            by_layer[layer] = zone_classes(layer, samples, indices) if indices else {}
+        for i, zone_class in by_layer[layer].items():
+            value = factor["classes"].get(zone_class)
+            if value is None:
+                continue
+            points = float(factor["weight"]) * float(value)
+            ranking[i]["bonus"] += points
+            ranking[i]["reasons"].append(
+                {"key": key, "label": factor["reasons"][zone_class], "points": round(points, 1)}
+            )
+    return ranking, by_layer
+
+
+def terrain_badges(i: int, classes: dict[str, dict[int, str]], pooling_checked: bool) -> dict:
+    """The badges a potential spot can honestly carry, from the zones it is in or not in.
+    High pooling risk was filtered out, so with the damp-ground layer a spot outside it is
+    low; a level is only given when the layers that decide it were read."""
+    exposure, sheltered = classes.get("exposure"), classes.get("sheltered")
+    if exposure is not None and i in exposure:
+        shelter = "exposed"
+    elif sheltered is not None and i in sheltered:
+        shelter = "sheltered"
+    elif exposure is not None and sheltered is not None:
+        shelter = "moderate"
+    else:
+        shelter = None
+    damp = classes.get("damp-ground")
+    pooling = None
+    if pooling_checked and damp is not None:
+        pooling = "medium" if i in damp else "low"
+    return {"pooling": pooling, "shelter": shelter, "water_view": None}
+
+
 def terrain_digest() -> str:
     """Identifies the terrain zones a cached search used: the latest finished run."""
     from terrain.models import TerrainRun
@@ -269,9 +346,14 @@ def elevation_check(point: Point, elevation_m: float, land_names: str) -> tuple[
 
 
 def spread(candidates: list[dict], min_spacing_m: float, max_results: int) -> list[dict]:
-    """Highest score first; each kept one at least `min_spacing_m` along the trail from
-    every other kept one; at most `max_results`; returned in order along the trail."""
-    ranked = sorted(candidates, key=lambda c: (-(c["score"] or 0), c["distance_along_m"], c["id"]))
+    """Highest rank first (the score, plus or minus its terrain: TM05-153); each kept one
+    at least `min_spacing_m` along the trail from every other kept one; at most
+    `max_results`; returned in order along the trail."""
+
+    def rank(candidate: dict) -> float:
+        return candidate.get("rank", candidate["score"]) or 0
+
+    ranked = sorted(candidates, key=lambda c: (-rank(c), c["distance_along_m"], c["id"]))
     kept: list[dict] = []
     for candidate in ranked:
         if len(kept) >= max_results:
@@ -332,7 +414,8 @@ def find_candidates(route_geom: GEOSGeometry, within_m: float, settings: dict) -
         alive = [i for i in alive if i not in too_close]
 
     # TM05-143: not where the terrain model puts a high water pooling risk.
-    pooling_checked = bool(settings.get("reject_pooling_risk")) and terrain_checked(route_geom)
+    has_terrain = terrain_checked(route_geom)
+    pooling_checked = bool(settings.get("reject_pooling_risk")) and has_terrain
     if pooling_checked and alive:
         wet = in_zone("pooling-risk", samples, alive)
         counts["rejected"]["pooling"] = len(wet)
@@ -380,16 +463,21 @@ def find_candidates(route_geom: GEOSGeometry, within_m: float, settings: dict) -
     alive = passed
     counts["passed"] = len(alive)
 
-    # Scoring is the costly step (about 0.1 s a point), so only the flattest survivor at
-    # each station is scored, and at most `max_scored` of those, evenly along the trail.
-    # The spread keeps one per ~0.5 mi anyway, so this loses nothing a hiker would see.
+    # TM05-153: rank what passed every filter on its terrain zones.
+    layers = zone_layers() if has_terrain else set()
+    ranking, zone_class_at = terrain_ranking(samples, alive, settings, layers)
+
+    # Scoring is the costly step (about 0.1 s a point), so only the best survivor at each
+    # station is scored, and at most `max_scored` of those, evenly along the trail: the
+    # best terrain first, then the flattest. The spread keeps one per ~0.5 mi anyway, so
+    # this loses nothing a hiker would see.
+    def better(i: int) -> tuple[float, float]:
+        return (-ranking[i]["bonus"], terrain[i]["slope_deg"])
+
     best_at: dict[float, int] = {}
     for i in alive:
         station = samples[i]["station_along_m"]
-        if (
-            station not in best_at
-            or terrain[i]["slope_deg"] < terrain[best_at[station]]["slope_deg"]
-        ):
+        if station not in best_at or better(i) < better(best_at[station]):
             best_at[station] = i
     alive = [best_at[station] for station in sorted(best_at)]
     limit = int(settings["max_scored"])
@@ -418,13 +506,15 @@ def find_candidates(route_geom: GEOSGeometry, within_m: float, settings: dict) -
                 ),
                 "side": sample["side"],
                 "score": result["score"],
+                "rank": None
+                if result["score"] is None
+                else round(result["score"] + ranking[i]["bonus"], 1),
                 "suitability_score": result.get("suitability_score"),
                 "score_breakdown": result,
             }
         )
     kept = spread(scored, float(settings["min_spacing_m"]), int(settings["max_results"]))
     counts["kept"] = len(kept)
-    exposed = in_zone("exposure", samples, [c["index"] for c in kept]) if kept else set()
 
     candidates = []
     for candidate in kept:
@@ -482,13 +572,12 @@ def find_candidates(route_geom: GEOSGeometry, within_m: float, settings: dict) -
                 "slope_deg": round(slope, 1),
                 "nearest_trail_m": trail_m,
                 "nearest_water_m": water_m,
-                # TM05-143: the badges a potential spot can honestly carry: the zones say
-                # high pooling risk (filtered out above) and exposure; nothing more is known.
-                "terrain": {
-                    "pooling": None,
-                    "shelter": "exposed" if i in exposed else None,
-                    "water_view": None,
-                },
+                # TM05-143, TM05-153: what the terrain zones say about this spot, and the
+                # terrain points that ranked it, best first.
+                "terrain": terrain_badges(i, zone_class_at, pooling_checked),
+                "terrain_reasons": sorted(
+                    ranking[i]["reasons"], key=lambda reason: -reason["points"]
+                ),
             }
         )
     return {

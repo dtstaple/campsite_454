@@ -12,6 +12,13 @@ export interface CandidateCheck {
   label: string;
 }
 
+/** TM05-153: one terrain zone that moved a spot up (points > 0) or down the ranking. */
+export interface TerrainReason {
+  key: string;
+  label: string;
+  points: number;
+}
+
 /** A computed spot, never a mapped campsite. Contract: docs/api.md, "Potential campsites". */
 export interface Candidate {
   id: string;
@@ -31,6 +38,34 @@ export interface Candidate {
   slope_deg: number;
   /** TM05-143: what the terrain zones say (exposure); absent from an older API. */
   terrain?: TerrainBadges | null;
+  /** TM05-153: the score plus or minus its terrain, which ordered the search. */
+  rank?: number | null;
+  /** TM05-153: why its terrain ranked it, best first; absent from an older API. */
+  terrain_reasons?: TerrainReason[];
+}
+
+/** "+8", "−5": a reason's points, with a real minus sign. */
+export function signedPoints(points: number): string {
+  const rounded = Math.round(points);
+  if (rounded === 0) return "0";
+  return rounded > 0 ? `+${rounded}` : `−${Math.abs(rounded)}`;
+}
+
+/** The short name of a reason: "Sheltered: lower than..." reads "sheltered". */
+function shortReason(reason: TerrainReason): string {
+  return reason.label.split(":")[0].toLowerCase();
+}
+
+/**
+ * The one-line terrain summary on a candidate's list row: the net points and the reasons,
+ * e.g. "Terrain +8: sheltered" or "Terrain −5: exposed, high ground". Null when terrain
+ * set the spot apart in neither direction.
+ */
+export function terrainSummary(candidate: Pick<Candidate, "terrain_reasons">): string | null {
+  const reasons = candidate.terrain_reasons ?? [];
+  if (reasons.length === 0) return null;
+  const net = reasons.reduce((sum, reason) => sum + reason.points, 0);
+  return `Terrain ${signedPoints(net)}: ${reasons.map(shortReason).join(", ")}`;
 }
 
 export interface CandidateSearch {

@@ -99,6 +99,38 @@ tools:
       min_area_m2: 50000
       simplify_m: 30
 
+  # TM05-153: two zone layers only the potential-campsite search reads (planning/
+  # candidates.yml), so a computed spot can be ranked on the same ground classes a
+  # campsite gets. Not served as map tiles, and not used by scoring.
+  shelter:
+    grid: coarse
+    steps:
+      # The same deviation as `position`; this tool zones the low side of it.
+      - {id: dev, tool: deviation_from_mean_elevation, args: {input: "{dem}", filter_size_x: 33, filter_size_y: 33}}
+    zones:
+      layer: sheltered
+      # Below the surrounding terrain by as much as a "sheltered" site (classify, below).
+      classes:
+        - {class: sheltered, max: -0.75}
+      min_area_m2: 50000
+      simplify_m: 30
+
+  damp:
+    grid: hydrology
+    steps:
+      - {id: filled, tool: fill_depressions, args: {dem: "{dem}"}}
+      - {id: sca, tool: dinf_flow_accum, args: {input: "{filled}", out_type: sca}}
+      - {id: slope, tool: slope, args: {input: "{dem}", units: degrees}}
+      - {id: twi, tool: wetness_index, args: {sca: "{sca}", slope: "{slope}"}}
+    zones:
+      layer: damp-ground
+      # A site's "medium" pooling band on TWI; the high band is `pooling-risk`, which the
+      # search already rejects.
+      classes:
+        - {class: medium, min: 10.0, max: 12.5}
+      min_area_m2: 20000
+      simplify_m: 45
+
   viewshed:
     grid: coarse
     # One viewshed per campsite on a window around it, not a tiled raster.

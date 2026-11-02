@@ -28,3 +28,47 @@ max_results: 8
 # Scoring is the slow step, so only the flattest survivor at each station is scored, and
 # at most this many of those, evenly spread along the trail.
 max_scored: 60
+
+# TM05-153: rank the spots that passed every filter above on their terrain, so the search
+# prefers sheltered, dry, gentle ground, with a view when it can. Ranking only reorders
+# survivors; it can never bring back a point a filter removed.
+#
+# Each factor reads one terrain zone layer (`make terrain`, terrain/tools.yml). A point
+# inside a zone of a listed class gets `weight` x that class's value added to its 0-100
+# score; outside every zone it gets nothing. A layer the region doesn't have yet counts
+# as not available: no points either way, and no reason shown.
+ranking:
+  factors:
+    shelter:
+      layer: sheltered
+      weight: 8
+      classes: {sheltered: 1.0}
+      reasons: {sheltered: "Sheltered: lower than the ground around it"}
+    exposure:
+      layer: exposure
+      weight: 8
+      classes: {high: -1.0}
+      reasons: {high: "Exposed: stands above the ground around it"}
+    damp:
+      layer: damp-ground
+      weight: 8
+      classes: {medium: -1.0}
+      reasons: {medium: "Damp ground: water collects nearby"}
+    # TM05-147 (cold-air pooling) and TM05-148 (wind exposure) add these layers; until a
+    # run writes them they are not available and change nothing.
+    cold_air:
+      layer: cold-air
+      weight: 8
+      classes: {high: -1.0, medium: -0.5}
+      reasons: {high: "Frost hollow: cold air pools here", medium: "Some cold-air pooling"}
+    wind:
+      layer: wind-exposure
+      weight: 6
+      classes: {exposed: -1.0, moderate: -0.3}
+      reasons: {exposed: "Open to the prevailing wind", moderate: "Partly open to the prevailing wind"}
+    # High ground sees farther: the same exposure zone, as a likely view.
+    view:
+      layer: exposure
+      weight: 3
+      classes: {high: 1.0}
+      reasons: {high: "High ground: likely a view"}
