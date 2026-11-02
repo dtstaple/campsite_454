@@ -1,6 +1,6 @@
 /**
  * Terrain overlays on the map (TM05-142): the pooling-risk and exposure zones, and one
- * campsite's viewshed for "Show what I can see".
+ * campsite's viewshed for "Show what I can see", or a map point's (TM05-151).
  *
  * Zones go above public land and under water, trails and campsites: they describe the
  * ground those sit on. The viewshed sits under the campsite markers. Colours come from
@@ -15,15 +15,16 @@ import { numericToken, token } from "../theme";
 import { ZONES, zoneLayerIds, zoneSource, type ZoneOverlay } from "./zones";
 
 export const VIEWSHED_SOURCE = "terrain-viewshed";
-const VIEWSHED_FILL = "terrain-viewshed-fill";
-const VIEWSHED_LINE = "terrain-viewshed-line";
+/** TM05-151: "What can I see from here?" for any map point; its own source, so opening or
+ * closing a campsite never clears it, and the other way round. */
+export const POINT_VIEWSHED_SOURCE = "terrain-viewshed-point";
 const EMPTY: FeatureCollection = { type: "FeatureCollection", features: [] };
 
 function before(map: maplibregl.Map, ids: string[]): string | undefined {
   return ids.find((id) => map.getLayer(id));
 }
 
-/** Add both zone overlays and the (empty) viewshed layer. Call once, after addMapLayers. */
+/** Add both zone overlays and the (empty) viewshed layers. Call once, after addMapLayers. */
 export function addTerrainOverlays(
   map: maplibregl.Map,
   visible: Record<ZoneOverlay, boolean>,
@@ -67,38 +68,47 @@ export function addTerrainOverlays(
       under,
     );
   }
-  if (!map.getSource(VIEWSHED_SOURCE)) {
-    map.addSource(VIEWSHED_SOURCE, { type: "geojson", data: EMPTY });
-    const under = before(map, ["campsites-point"]);
-    map.addLayer(
-      {
-        id: VIEWSHED_FILL,
-        type: "fill",
-        source: VIEWSHED_SOURCE,
-        paint: {
-          "fill-color": token("--terrain-viewshed"),
-          "fill-opacity": numericToken("--terrain-viewshed-fill-opacity", 0.3),
-        },
-      },
-      under,
-    );
-    map.addLayer(
-      {
-        id: VIEWSHED_LINE,
-        type: "line",
-        source: VIEWSHED_SOURCE,
-        paint: {
-          "line-color": token("--terrain-viewshed"),
-          "line-width": numericToken("--terrain-zone-line-width", 1),
-        },
-      },
-      under,
-    );
-  }
+  addViewshedLayers(map, VIEWSHED_SOURCE);
+  addViewshedLayers(map, POINT_VIEWSHED_SOURCE);
 }
 
-/** Draw one campsite's viewshed, or clear it with null. */
-export function showViewshed(map: maplibregl.Map, feature: Feature | null): void {
-  const source = map.getSource(VIEWSHED_SOURCE) as maplibregl.GeoJSONSource | undefined;
+/** A viewshed source with its pale fill and outline, under the campsite markers. */
+function addViewshedLayers(map: maplibregl.Map, sourceId: string): void {
+  if (map.getSource(sourceId)) return;
+  map.addSource(sourceId, { type: "geojson", data: EMPTY });
+  const under = before(map, ["campsites-point"]);
+  map.addLayer(
+    {
+      id: `${sourceId}-fill`,
+      type: "fill",
+      source: sourceId,
+      paint: {
+        "fill-color": token("--terrain-viewshed"),
+        "fill-opacity": numericToken("--terrain-viewshed-fill-opacity", 0.3),
+      },
+    },
+    under,
+  );
+  map.addLayer(
+    {
+      id: `${sourceId}-line`,
+      type: "line",
+      source: sourceId,
+      paint: {
+        "line-color": token("--terrain-viewshed"),
+        "line-width": numericToken("--terrain-zone-line-width", 1),
+      },
+    },
+    under,
+  );
+}
+
+/** Draw one viewshed, or clear it with null: a campsite's by default, or a map point's. */
+export function showViewshed(
+  map: maplibregl.Map,
+  feature: Feature | null,
+  sourceId: string = VIEWSHED_SOURCE,
+): void {
+  const source = map.getSource(sourceId) as maplibregl.GeoJSONSource | undefined;
   source?.setData(feature ? { type: "FeatureCollection", features: [feature] } : EMPTY);
 }

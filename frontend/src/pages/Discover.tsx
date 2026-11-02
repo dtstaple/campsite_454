@@ -47,6 +47,7 @@ import LayerPanel from "../components/LayerPanel";
 import { requestFromState, type OpenRequest } from "../profile/openRequest";
 import SaveButton from "../components/SaveButton";
 import CampsiteDetail from "../campsite/CampsiteDetail";
+import ViewHere from "../viewshed/ViewHere";
 import TrailInsight from "../trails/TrailInsight";
 import Waypoints from "../waypoints/Waypoints";
 import { placement } from "../waypoints/placement";
@@ -673,6 +674,7 @@ export default function Discover() {
           );
         }}
       />
+      <ViewHere map={mapInstance} />
       <StartLocation map={mapInstance} onRegion={flyToRegion} />
       <LiveLocation map={mapInstance} onPosition={setUserPosition} tracked={hike.recording?.status === "stopped" ? null : hikePosition}>
         <TrackButton

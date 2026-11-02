@@ -444,6 +444,10 @@
   --terrain-viewshed-fill-opacity: 0.3;
   --terrain-good: var(--success);
   --terrain-warn: var(--danger);
+  /* TM05-151: "What can I see from here?" — its card and the observer's dot. */
+  --viewshed-card-width: 320px;
+  --viewshed-observer-size: 14px;
+  --viewshed-observer: var(--terrain-viewshed);
 }
 
 /* --- Compare trails (TM05-121) ----------------------------------------------------------- */

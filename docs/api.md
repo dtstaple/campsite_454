@@ -28,6 +28,7 @@ weights ([Scoring weights](#scoring-weights-tm05-46)).
 | `GET /api/routes/` | Named hiking routes in a bbox — see [Named routes](#named-routes-tm05-60) |
 | `GET /api/routes/<osm_id>/` | One route: stats, elevation profile, campsites along it with scores |
 | `GET /api/saved-campsites/` | The signed-in user's saved campsites, with names, scores and land units — see [Saved campsites list](#saved-campsites-list-tm05-87) |
+| `GET /api/viewshed/?lat=&lon=[&radius_m=]` | What the terrain lets you see from any point, computed on request and cached — see [Viewshed from any point](#viewshed-from-any-point-tm05-151) |
 | `GET /api/conditions/?lat=&lon=` | The 3-day forecast and active NWS weather alerts for a point — see [Conditions](#conditions-tm05-120) |
 | `GET`/`PUT`/`DELETE /api/auth/me/weights/` | The signed-in user's factor weights — see [Scoring weights](#scoring-weights-tm05-46) |
 
@@ -1394,6 +1395,59 @@ Feature: a MultiPolygon in EPSG:4326, simplified to 15 m. Its properties are `ar
 `direction`, `water_view` and `note`. It is a separate request because the outline is the
 one large part, and the panel only needs it on "Show what I can see". It returns **404**
 when the site has no viewshed.
+
+### Viewshed from any point (TM05-151)
+
+`GET /api/viewshed/?lat=&lon=[&radius_m=]` is the same viewshed for any point on the map,
+behind the map's "What can I see from here?" (right-click, or long-press on a phone). It
+runs the campsite pipeline's own code (`terrain/worker.py` `viewshed_at`) with the same
+30 m grid, 1.7 m eye height and view classes. It is computed on request, through the
+analysis cache (`analysis/analyses/viewshed.py`). Code: `backend/api/viewshed.py`.
+
+| Parameter | |
+|---|---|
+| `lat`, `lon` | Required, as for [Conditions](#conditions-tm05-120) |
+| `radius_m` | Optional. Rounded to the nearest 1 km, at least 1 km, and capped at the pipeline's 10 km (the default) |
+
+```json
+{
+  "type": "Feature",
+  "geometry": {"type": "MultiPolygon", "coordinates": [...]},
+  "properties": {
+    "observer": {"lon": -73.95025, "lat": 44.15025},
+    "region": "adirondacks",
+    "radius_m": 10000, "eye_height_m": 1.7, "resolution_m": 30,
+    "area_km2": 7.123, "direction": "east",
+    "summary": "About 7.1 km² visible within 10 km, mostly to the east.",
+    "label": "Bare-earth elevation",
+    "note": "Terrain-model estimate from bare-earth elevation. Trees, buildings and recent changes aren't counted.",
+    "cached": false, "computed_at": "2026-11-02T23:30:00+00:00"
+  }
+}
+```
+
+- **Caching.** The point is snapped to a 0.0005° cell (about 55 m × 40 m here, under two
+  cells of the 30 m grid), and keyed with the rounded radius. Presses close together, at
+  the same radius, share one answer. `observer` is the snapped point. The answer keeps
+  for a year, because terrain doesn't change. The first request at a place takes a few
+  seconds; later ones are a cache read.
+- **Bare earth.** Always show `label` and `note`: 3DEP has no trees or buildings, so
+  forest will hide much of what the terrain allows.
+- **`geometry` is null** when the ground closes in all around (less than one visible
+  cell); `summary` says so.
+- **Only local data.** It uses the region's elevation mosaic and GeoLibre runtime that
+  `make terrain` left in the terrain cache (`TERRAIN_CACHE_DIR`). A request never
+  downloads them.
+
+**Errors**, each with `{"error": "…"}`:
+- **400** for a missing, non-numeric or out-of-range `lat`/`lon`, or a `radius_m` that
+  isn't a positive number.
+- **422** for a point outside every region in `regions.yml`, or one with no elevation
+  data under it.
+- **503** when this server has no terrain model for the region: no finished
+  `make terrain` run, or its mosaic or runtime is missing.
+
+Nothing is cached for an error.
 
 ### On a route's campsite rows: `terrain`
 
