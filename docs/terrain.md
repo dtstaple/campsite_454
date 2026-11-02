@@ -5,6 +5,31 @@ for the hillshade and 3D terrain: AWS Terrain Tiles in Terrarium encoding
 (`TERRAIN_TILES` in frontend/src/map/layers.ts). No overlay adds a tile source or a server
 endpoint.
 
+## 3D terrain (TM05-62, TM05-144)
+
+3D drapes the map over the same DEM tiles, at the exaggeration in
+`--map-terrain-exaggeration`. It can be switched on in two places:
+
+- **The main map's 3D button**, next to Map / Satellite. It works with or without a trail
+  panel open, in every mode and on both basemaps. Turning it on tilts the camera to 60°.
+- **The trail panel's 3D button and Fly the trail**, which also put the camera behind the
+  trail.
+
+Both read and change one state, `useThreeD` (frontend/src/map/useThreeD.ts), so they always
+agree. The rules for who turned 3D on are in `map/threeD.ts`:
+
+| Turned on by | Closing the trail panel | Remembered across reloads |
+|---|---|---|
+| A 3D button (map or panel) | stays in 3D | yes (`campsite.threeD` in localStorage) |
+| Fly the trail, from 2D | back to 2D, as before TM05-144 | no |
+
+Turning 3D off from the main map also stops a flythrough. The basemap and mode switches only
+show and hide layers, and the DEM source is never removed, so 3D survives both. On a phone
+the button rides in the basemap pill, so it stays above an open sheet.
+
+Checked headless at 1440 × 900 and 390 × 844, with a trail and a planned route open:
+artifacts/tm05-144/check-log.txt.
+
 ## Contour lines
 
 | | |
