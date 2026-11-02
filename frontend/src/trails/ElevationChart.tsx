@@ -9,6 +9,7 @@
  */
 
 import { useRef } from "react";
+import type { ChartBand } from "../terrain/along";
 import { nearestIndex } from "./profile";
 
 const WIDTH = 320;
@@ -25,6 +26,8 @@ interface Props {
   elevations: number[];
   cursorM: number | null;
   markers?: ChartMarker[];
+  /** TM05-152: stretches of exposed or wet ground, shaded behind the profile. */
+  bands?: ChartBand[];
   onHover: (distance: number | null) => void;
   onScrub?: (distance: number) => void;
   formatDistance: (metres: number) => string;
@@ -36,6 +39,7 @@ export default function ElevationChart({
   elevations,
   cursorM,
   markers = [],
+  bands = [],
   onHover,
   onScrub,
   formatDistance,
@@ -94,6 +98,20 @@ export default function ElevationChart({
     >
       <line className="chart-grid" x1={PAD.left} x2={WIDTH - PAD.right} y1={y(high)} y2={y(high)} />
       <line className="chart-grid" x1={PAD.left} x2={WIDTH - PAD.right} y1={y(low)} y2={y(low)} />
+      {bands.map((band) => (
+        <rect
+          key={`${band.layer}-${band.start}`}
+          className={`chart-band chart-band-${band.layer}`}
+          x={x(band.start)}
+          y={PAD.top}
+          width={Math.max(1, x(band.end) - x(band.start))}
+          height={innerH}
+        >
+          <title>
+            {band.label}, {formatDistance(band.start)} to {formatDistance(band.end)}
+          </title>
+        </rect>
+      ))}
       <path className="chart-area" d={area} />
       <path className="chart-line" d={line} />
 

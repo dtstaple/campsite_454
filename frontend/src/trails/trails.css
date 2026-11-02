@@ -160,6 +160,62 @@
   stroke-width: 1.5;
 }
 
+/* TM05-152: exposed and wet stretches, in the map's zone colours. */
+.chart-band-exposure {
+  fill: var(--terrain-exposure);
+  fill-opacity: var(--terrain-exposure-fill-opacity);
+}
+
+.chart-band-pooling-risk {
+  fill: var(--terrain-pooling);
+  fill-opacity: var(--terrain-pooling-fill-opacity);
+}
+
+.trail-along-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-md);
+  margin: var(--space-xs) 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+.trail-along-legend li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.trail-along-swatch {
+  width: var(--space-sm);
+  height: var(--space-sm);
+  border-radius: var(--radius-sm);
+}
+
+.trail-along-swatch.is-exposure {
+  background: var(--terrain-exposure);
+}
+
+.trail-along-swatch.is-pooling-risk {
+  background: var(--terrain-pooling);
+}
+
+.trail-along ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+}
+
+.trail-along-note {
+  margin: var(--space-xs) 0 0;
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+}
+
 .trail-readout {
   display: flex;
   gap: var(--space-md);
