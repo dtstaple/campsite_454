@@ -393,11 +393,11 @@ def terrain_run():
     )
 
 
-def zone(layer, x0, y0, x1, y1):
+def zone(layer, x0, y0, x1, y1, zone_class="high"):
     from terrain.models import TerrainZone
 
     return TerrainZone.objects.create(
-        region="adirondacks", layer=layer, zone_class="high", area_m2=1,
+        region="adirondacks", layer=layer, zone_class=zone_class, area_m2=1,
         geom=polygon(x0, y0, x1, y1),
     )  # fmt: skip
 
@@ -460,3 +460,103 @@ def test_a_new_terrain_run_is_a_new_cache_key(route):
     terrain_run()
     after = search.TrailCandidates().canonical_params({"within_m": 500})
     assert before["terrain"] == "none" and after["terrain"] != "none"
+
+
+# --- terrain ranking (TM05-153) ----------------------------------------------------------
+
+NORTH = (-2000, 1, LENGTH + 2000, 2000)
+SOUTH = (-2000, -2000, LENGTH + 2000, -1)
+
+
+def test_sheltered_ground_is_preferred_and_says_why(route):
+    land()
+    terrain_run()
+    zone("sheltered", *NORTH, zone_class="sheltered")
+    body = find(500)
+    assert body["candidates"]
+    # Flat everywhere, so the scores tie and the terrain decides: every spot is sheltered.
+    assert all(offset_of(c) > 0 for c in body["candidates"])
+    for candidate in body["candidates"]:
+        assert candidate["terrain"]["shelter"] == "sheltered"
+        assert candidate["terrain_reasons"] == [
+            {"key": "shelter", "label": "Sheltered: lower than the ground around it", "points": 8.0}
+        ]
+        assert candidate["rank"] == candidate["score"] + 8
+
+
+def test_damp_ground_is_ranked_down_and_badged(route):
+    land()
+    terrain_run()
+    zone("damp-ground", *NORTH, zone_class="medium")
+    body = find(500)
+    assert body["candidates"] and all(offset_of(c) < 0 for c in body["candidates"])
+    # Outside the damp zone, with high pooling risk filtered out: low.
+    assert {c["terrain"]["pooling"] for c in body["candidates"]} == {"low"}
+
+
+def test_exposed_ground_loses_more_than_its_view_gains(route):
+    land()
+    terrain_run()
+    zone("exposure", *SOUTH)
+    body = find(500)
+    assert body["candidates"] and all(offset_of(c) > 0 for c in body["candidates"])
+    exposed = search.terrain_ranking([{"x": X0 + 100, "y": Y0 - 300}], [0], config(), {"exposure"})[
+        0
+    ][0]
+    assert exposed["bonus"] == -8 + 3
+    assert [r["key"] for r in exposed["reasons"]] == ["exposure", "view"]
+
+
+def test_the_weights_come_from_the_config(route):
+    land()
+    terrain_run()
+    zone("sheltered", *NORTH, zone_class="sheltered")
+    settings = copy.deepcopy(config())
+    settings["ranking"]["factors"]["shelter"]["weight"] = -8
+    result = search.find_candidates(route.geom, 500, settings)
+    assert result["candidates"] and all(offset_of(c) < 0 for c in result["candidates"])
+
+
+def test_ranking_never_brings_back_a_point_a_filter_removed(route):
+    # Public land only south of the trail; the sheltered, dry, high ground is all north,
+    # and right up against the trail.
+    land(y0=-2000, y1=-1)
+    terrain_run()
+    zone("sheltered", -2000, -2000, LENGTH + 2000, 2000, zone_class="sheltered")
+    zone("exposure", *NORTH)
+    body = find(500)
+    assert body["candidates"]
+    for candidate in body["candidates"]:
+        assert offset_of(candidate) < 0
+        assert candidate["distance_from_route_m"] >= search.config()["rule_distance_m"]
+        assert all(check["passed"] for check in candidate["checks"])
+    unranked = search.find_candidates(route.geom, 500, {**config(), "ranking": {"factors": {}}})
+    assert unranked["counts"]["rejected"] == body["counts"]["rejected"]
+    assert unranked["counts"]["passed"] == body["counts"]["passed"]
+
+
+def test_a_layer_no_run_has_written_changes_nothing(route):
+    land()
+    terrain_run()  # a run, but no zones yet: cold-air and wind (TM05-147/148) included
+    body = find(500)
+    for candidate in body["candidates"]:
+        assert candidate["terrain_reasons"] == []
+        assert candidate["rank"] == candidate["score"]
+        assert candidate["terrain"] == {"pooling": None, "shelter": None, "water_view": None}
+
+
+def test_without_a_terrain_run_nothing_is_ranked_on_zones(route):
+    land()
+    zone("sheltered", *NORTH, zone_class="sheltered")  # zones, but no run for the region
+    body = find(500)
+    assert body["candidates"]
+    for candidate in body["candidates"]:
+        assert candidate["terrain_reasons"] == [] and candidate["rank"] == candidate["score"]
+
+
+def test_spread_orders_by_rank_when_there_is_one():
+    near = [
+        {"id": "a", "distance_along_m": 0, "score": 60, "rank": 52},
+        {"id": "b", "distance_along_m": 100, "score": 55, "rank": 63},
+    ]
+    assert [c["id"] for c in spread(near, 805, 8)] == ["b"]
