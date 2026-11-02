@@ -1,0 +1,154 @@
+/* "What can I see from here?" (TM05-151): the popup action, the observer's dot and the
+ * card with the summary. Colours and sizes are theme.css tokens. */
+
+.viewshed-menu .maplibregl-popup-content {
+  padding: var(--space-xs);
+  background: var(--bg-floating);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-panel);
+}
+
+.viewshed-menu-action {
+  display: block;
+  min-height: var(--space-2xl);
+  padding: var(--space-xs) var(--space-xl) var(--space-xs) var(--space-sm);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.viewshed-menu-action:hover,
+.viewshed-menu-action:focus-visible {
+  background: var(--bg-raised);
+  outline: none;
+}
+
+.viewshed-observer {
+  width: var(--viewshed-observer-size);
+  height: var(--viewshed-observer-size);
+  background: var(--viewshed-observer);
+  border: 2px solid var(--bg-base);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-float);
+}
+
+.viewshed-here {
+  position: absolute;
+  top: var(--space-md);
+  left: 50%;
+  z-index: 3;
+  width: min(var(--viewshed-card-width), calc(100% - 2 * var(--space-md)));
+  transform: translateX(-50%);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-floating);
+  backdrop-filter: blur(var(--blur-floating));
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-panel);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+}
+
+.viewshed-here.is-error {
+  border-color: var(--danger);
+}
+
+.viewshed-here-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.viewshed-here-title {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+}
+
+.viewshed-here-close {
+  min-width: var(--space-2xl);
+  min-height: var(--space-2xl);
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: var(--text-md);
+  cursor: pointer;
+}
+
+.viewshed-here-close:hover {
+  color: var(--text-primary);
+}
+
+.viewshed-here-place {
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.viewshed-here-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+  color: var(--text-secondary);
+}
+
+.viewshed-here-summary {
+  margin: var(--space-sm) 0 0;
+}
+
+.viewshed-here-caveat {
+  margin: var(--space-xs) 0 0;
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+}
+
+.viewshed-here-label {
+  display: inline-block;
+  margin-right: var(--space-xs);
+  padding: 0 var(--space-xs);
+  border: 1px solid var(--terrain-viewshed);
+  border-radius: var(--radius-sm);
+  color: var(--terrain-viewshed);
+}
+
+.viewshed-here-error {
+  margin: var(--space-sm) 0 var(--space-xs);
+  color: var(--danger);
+}
+
+.viewshed-here-action {
+  min-height: var(--space-2xl);
+  padding: var(--space-xs) var(--space-md);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.viewshed-here button:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+@media (max-width: 640px) {
+  /* On a phone the card sits at the bottom, clear of the search at the top, above any open
+   * sheet and the home bar, so the overlay stays in view above it. */
+  .app .viewshed-here {
+    top: auto;
+    bottom: calc(
+      var(--sheet-height, var(--phone-attribution-height)) + var(--live-controls-lift) +
+        var(--space-sm) + env(safe-area-inset-bottom)
+    );
+    width: calc(100% - 2 * var(--space-sm) - env(safe-area-inset-left) - env(safe-area-inset-right));
+  }
+}

@@ -13,6 +13,7 @@ from api.routes import (
 )
 from api.tiles import tile_view
 from api.views import layer_view, map_data_view
+from api.viewshed import viewshed_view
 
 urlpatterns = [
     path("map-data/", map_data_view, name="map-data"),
@@ -32,6 +33,8 @@ urlpatterns = [
     path("regions/", regions_view, name="regions"),
     # TM05-120: forecast and NWS alerts for a point (api/conditions.py).
     path("conditions/", conditions_view, name="conditions"),
+    # TM05-151: what the terrain lets you see from any point (api/viewshed.py).
+    path("viewshed/", viewshed_view, name="viewshed"),
     path("routes/<int:osm_id>/", route_detail_view, name="route-detail"),
     path("routes/<int:osm_id>/gpx/", route_gpx_view, name="route-gpx"),
     # <path:> because a source_id contains a slash ("way/20074658"); TM05-97.

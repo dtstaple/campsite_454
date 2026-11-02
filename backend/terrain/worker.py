@@ -198,81 +198,106 @@ def process_tile(task: dict) -> dict:
     }
 
 
+def viewshed_at(
+    wasm: Path,
+    src: Path,
+    srid: int,
+    nodata: float,
+    x: float,
+    y: float,
+    *,
+    radius_m: float,
+    resolution_m: float,
+    eye_height_m: float,
+    view_cfg: dict,
+    label: str,
+    same_grid: bool = True,
+) -> tuple[dict, int]:
+    """One station's viewshed on a window of `radius_m` around (x, y) in `srid`:
+    ({area_km2, direction, polygons}, peak memory). Raises runtime.ToolFailed when the
+    station is off the DEM. Campsites (process_sites) and any map point (TM05-151,
+    analysis/analyses/viewshed.py) both come through here. `same_grid` is False when
+    `src` is the source VRT rather than the grid's mosaic, so the window is averaged."""
+    bounds = (
+        math.floor((x - radius_m) / resolution_m) * resolution_m,
+        math.floor((y - radius_m) / resolution_m) * resolution_m,
+        math.ceil((x + radius_m) / resolution_m) * resolution_m,
+        math.ceil((y + radius_m) / resolution_m) * resolution_m,
+    )
+    window = dem.tile_bytes(src, bounds, resolution_m, srid, nodata, same_grid, label)
+    stations = json.dumps(
+        {
+            "type": "FeatureCollection",
+            "crs": {
+                "type": "name",
+                "properties": {"name": f"urn:ogc:def:crs:EPSG::{srid}"},
+            },
+            "features": [
+                {
+                    "type": "Feature",
+                    "properties": {"id": label},
+                    "geometry": {"type": "Point", "coordinates": [x, y]},
+                }
+            ],
+        }
+    ).encode()
+    shed = runtime.run(
+        wasm,
+        "viewshed",
+        {
+            "input": "/work/dem.tif",
+            "stations": "/work/stations.geojson",
+            "height": eye_height_m,
+            "output": "/work/viewshed.tif",
+        },
+        {"dem.tif": window, "stations.geojson": stations},
+    )
+    raster = GDALRaster(shed.files["viewshed.tif"])
+    visible = raster.bands[0].data()
+    site_cell = (int((x - bounds[0]) // resolution_m), int((bounds[3] - y) // resolution_m))
+    area, direction = mappers.view_stats(
+        visible, raster.width, raster.height, resolution_m, site_cell, view_cfg
+    )
+    polygons = runtime.run(
+        wasm,
+        "raster_to_vector_polygons",
+        {"input": "/work/viewshed.tif", "output": "/work/visible.geojson"},
+        {"viewshed.tif": shed.files["viewshed.tif"]},
+    )
+    geometries = [
+        f["geometry"]
+        for f in json.loads(polygons.files["visible.geojson"])["features"]
+        if int(f["properties"]["VALUE"]) == 1
+    ]
+    peak = max(shed.peak_memory, polygons.peak_memory)
+    return {"area_km2": area, "direction": direction, "polygons": geometries}, peak
+
+
 def process_sites(task: dict) -> dict:
     """The viewshed for a batch of sites (worker side)."""
     started = time.perf_counter()
     tool: Tool = task["tool"]
-    resolution = tool.grid.resolution_m
-    radius = tool.per_site["radius_m"]
-    wasm = Path(task["wasm"])
     out, failed, peak = {}, {}, 0
     for site_id, x, y in task["sites"]:
-        bounds = (
-            math.floor((x - radius) / resolution) * resolution,
-            math.floor((y - radius) / resolution) * resolution,
-            math.ceil((x + radius) / resolution) * resolution,
-            math.ceil((y + radius) / resolution) * resolution,
-        )
-        window = dem.tile_bytes(
-            Path(task["src"]),
-            bounds,
-            resolution,
-            task["srid"],
-            task["nodata"],
-            True,
-            f"view-{site_id}",
-        )
-        stations = json.dumps(
-            {
-                "type": "FeatureCollection",
-                "crs": {
-                    "type": "name",
-                    "properties": {"name": f"urn:ogc:def:crs:EPSG::{task['srid']}"},
-                },
-                "features": [
-                    {
-                        "type": "Feature",
-                        "properties": {"id": site_id},
-                        "geometry": {"type": "Point", "coordinates": [x, y]},
-                    }
-                ],
-            }
-        ).encode()
         try:
-            shed = runtime.run(
-                wasm,
-                "viewshed",
-                {
-                    "input": "/work/dem.tif",
-                    "stations": "/work/stations.geojson",
-                    "height": tool.per_site["eye_height_m"],
-                    "output": "/work/viewshed.tif",
-                },
-                {"dem.tif": window, "stations.geojson": stations},
+            out[site_id], site_peak = viewshed_at(
+                Path(task["wasm"]),
+                Path(task["src"]),
+                task["srid"],
+                task["nodata"],
+                x,
+                y,
+                radius_m=tool.per_site["radius_m"],
+                resolution_m=tool.grid.resolution_m,
+                eye_height_m=tool.per_site["eye_height_m"],
+                view_cfg=task["view_cfg"],
+                label=f"view-{site_id}",
             )
         except runtime.ToolFailed as error:
             # A site off the DEM (nodata under it) has no viewshed; the rest go on.
             failed[site_id] = str(error)
             continue
-        raster = GDALRaster(shed.files["viewshed.tif"])
-        visible = raster.bands[0].data()
-        site_cell = (int((x - bounds[0]) // resolution), int((bounds[3] - y) // resolution))
-        area, direction = mappers.view_stats(
-            visible, raster.width, raster.height, resolution, site_cell, task["view_cfg"]
-        )
-        polygons = runtime.run(
-            wasm,
-            "raster_to_vector_polygons",
-            {"input": "/work/viewshed.tif", "output": "/work/visible.geojson"},
-            {"viewshed.tif": shed.files["viewshed.tif"]},
-        )
-        peak = max(peak, shed.peak_memory, polygons.peak_memory)
-        geometries = [
-            f["geometry"]
-            for f in json.loads(polygons.files["visible.geojson"])["features"]
-            if int(f["properties"]["VALUE"]) == 1
-        ]
-        out[site_id] = {"area_km2": area, "direction": direction, "polygons": geometries}
+        peak = max(peak, site_peak)
     return {
         "tool": tool.id,
         "tile": task["key"],
