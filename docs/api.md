@@ -982,8 +982,15 @@ for a trail can take 15–35 s (3DEP), and later ones about 5 ms.
   pooling risk not checked: no terrain data here yet."
 - **Rejections.** `counts.rejected.pooling` counts the points the zones removed.
 - **Badges.** Each candidate carries
-  `"terrain": {"pooling": null, "shelter": "exposed" | null, "water_view": null}`: only
-  what the zones can say about a point with no site facts. docs/candidates.md explains why.
+  `"terrain": {"pooling": "low" | "medium" | null, "shelter": "exposed" | "sheltered" | "moderate" | null, "water_view": null}`:
+  only what the zones can say about a point with no site facts. docs/candidates.md
+  explains why.
+- **Ranking (TM05-153).** Each candidate also carries:
+  - `rank`: its score plus or minus its terrain points, which ordered the search; null
+    when the score is
+  - `terrain_reasons`: `[{"key": "shelter", "label": "Sheltered: lower than the ground around it", "points": 8.0}, …]`,
+    best first, and empty when no terrain zone set it apart. The factors and weights are
+    in `backend/planning/candidates.yml`.
 - **Scoring.** Campsite scores (model 1.3.0) gain the optional `drainage`, `shelter` and
   `view` factors (docs/scoring.md). They appear in `score_breakdown` like any other factor.
 

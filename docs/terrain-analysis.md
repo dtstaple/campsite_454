@@ -378,6 +378,30 @@ every campsite on the next run. To also draw it as a map layer, add `zones`:
 
 Then add a `TileLayer` for `rough-ground` in `backend/api/tiles.py`, like `exposure`.
 
+**Class ranges (TM05-153).** A class covers `min` (inclusive) up to `max` (exclusive):
+
+- Without `max`, a class runs up to the next class's `min`, or without limit.
+- Without `min`, it runs down without limit. Only the first class can leave it out. This
+  is for a zone *below* a value, for example `{class: sheltered, max: -0.75}`.
+- Classes go in ascending order and can't overlap.
+- A cell in no class is in no zone.
+
+**Zones only the potential-campsite search reads (TM05-153).** Two tools write layers that
+aren't served as tiles or used by scoring. They exist so a computed spot, which has no
+site facts, can be ranked on the same ground classes a campsite gets
+(docs/candidates.md, step 4):
+
+| Tool | Grid | Layer (class) | Range |
+|---|---|---|---|
+| `shelter` | coarse, DEV as for `position` | `sheltered` (`sheltered`) | DEV below −0.75, a site's "sheltered" |
+| `damp` | hydrology, TWI as for `wetness` | `damp-ground` (`medium`) | TWI 10 to 12.5, a site's medium pooling band |
+
+Each recomputes its tool's chain rather than sharing it, because a tool writes one zone
+layer. That costs one more DEV pass (about 1 min CPU) and one more whole-region hydrology
+pass (about 1.5 min). TM05-147 (cold-air pooling) and TM05-148 (wind exposure) plug into the
+same ranking by writing layers named `cold-air` and `wind-exposure`
+(`backend/planning/candidates.yml`).
+
 A new **class** shown in the app (like `pooling` or `shelter`) needs one small function in
 `mappers.py`, plus a column on `TerrainFacts` if scoring or filtering reads it. A new
 sampling method or per-site mapper is added to `SAMPLE_METHODS` or `MAPPERS` in
