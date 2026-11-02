@@ -142,19 +142,25 @@ def _multipolygon(geometry: dict) -> MultiPolygon:
 VIEWSHED_SIMPLIFY_M = 15
 
 
+def view_outline(polygons: list[dict]) -> MultiPolygon | None:
+    """A viewshed's visible polygons (GeoJSON, EPSG:4326) as one MultiPolygon, simplified
+    to VIEWSHED_SIMPLIFY_M, or None when nothing is visible."""
+    if not polygons:
+        return None
+    parts = [_multipolygon(g) for g in polygons]
+    merged = MultiPolygon([p for part in parts for p in part], srid=4326).unary_union
+    merged.transform(5070)
+    merged = merged.simplify(VIEWSHED_SIMPLIFY_M, preserve_topology=True)
+    merged.transform(4326)
+    if merged.geom_type == "Polygon":
+        merged = MultiPolygon(merged, srid=4326)
+    return merged if merged.geom_type == "MultiPolygon" and not merged.empty else None
+
+
 def _store_views(run: TerrainRun, sites: dict[int, dict]) -> None:
     now = timezone.now()
     for site_id, view in sites.items():
-        shape = None
-        if view["polygons"]:
-            parts = [_multipolygon(g) for g in view["polygons"]]
-            merged = MultiPolygon([p for part in parts for p in part], srid=4326).unary_union
-            merged.transform(5070)
-            merged = merged.simplify(VIEWSHED_SIMPLIFY_M, preserve_topology=True)
-            merged.transform(4326)
-            if merged.geom_type == "Polygon":
-                merged = MultiPolygon(merged, srid=4326)
-            shape = merged if merged.geom_type == "MultiPolygon" and not merged.empty else None
+        shape = view_outline(view["polygons"])
         row, _ = TerrainFacts.objects.get_or_create(
             campsite_id=site_id, defaults={"run": run, "computed_at": now}
         )
