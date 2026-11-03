@@ -1,0 +1,138 @@
+{
+  "source": "Open-Meteo Historical Weather API (ERA5 reanalysis), hourly 10 m wind",
+  "period": "2016-01-01 to 2025-12-31",
+  "calm_below_ms": 1.0,
+  "url_template": "https://archive-api.open-meteo.com/v1/archive?latitude={lat}&longitude={lon}&start_date=2016-01-01&end_date=2025-12-31&hourly=wind_speed_10m,wind_direction_10m&wind_speed_unit=ms&timezone=UTC",
+  "points": {
+    "Marcy Dam (High Peaks)": {
+      "lat": 44.159,
+      "lon": -73.951,
+      "hours": 87672,
+      "windy_hours": 83218,
+      "share_pct": {
+        "N": 4.1,
+        "NE": 3.3,
+        "E": 2.9,
+        "SE": 6.1,
+        "S": 19.4,
+        "SW": 18.7,
+        "W": 27.5,
+        "NW": 18.0
+      },
+      "speed_weighted_share_pct": {
+        "N": 3.0,
+        "NE": 2.2,
+        "E": 1.8,
+        "SE": 5.7,
+        "S": 20.3,
+        "SW": 17.7,
+        "W": 30.5,
+        "NW": 18.8
+      },
+      "resultant_from_deg": 248.8
+    },
+    "Lake Placid": {
+      "lat": 44.279,
+      "lon": -73.98,
+      "hours": 87672,
+      "windy_hours": 82887,
+      "share_pct": {
+        "N": 2.7,
+        "NE": 3.4,
+        "E": 7.5,
+        "SE": 7.0,
+        "S": 15.0,
+        "SW": 25.7,
+        "W": 28.3,
+        "NW": 10.3
+      },
+      "speed_weighted_share_pct": {
+        "N": 1.8,
+        "NE": 2.4,
+        "E": 5.6,
+        "SE": 5.3,
+        "S": 15.1,
+        "SW": 26.4,
+        "W": 33.4,
+        "NW": 10.0
+      },
+      "resultant_from_deg": 240.8
+    },
+    "Newcomb (central)": {
+      "lat": 43.973,
+      "lon": -74.164,
+      "hours": 87672,
+      "windy_hours": 80612,
+      "share_pct": {
+        "N": 5.8,
+        "NE": 1.8,
+        "E": 10.2,
+        "SE": 15.5,
+        "S": 6.9,
+        "SW": 6.8,
+        "W": 21.4,
+        "NW": 31.7
+      },
+      "speed_weighted_share_pct": {
+        "N": 3.8,
+        "NE": 0.9,
+        "E": 8.0,
+        "SE": 14.6,
+        "S": 6.1,
+        "SW": 6.3,
+        "W": 25.3,
+        "NW": 35.0
+      },
+      "resultant_from_deg": 281.9
+    },
+    "Old Forge (southwest)": {
+      "lat": 43.711,
+      "lon": -74.974,
+      "hours": 87672,
+      "windy_hours": 84779,
+      "share_pct": {
+        "N": 6.4,
+        "NE": 4.6,
+        "E": 4.3,
+        "SE": 9.9,
+        "S": 19.8,
+        "SW": 19.3,
+        "W": 20.6,
+        "NW": 15.1
+      },
+      "speed_weighted_share_pct": {
+        "N": 5.0,
+        "NE": 3.2,
+        "E": 3.0,
+        "SE": 10.4,
+        "S": 21.8,
+        "SW": 19.3,
+        "W": 22.6,
+        "NW": 14.6
+      },
+      "resultant_from_deg": 234.3
+    }
+  },
+  "all_points": {
+    "share_pct": {
+      "N": 4.7,
+      "NE": 3.3,
+      "E": 6.2,
+      "SE": 9.6,
+      "S": 15.4,
+      "SW": 17.7,
+      "W": 24.5,
+      "NW": 18.7
+    },
+    "speed_weighted_share_pct": {
+      "N": 3.4,
+      "NE": 2.2,
+      "E": 4.5,
+      "SE": 8.9,
+      "S": 16.2,
+      "SW": 17.7,
+      "W": 27.9,
+      "NW": 19.2
+    }
+  }
+}

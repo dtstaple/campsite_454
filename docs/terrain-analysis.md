@@ -84,6 +84,7 @@ under [Resolutions](#resolutions-chosen-and-why).
 | Shelter / exposure | `deviation_from_mean_elevation` (DEV), `relative_topographic_position`, `openness`, `geomorphons`, `exposure_towards_wind_flux`, `sky_view_factor` | `deviation_from_mean_elevation` |
 | What you can see | `viewshed` (per station), `visibility_index`, `skyline_analysis` | `viewshed`, one station per site |
 | Cold-air pooling (TM05-147) | `elevation_percentile`, `relative_topographic_position`, `sky_view_factor`, `depth_in_sink` | `elevation_percentile` |
+| Exposure to the prevailing wind (TM05-148) | `fetch_analysis`, `exposure_towards_wind_flux` | `fetch_analysis` |
 | Zones as polygons | `reclass`, `raster_to_vector_polygons` | both |
 
 ## The DEM source: USGS 3DEP 1/3 arc-second, verified live
@@ -258,7 +259,8 @@ That is roughly 15 minutes on one core. The pipeline (TM05-141) measures the rea
 These are Sprint 8 candidates; none needs a new dependency:
 
 - `solar_radiation`: summer Wh/m², which could become "sun hours" (22 CPU-min at 30 m).
-- `exposure_towards_wind_flux`: wind exposure to the prevailing westerlies.
+- `exposure_towards_wind_flux`: wind exposure to the prevailing westerlies. TM05-148 uses
+  `fetch_analysis` instead (see [Wind exposure](#wind-exposure-tm05-148)).
 - `geomorphons`: landform classes such as ridge, hollow or valley.
 - `openness`.
 - `sky_view_factor` at 30 m, as a cold-air-pooling helper. TM05-147 uses
@@ -292,7 +294,7 @@ The code is in `backend/terrain/`:
 
 | Module | Does |
 |---|---|
-| `tools.yml` | The registry: runtime pin, DEM source, grids, tools, and classification thresholds |
+| `tools.yml` | The registry: runtime pin, DEM source, grids, per-region values (`regional`), tools, and classification thresholds |
 | `registry.py` | Loads and validates `tools.yml`. A typo fails at load, naming the tool. |
 | `runtime.py` | Runs a GeoLibre tool in-process (wasmtime). Checks the runtime's sha256, caches the compiled module, and reports each call's peak memory. |
 | `dem.py` | 3DEP source tiles (downloaded once, re-fetched when Last-Modified changes), the region VRT and mosaics, and grid tiles cut with GDAL warp |
@@ -330,6 +332,7 @@ The code is in `backend/terrain/`:
    - facing and sun, from aspect, or "flat" under 4°
    - shelter, from DEV
    - cold-air pooling, from the elevation percentile (TM05-147)
+   - wind exposure, from the upwind distance to rising ground (TM05-148)
    - water view: at least 5,000 m² of NHD lake or pond inside the viewshed
 
 **Idempotent and resumable.**
@@ -402,8 +405,8 @@ site facts, can be ranked on the same ground classes a campsite gets
 Each recomputes its tool's chain rather than sharing it, because a tool writes one zone
 layer. That costs one more DEV pass (about 1 min CPU) and one more whole-region hydrology
 pass (about 1.5 min). TM05-147 (cold-air pooling, the `cold_air` tool) and TM05-148 (wind
-exposure) plug into the same ranking by writing layers named `cold-air` and
-`wind-exposure` (`backend/planning/candidates.yml`).
+exposure, the `wind` tool) plug into the same ranking by writing layers named `cold-air`
+and `wind-exposure` (`backend/planning/candidates.yml`).
 
 A new **class** shown in the app (like `pooling` or `shelter`) needs one small function in
 `mappers.py`, plus a column on `TerrainFacts` if scoring or filtering reads it. A new
@@ -460,6 +463,92 @@ ground in the window that is lower than it: 0 is the lowest cell around, 50 a mi
     why `high` means the lowest tenth.
   - Bare earth: forest cover, which slows the drainage, isn't counted.
   - The thresholds are first estimates, not yet tuned against a full region run.
+
+### Wind exposure (TM05-148)
+
+The `shelter` class says whether a site stands above or below the ground around it, in
+any direction. Wind exposure asks something narrower: is the ground upwind of the
+site, towards the direction the wind usually comes from, open, or does a ridge or valley
+wall break that wind?
+
+**The tool.** `fetch_analysis` on its own 90 m `wind` grid. For each cell it searches
+upwind, towards `wind_from_deg`, for the first ground that rises against the wind by more
+than `hgt_inc` (5%, about 3°) above the cell. The result is the distance to that ground in
+metres, the *fetch*. A negative value means nothing rose before the DEM ended, and gives
+the distance searched. Each site samples the median within 90 m, as `wind_fetch_m`.
+
+| Class | `wind_fetch_m` | The panel says |
+|---|---|---|
+| `sheltered` | 0 to 300 m | "Ground rises against a west wind about 120 m upwind, breaking it before it reaches here." |
+| `moderate` | 300 m to 1 km | "Partly open to a west wind: the nearest ground rising against it is about 640 m upwind." |
+| `exposed` | 1 km and up, or nothing rising within at least 1 km | "Open to a west wind: about 2.5 km of open ground upwind." |
+
+- **The thresholds** are `classify.wind` (`sheltered_within_m`, `exposed_from_m`). The
+  `wind-exposure` zone layer uses the same values. It holds `moderate` and `exposed`, the
+  two classes the potential-campsite ranking reads (`planning/candidates.yml`, `wind`).
+  Sheltered ground isn't zoned.
+- **Seams.** Tiles overlap by 1,500 m, more than the 1 km at which ground counts as
+  exposed. So a core cell's class is the same whichever tile computes it, even though the
+  raw fetch past 1.5 km depends on the tile.
+- **The region's edge.** There, the search stops short. A site whose search reached
+  less than 1 km with nothing rising is *unknown*, not exposed. The zones count any
+  negative value as exposed, so a strip along the region's upwind edge can be over-stated
+  on the map.
+- **Why 90 m.** On flat ground, such as a big lake, `fetch_analysis` walks to the tile
+  edge from every cell, so its cost grows with the cube of the tile width.
+  - Measured on synthetic DEMs: 49 s for 1,000² flat cells, 21 s for 1,000² rugged cells
+    (25 MB of WASM memory).
+  - At the 30 m grid's 3,000-cell tiles, the flat case would take about 25 minutes a tile.
+  - At 90 m, a 1,000-cell tile (90 km) stays near a minute even when flat. Wind shelter is
+    a landscape-scale effect, so 90 m loses little.
+- **Why not `exposure_towards_wind_flux`.** On test planes, its horizon component behaved
+  as documented: a 200 m wall 600 m upwind gave +0.30 rad. But its surface-angle
+  component gave a north-facing slope a positive "exposure" to a north wind and a
+  crosswind plane a non-zero value. We couldn't explain its sign, so it isn't used.
+
+**The prevailing wind, per region.** `regional.wind_from_deg` in `tools.yml` is the
+compass bearing the wind blows **from**, the convention `fetch_analysis` uses. That was
+checked: a wall to the west is found at `azimuth: 270`. A region not listed uses
+`default`. `Registry.for_region()` fills the value into the tool's `{wind_from_deg}`
+argument for the region being run.
+
+- Each site stores the direction it was classified for (`TerrainFacts.wind_from_deg`).
+  The panel shows it with the class: "Estimate, assuming the prevailing wind is from the
+  west (270°)".
+- Changing a direction changes the registry digest, so the next run recomputes its tiles.
+
+**The Adirondacks: 270°, from the west.**
+
+- **Source:** ten years (2016–2025) of hourly 10 m wind from the
+  [Open-Meteo Historical Weather API](https://open-meteo.com/en/docs/historical-weather-api)
+  (ERA5 reanalysis), the same provider as the app's forecasts. Four points were sampled
+  across the park, with calm hours (under 1 m/s) left out.
+- **Evidence:** the script and its output are in `artifacts/terrain/wind/`
+  (`wind_rose.py`, `adirondacks-wind-rose.json`).
+
+| Point | Most frequent sector (share of windy hours) | Resultant wind, from |
+|---|---|---|
+| Marcy Dam (High Peaks) | W, 27.5% (then S 19.4%, SW 18.7%) | 249° |
+| Lake Placid | W, 28.3% (then SW 25.7%) | 241° |
+| Newcomb (central) | NW, 31.7% (then W 21.4%) | 282° |
+| Old Forge (southwest) | W, 20.6% (then S 19.8%, SW 19.3%) | 234° |
+| **All four** | **W, 24.5%** (27.9% weighted by speed) | |
+
+- West is the most frequent sector overall and at three of the four points, and it is
+  also the strongest.
+- The resultant runs from 234° to 282° between points, which brackets 270°. The valleys
+  steer surface wind locally, which no single direction captures.
+- `white-mountains-nh` and any other region use the `default` (270°) until someone gives
+  them their own.
+
+**What it leaves out.**
+
+- One prevailing direction: a storm from the southeast, or a calm night, isn't the
+  prevailing wind.
+- Bare earth: forest breaks most wind at ground level, and the model doesn't see it.
+- Funnelling along valleys and speed-up over ridges aren't modelled. Only whether
+  terrain stands in the wind's way upwind is.
+- The thresholds are first estimates, not yet tuned against a full region run.
 
 ### Measured: the Adirondacks (2026-10-23)
 
