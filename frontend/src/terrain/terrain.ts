@@ -10,11 +10,15 @@
 
 export type PoolingLevel = "low" | "medium" | "high";
 export type ShelterLevel = "sheltered" | "moderate" | "exposed";
+/** TM05-147: how much cold air settles at the site on calm nights. */
+export type ColdAirLevel = "low" | "medium" | "high";
 
 export interface TerrainPayload {
   pooling: { level: PoolingLevel; reason: string } | null;
   sun: { facing: string; label: string } | null;
   shelter: { level: ShelterLevel; reason: string } | null;
+  /** TM05-147; absent from a payload older than the cold-air tool. */
+  cold_air?: { level: ColdAirLevel; reason: string } | null;
   view: { area_km2: number | null; direction: string | null; water: boolean | null } | null;
   has_viewshed: boolean;
   note: string;
@@ -28,13 +32,18 @@ export interface TerrainBadges {
 }
 
 export interface TerrainLine {
-  key: "pooling" | "sun" | "shelter" | "view";
+  key: "pooling" | "sun" | "shelter" | "cold_air" | "view";
   label: string;
   value: string;
   detail: string | null;
-  /** For styling: a pooling or shelter level. */
+  /** For styling: a pooling, shelter or cold-air level. */
   tone: string | null;
+  /** What kind of estimate the line is, shown under it, e.g. "Terrain estimate". */
+  estimate?: string;
 }
+
+/** TM05-147: the cold-air line's estimate label. */
+export const COLD_AIR_ESTIMATE = "Terrain estimate: where the ground sits among its surroundings, not a measurement";
 
 /** Shown under the section whenever it is. */
 export const TERRAIN_NOTE =
@@ -95,6 +104,16 @@ export function terrainLines(terrain: TerrainPayload | null | undefined): Terrai
       value: SHELTER_WORDS[terrain.shelter.level],
       detail: terrain.shelter.reason || null,
       tone: terrain.shelter.level,
+    });
+  }
+  if (terrain.cold_air) {
+    lines.push({
+      key: "cold_air",
+      label: "Cold-air pooling",
+      value: terrain.cold_air.level,
+      detail: terrain.cold_air.reason || null,
+      tone: terrain.cold_air.level,
+      estimate: COLD_AIR_ESTIMATE,
     });
   }
   const view = terrain.view ? viewText(terrain.view) : null;
