@@ -42,6 +42,25 @@ grids:
     overlap_m: 1000
     # Only tiles with a campsite in their core: nothing on this grid makes zones.
     sites_only: true
+  # TM05-148: wind exposure. fetch_analysis searches upwind until terrain rises against
+  # the wind, so on flat ground (a big lake) it walks to the tile edge from every cell and
+  # its cost grows with the cube of the tile width: 49 s for 1,000 x 1,000 flat cells, ~25
+  # min at the coarse grid's tile size. Wind shelter is a landscape-scale effect (hundreds
+  # of metres), so 90 m cells are fine for it and keep a worst-case tile near a minute.
+  wind:
+    resolution_m: 90
+    tile_cells: 1000
+    overlap_m: 1500
+
+# TM05-148: values that differ by region (pipeline/regions.yml names), used in step
+# arguments as {name}. A region not listed uses `default`. Changing one changes the
+# registry digest, so the tiles that read it are recomputed on the next run.
+regional:
+  # The prevailing wind: the compass direction it blows FROM, in degrees clockwise from
+  # north. docs/terrain-analysis.md ("Wind exposure") says where each value comes from.
+  wind_from_deg:
+    default: 270
+    adirondacks: 270
 
 # Each tool is a chain of GeoLibre calls on one grid. `{dem}` is the grid's DEM tile and
 # `{<step>}` an earlier step's output; the last step's output is the tool's raster.
@@ -153,6 +172,30 @@ tools:
       min_area_m2: 20000
       simplify_m: 30
 
+  # TM05-148: exposure to the region's prevailing wind. fetch_analysis gives each cell the
+  # distance upwind (towards `wind_from_deg`) to the first ground that rises against the
+  # wind by more than `hgt_inc` (5%, about 3 degrees) above it. A short distance means a
+  # ridge or valley wall breaks the wind; negative means nothing rose before the DEM ended
+  # (minus the distance searched), which is open ground.
+  wind:
+    grid: wind
+    steps:
+      - {id: fetch, tool: fetch_analysis, args: {input: "{dem}", azimuth: "{wind_from_deg}", hgt_inc: 0.05}}
+    facts:
+      wind_fetch_m: {sample: median, radius_m: 90}
+    zones:
+      # planning/candidates.yml ranks potential campsites on this layer by name.
+      layer: wind-exposure
+      # The same distances as a site's wind class (classify, below). Nothing rising within
+      # the search (negative) and 1 km or more of open ground upwind are both `exposed`.
+      # Sheltered ground isn't zoned: the ranking only reads moderate and exposed.
+      classes:
+        - {class: exposed, max: 0.0}
+        - {class: moderate, min: 300.0, max: 1000.0}
+        - {class: exposed, min: 1000.0}
+      min_area_m2: 50000
+      simplify_m: 90
+
   viewshed:
     grid: coarse
     # One viewshed per campsite on a window around it, not a tiled raster.
@@ -187,6 +230,11 @@ classify:
     # On `dev`, standard deviations above the surrounding terrain.
     exposed_from: 1.0
     sheltered_below: -0.75
+  wind:
+    # On `wind_fetch_m`, metres upwind to the first ground rising against the wind.
+    # Sheltered: it rises within 300 m; exposed: 1 km or more of open ground upwind.
+    sheltered_within_m: 300.0
+    exposed_from_m: 1000.0
   cold_air:
     # On `elev_percentile`, the share (%) of the ground within ~1 km lower than the site.
     # High: in the lowest tenth, where cold air settles; medium: the lowest quarter.

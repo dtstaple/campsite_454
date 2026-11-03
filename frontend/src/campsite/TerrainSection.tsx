@@ -1,6 +1,6 @@
 /**
  * The campsite panel's Terrain section (TM05-142): pooling risk, sun, shelter, cold-air
- * pooling (TM05-147) and view,
+ * pooling (TM05-147), prevailing-wind exposure (TM05-148) and view,
  * from the terrain pipeline's precomputed facts, so it shows instantly with the panel.
  * Wording lives in terrain/terrain.ts. "Show what I can see" draws the site's viewshed
  * on the map. Every estimate carries the bare-earth caveat.

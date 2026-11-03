@@ -439,3 +439,30 @@ def test_cold_air_zones_are_served_with_their_class(client):
     features = decode_tile(get_tile(client, "cold-air", 12).content)["cold-air"]["features"]
     assert sorted(f["properties"]["zone_class"] for f in features) == ["high", "medium"]
     assert get_tile(client, "cold-air", 7).status_code == 204
+
+
+def test_wind_exposure_zones_are_served_with_their_class(client):
+    """TM05-148: the `wind-exposure` layer serves its merged exposed and moderate zones."""
+    from terrain.models import TerrainZone
+
+    square = Polygon.from_bbox((LON - 0.005, LAT - 0.005, LON + 0.005, LAT + 0.005))
+    square.srid = 4326
+    shape = MultiPolygon(square, srid=4326)
+    for zone_class in ("exposed", "moderate"):
+        TerrainZone.objects.create(
+            region="adirondacks",
+            layer="wind-exposure",
+            zone_class=zone_class,
+            area_m2=1,
+            geom=shape,
+        )
+    TerrainZone.objects.create(
+        region="adirondacks", layer="cold-air", zone_class="high", area_m2=1, geom=shape
+    )
+
+    layer = decode_tile(get_tile(client, "wind-exposure", 12).content)["wind-exposure"]
+    assert sorted(f["properties"]["zone_class"] for f in layer["features"]) == [
+        "exposed",
+        "moderate",
+    ]
+    assert get_tile(client, "wind-exposure", 7).status_code == 204

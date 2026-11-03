@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 
+from terrain.mappers import sector
 from terrain.models import TerrainFacts
 
 #: The caveat the app shows with every terrain fact.
@@ -49,6 +50,15 @@ def detail(site) -> dict | None:
         # TM05-147: how much cold air settles here on calm nights.
         "cold_air": {"level": facts.cold_air, "reason": facts.cold_air_reason}
         if facts.cold_air
+        else None,
+        # TM05-148: exposure to the prevailing wind, with the direction it assumes.
+        "wind": {
+            "level": facts.wind,
+            "reason": facts.wind_reason,
+            "from_deg": facts.wind_from_deg,
+            "from": sector(facts.wind_from_deg) if facts.wind_from_deg is not None else None,
+        }
+        if facts.wind
         else None,
         "view": view,
         "has_viewshed": facts.viewshed is not None,

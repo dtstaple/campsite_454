@@ -19,6 +19,11 @@ export interface TerrainPayload {
   shelter: { level: ShelterLevel; reason: string } | null;
   /** TM05-147; absent from a payload older than the cold-air tool. */
   cold_air?: { level: ColdAirLevel; reason: string } | null;
+  /**
+   * TM05-148: exposure to the region's prevailing wind, with the direction assumed:
+   * `from_deg` is the compass bearing it blows from, `from` its 8-point name.
+   */
+  wind?: { level: ShelterLevel; reason: string; from_deg: number | null; from: string | null } | null;
   view: { area_km2: number | null; direction: string | null; water: boolean | null } | null;
   has_viewshed: boolean;
   note: string;
@@ -32,7 +37,7 @@ export interface TerrainBadges {
 }
 
 export interface TerrainLine {
-  key: "pooling" | "sun" | "shelter" | "cold_air" | "view";
+  key: "pooling" | "sun" | "shelter" | "cold_air" | "wind" | "view";
   label: string;
   value: string;
   detail: string | null;
@@ -54,6 +59,22 @@ const SHELTER_WORDS: Record<ShelterLevel, string> = {
   moderate: "Moderate shelter",
   exposed: "Exposed",
 };
+
+const WIND_WORDS: Record<ShelterLevel, string> = {
+  sheltered: "Wind-sheltered",
+  moderate: "Moderate",
+  exposed: "Exposed",
+};
+
+/**
+ * TM05-148: the wind line's estimate label, naming the direction it assumes:
+ * "Estimate, assuming the prevailing wind is from the west (270°)".
+ */
+export function windEstimate(wind: NonNullable<TerrainPayload["wind"]>): string {
+  if (wind.from_deg === null) return "Estimate, for the region's prevailing wind";
+  const name = wind.from ? `the ${wind.from} ` : "";
+  return `Estimate, assuming the prevailing wind is from ${name}(${Math.round(wind.from_deg)}°)`;
+}
 
 /** "4.2 km²", "0.35 km²" or "12 km²". */
 export function area(km2: number): string {
@@ -114,6 +135,16 @@ export function terrainLines(terrain: TerrainPayload | null | undefined): Terrai
       detail: terrain.cold_air.reason || null,
       tone: terrain.cold_air.level,
       estimate: COLD_AIR_ESTIMATE,
+    });
+  }
+  if (terrain.wind) {
+    lines.push({
+      key: "wind",
+      label: "Prevailing wind",
+      value: WIND_WORDS[terrain.wind.level],
+      detail: terrain.wind.reason || null,
+      tone: terrain.wind.level,
+      estimate: windEstimate(terrain.wind),
     });
   }
   const view = terrain.view ? viewText(terrain.view) : null;

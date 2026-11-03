@@ -151,6 +151,45 @@ def cold_air(values: dict, cfg: dict) -> tuple[str, str]:
     return "low", f"Cold air drains away: {round(rank)}% of the land within about 1 km is lower."
 
 
+def wind(values: dict, cfg: dict, from_deg: float | None) -> tuple[str, str]:
+    """Exposure to the prevailing wind (TM05-148): sheltered, moderate or exposed, from
+    how far upwind the ground first rises against a wind from `from_deg`.
+
+    `wind_fetch_m` is fetch_analysis's distance to that ground. Negative means nothing
+    rose before the DEM ended, after searching that many metres: open ground when the
+    search reached `exposed_from_m`, and unknown when the region's edge cut it shorter.
+    """
+    fetch = values.get("wind_fetch_m")
+    if fetch is None or from_deg is None:
+        return "", ""
+    side = sector(from_deg)
+    within, exposed = cfg["sheltered_within_m"], cfg["exposed_from_m"]
+    if fetch < 0:
+        if -fetch < exposed:
+            return "", ""
+        return (
+            "exposed",
+            f"Open to a {side} wind: no ground rises against it for at least "
+            f"{-fetch / 1000:.1f} km upwind.",
+        )
+    if fetch < within:
+        return (
+            "sheltered",
+            f"Ground rises against a {side} wind about {round(fetch, -1):.0f} m upwind, "
+            "breaking it before it reaches here.",
+        )
+    if fetch < exposed:
+        return (
+            "moderate",
+            f"Partly open to a {side} wind: the nearest ground rising against it is about "
+            f"{round(fetch, -1):.0f} m upwind.",
+        )
+    return (
+        "exposed",
+        f"Open to a {side} wind: about {fetch / 1000:.1f} km of open ground upwind.",
+    )
+
+
 # --- viewshed -----------------------------------------------------------------------
 
 

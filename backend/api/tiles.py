@@ -139,6 +139,15 @@ TILE_LAYERS: dict[str, TileLayer] = {
         where="layer = 'cold-air' AND tile = ''",
         full_detail_zoom=12,
     ),
+    # TM05-148: ground open to the region's prevailing wind (exposed and moderate).
+    "wind-exposure": TileLayer(
+        name="wind-exposure",
+        model=TerrainZone,
+        minzoom=8,
+        attributes=((0, ("zone_class",)),),
+        where="layer = 'wind-exposure' AND tile = ''",
+        full_detail_zoom=12,
+    ),
 }
 
 
