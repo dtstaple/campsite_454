@@ -7,6 +7,7 @@ import {
   TERRAIN_NOTE,
   terrainBadges,
   terrainLines,
+  windEstimate,
   type TerrainPayload,
 } from "../src/terrain/terrain.ts";
 import { measurementText, parseScore } from "../src/score/breakdown.ts";
@@ -16,12 +17,18 @@ const FULL: TerrainPayload = {
   sun: { facing: "east", label: "morning sun" },
   shelter: { level: "sheltered", reason: "Lies lower than the ground around it, out of the wind." },
   cold_air: { level: "high", reason: "In the lowest ground around." },
+  wind: {
+    level: "exposed",
+    reason: "Open to a west wind: about 2.5 km of open ground upwind.",
+    from_deg: 270,
+    from: "west",
+  },
   view: { area_km2: 4.2, direction: "east", water: true },
   has_viewshed: true,
   note: TERRAIN_NOTE,
 };
 
-test("a site with every fact gets five lines in order, worded as the panel shows them", () => {
+test("a site with every fact gets six lines in order, worded as the panel shows them", () => {
   const lines = terrainLines(FULL);
   assert.deepEqual(
     lines.map((l) => [l.label, l.value]),
@@ -30,6 +37,7 @@ test("a site with every fact gets five lines in order, worded as the panel shows
       ["Sun", "Faces east: morning sun"],
       ["Wind", "Sheltered"],
       ["Cold-air pooling", "high"],
+      ["Prevailing wind", "Exposed"],
       ["View", "4.2 km², mostly east · water view"],
     ],
   );
@@ -43,6 +51,7 @@ test("partial facts: each unknown fact is left out, never shown as zero or 'unkn
     sun: null,
     shelter: null,
     cold_air: null,
+    wind: null,
     view: { area_km2: null, direction: null, water: null },
   });
   assert.deepEqual(
@@ -61,6 +70,20 @@ test("cold-air pooling is labelled as a terrain estimate, with its reason (TM05-
   assert.match(line.estimate!, /^Terrain estimate/);
   const older: TerrainPayload = { ...FULL, cold_air: undefined };
   assert.ok(!terrainLines(older).some((l) => l.key === "cold_air"), "an older payload has no line");
+});
+
+test("prevailing wind shows the direction it assumes, labelled as an estimate (TM05-148)", () => {
+  const line = terrainLines(FULL).find((l) => l.key === "wind")!;
+  assert.equal(line.tone, "exposed");
+  assert.equal(line.detail, "Open to a west wind: about 2.5 km of open ground upwind.");
+  assert.equal(line.estimate, "Estimate, assuming the prevailing wind is from the west (270°)");
+  const sheltered = terrainLines({ ...FULL, wind: { ...FULL.wind!, level: "sheltered" } });
+  assert.equal(sheltered.find((l) => l.key === "wind")!.value, "Wind-sheltered");
+  assert.equal(
+    windEstimate({ level: "moderate", reason: "", from_deg: 292.5, from: "northwest" }),
+    "Estimate, assuming the prevailing wind is from the northwest (293°)",
+  );
+  assert.ok(!terrainLines({ ...FULL, wind: undefined }).some((l) => l.key === "wind"));
 });
 
 test("missing facts: no terrain block means no section", () => {
