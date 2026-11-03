@@ -239,6 +239,7 @@ def classify(registry: Registry, site_ids: list[int]) -> None:
         row.pooling, row.pooling_reason = mappers.pooling(row.values, cfg["pooling"])
         row.facing, row.sun = mappers.sun(row.values, cfg["sun"])
         row.shelter, row.shelter_reason = mappers.shelter(row.values, cfg["shelter"])
+        row.cold_air, row.cold_air_reason = mappers.cold_air(row.values, cfg["cold_air"])
         if row.viewshed is not None:
             with connection.cursor() as cursor:
                 cursor.execute(
@@ -403,6 +404,7 @@ def run(
         "pooling": facts.exclude(pooling="").count(),
         "facing": facts.exclude(facing="").count(),
         "shelter": facts.exclude(shelter="").count(),
+        "cold_air": facts.exclude(cold_air="").count(),
         "viewshed": facts.exclude(viewshed=None).count(),
         "water_view": facts.filter(water_view=True).count(),
     }

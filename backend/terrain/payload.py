@@ -46,6 +46,10 @@ def detail(site) -> dict | None:
         "shelter": {"level": facts.shelter, "reason": facts.shelter_reason}
         if facts.shelter
         else None,
+        # TM05-147: how much cold air settles here on calm nights.
+        "cold_air": {"level": facts.cold_air, "reason": facts.cold_air_reason}
+        if facts.cold_air
+        else None,
         "view": view,
         "has_viewshed": facts.viewshed is not None,
         "note": NOTE,

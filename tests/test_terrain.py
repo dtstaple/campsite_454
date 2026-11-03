@@ -185,6 +185,45 @@ def test_shelter_thresholds(dev, expected):
     assert mappers.shelter({"dev": dev}, REAL.classify["shelter"])[0] == expected
 
 
+@pytest.mark.parametrize(
+    ("rank", "expected"),
+    [
+        (0.0, "high"),  # the lowest cell around
+        (9.99, "high"),
+        (10.0, "medium"),  # at the medium threshold
+        (24.99, "medium"),
+        (25.0, "low"),
+        (60.0, "low"),
+        (None, ""),
+    ],
+)
+def test_cold_air_thresholds(rank, expected):
+    """TM05-147: high in the lowest tenth of the ground around, medium in the lowest
+    quarter, low above it; unknown when the percentile wasn't sampled."""
+    values = {} if rank is None else {"elev_percentile": rank}
+    level, reason = mappers.cold_air(values, REAL.classify["cold_air"])
+    assert level == expected
+    assert bool(reason) == bool(expected)
+
+
+def test_cold_air_reasons_say_how_low_the_site_sits():
+    cfg = REAL.classify["cold_air"]
+    assert "higher than only 4% of the land" in mappers.cold_air({"elev_percentile": 4.2}, cfg)[1]
+    assert (
+        "82% of the land within about 1 km is higher"
+        in (mappers.cold_air({"elev_percentile": 18.0}, cfg)[1])
+    )
+    assert "drains away" in mappers.cold_air({"elev_percentile": 70.0}, cfg)[1]
+
+
+def test_cold_air_zones_and_site_classes_share_thresholds():
+    """The map's cold-air zones and the panel's class can't disagree about a site."""
+    cfg = REAL.classify["cold_air"]
+    high, medium = REAL.tools["cold_air"].zones.classes
+    assert high.max == cfg["high_below"]
+    assert (medium.min, medium.max) == (cfg["high_below"], cfg["medium_below"])
+
+
 def test_view_stats_area_and_main_direction():
     # 21x21 cells of 30 m, site in the middle; a wedge opening to the east visible.
     width = height = 21
@@ -398,6 +437,9 @@ class FakeGeoLibre:
             values = [90.0] * len(values)
         elif tool == "deviation_from_mean_elevation":
             values = [(v - 620) / 20 for v in values]
+        elif tool == "elevation_percentile":
+            # The bowl's floor is the lowest ground around; everywhere else mid-slope.
+            values = [5.0 if v < 602 else 50.0 for v in values]
         output = Path(args.get("output", "/work/out.tif")).name
         return runtime.Result(
             {output: _like(src, values, f"{tool}-{len(self.calls)}")}, [], 1 << 20
@@ -473,6 +515,7 @@ def synthetic(tmp_path, monkeypatch, settings):
     raw["tools"]["viewshed"]["per_site"]["radius_m"] = 300
     raw["tools"]["wetness"]["zones"]["min_area_m2"] = 0
     raw["tools"]["position"]["zones"]["min_area_m2"] = 0
+    raw["tools"]["cold_air"]["zones"]["min_area_m2"] = 0
     path = tmp_path / "tools.yml"
     path.write_text(yaml.safe_dump(raw))
 
@@ -508,6 +551,12 @@ def test_the_pipeline_writes_facts_zones_and_provenance(synthetic):
     assert bowl.shelter in {"sheltered", "moderate", "exposed"}
     assert bowl.view_area_km2 > 0 and bowl.viewshed is not None
     assert bowl.water_view is True  # the pond sits inside its (all-visible) viewshed
+    assert bowl.values["elev_percentile"] == pytest.approx(5.0)
+    assert bowl.cold_air == "high" and "lowest ground around" in bowl.cold_air_reason
+    assert rim.cold_air == "low"
+    cold = TerrainZone.objects.filter(region="testland", layer="cold-air", tile="")
+    assert set(cold.values_list("zone_class", flat=True)) == {"high"}
+    assert run.counts["coverage"]["cold_air"] == 2
 
     pooling = TerrainZone.objects.filter(region="testland", layer="pooling-risk", tile="")
     assert pooling.exists()

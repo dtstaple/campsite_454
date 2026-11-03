@@ -130,6 +130,15 @@ TILE_LAYERS: dict[str, TileLayer] = {
         where="layer = 'exposure' AND tile = ''",
         full_detail_zoom=12,
     ),
+    # TM05-147: hollows and valley floors where cold air settles (high and medium).
+    "cold-air": TileLayer(
+        name="cold-air",
+        model=TerrainZone,
+        minzoom=8,
+        attributes=((0, ("zone_class",)),),
+        where="layer = 'cold-air' AND tile = ''",
+        full_detail_zoom=12,
+    ),
 }
 
 

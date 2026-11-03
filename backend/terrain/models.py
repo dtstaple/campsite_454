@@ -95,6 +95,9 @@ class TerrainFacts(models.Model):
     sun = models.CharField(max_length=48, blank=True)
     shelter = models.CharField(max_length=10, choices=Shelter.choices, blank=True)
     shelter_reason = models.CharField(max_length=160, blank=True)
+    #: TM05-147: how much cold air settles here on calm nights (low, medium or high).
+    cold_air = models.CharField(max_length=8, choices=Pooling.choices, blank=True)
+    cold_air_reason = models.CharField(max_length=160, blank=True)
     view_area_km2 = models.FloatField(null=True, blank=True)
     #: The sector holding the most visible ground, or "all around".
     view_direction = models.CharField(max_length=16, blank=True)
