@@ -39,6 +39,7 @@ def test_the_shipped_registry_loads():
         "wetness", "sink", "slope", "aspect", "position", "viewshed",
         "shelter", "damp",  # TM05-153, zones only, for the potential-campsite search
         "cold_air",  # TM05-147
+        "wind",  # TM05-148
     }  # fmt: skip
     assert REAL.tools["wetness"].grid.resolution_m == 45
     assert REAL.tools["wetness"].grid.tile_cells is None  # whole region in one piece
@@ -59,7 +60,7 @@ def test_every_registered_geolibre_tool_is_in_the_v1_7_1_manifest():
     known = {
         "fill_depressions", "dinf_flow_accum", "slope", "wetness_index", "depth_in_sink",
         "aspect", "deviation_from_mean_elevation", "viewshed",
-        "elevation_percentile",
+        "elevation_percentile", "fetch_analysis",
     }  # fmt: skip
     used = {name for tool in REAL.tools.values() for name in tool.geolibre_tools}
     assert used <= known
@@ -79,7 +80,7 @@ def write_registry(tmp_path, change) -> Path:
         (lambda r: r["tools"]["sink"].update(grid="nowhere"), "unknown grid 'nowhere'"),
         (
             lambda r: r["tools"]["wetness"]["steps"][1]["args"].update(input="{later}"),
-            "'{later}' is not the dem or an earlier step",
+            "'{later}' is not the dem, an earlier step or a regional value",
         ),
         (
             lambda r: r["tools"]["slope"]["facts"]["slope_deg"].update(sample="mode"),
@@ -95,11 +96,68 @@ def write_registry(tmp_path, change) -> Path:
             "facts named by more than one tool",
         ),
         (lambda r: r["grids"]["fine"].update(resolution_m=0), "resolution_m must be positive"),
+        (lambda r: r["regional"]["wind_from_deg"].pop("default"), "needs a 'default'"),
     ],
 )
 def test_a_malformed_registry_fails_at_load_with_the_tool_named(tmp_path, change, message):
     with pytest.raises(registry.RegistryError, match=message):
         registry.load(write_registry(tmp_path, change))
+
+
+# --- regional values (TM05-148) -----------------------------------------------------
+
+
+def test_the_adirondacks_prevailing_wind_is_from_the_west():
+    """The documented default (docs/terrain-analysis.md, "Wind exposure")."""
+    assert REAL.regional_value("wind_from_deg", "adirondacks") == 270
+    assert REAL.regional_value("wind_from_deg", "somewhere-unlisted") == 270  # the default
+
+
+def test_every_region_given_a_wind_direction_is_in_regions_yml():
+    from pipeline.regions import list_regions
+
+    named = set(REAL.regional["wind_from_deg"]) - {"default"}
+    assert named <= set(list_regions())
+    for value in REAL.regional["wind_from_deg"].values():
+        assert 0 <= value < 360
+
+
+def test_for_region_fills_in_that_regions_wind_direction(tmp_path):
+    def other(raw):
+        raw["regional"]["wind_from_deg"]["white-mountains-nh"] = 290
+
+    loaded = registry.load(write_registry(tmp_path, other))
+    [step] = loaded.tools["wind"].steps
+    assert step.args["azimuth"] == "{wind_from_deg}"  # unresolved until a region is chosen
+    white = loaded.for_region("white-mountains-nh")
+    assert white.tools["wind"].steps[0].args["azimuth"] == 290
+    assert white.params == {"wind_from_deg": 290} and white.region == "white-mountains-nh"
+    assert loaded.for_region("adirondacks").tools["wind"].steps[0].args["azimuth"] == 270
+    # Every other argument is untouched.
+    assert white.tools["wind"].steps[0].args["input"] == "{dem}"
+    assert white.tools["wetness"] == loaded.tools["wetness"]
+
+
+def test_changing_a_regions_wind_direction_recomputes_its_tiles(tmp_path):
+    def turn(raw):
+        raw["regional"]["wind_from_deg"]["adirondacks"] = 250
+
+    assert registry.load(write_registry(tmp_path, turn)).digest != REAL.digest
+
+
+def test_wind_zones_are_moderate_and_exposed_ground():
+    """TM05-148: the `wind-exposure` layer, which the potential-campsite ranking reads.
+    Nothing rising upwind within the search (negative) is exposed, like 1 km or more of
+    open ground; sheltered ground (under 300 m) is in no zone."""
+    tool = REAL.tools["wind"]
+    assert tool.zones.layer == "wind-exposure"
+    assert tool.grid.resolution_m == 90
+    assert [s.tool for s in tool.steps] == ["fetch_analysis"]
+    assert worker.reclass_values(tool) == "1,-1e30,0.0;0,0.0,300.0;2,300.0,1000.0;3,1000.0,1e+30"
+    cfg = REAL.classify["wind"]
+    exposed, moderate, beyond = tool.zones.classes
+    assert (moderate.min, moderate.max) == (cfg["sheltered_within_m"], cfg["exposed_from_m"])
+    assert beyond.min == cfg["exposed_from_m"] and exposed.name == beyond.name == "exposed"
 
 
 def test_adding_a_tool_is_a_config_entry(tmp_path):

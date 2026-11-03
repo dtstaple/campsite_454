@@ -5,10 +5,15 @@ Loading validates everything that can be checked without running a tool. That co
 grid references, step references, sample methods and mapper names, and that zone classes
 are ordered. A typo in the config therefore fails at load, with the tool's name, rather
 than an hour into a run.
+
+TM05-148: `regional` holds values that differ by region, such as the prevailing wind
+direction. A step argument names one as `{wind_from_deg}`, and `Registry.for_region()`
+fills it in for the region being run.
 """
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import json
 import math
@@ -107,6 +112,46 @@ class Registry:
     classify: dict[str, Any]
     #: The parsed config, for provenance.
     raw: dict[str, Any] = field(repr=False)
+    #: TM05-148: per-region values by name, each {"default": v, <region>: v, ...}.
+    regional: dict[str, dict[str, Any]] = field(default_factory=dict)
+    #: The region `for_region()` resolved `regional` for, and the values it used.
+    region: str | None = None
+    params: dict[str, Any] = field(default_factory=dict)
+
+    def regional_value(self, name: str, region: str) -> Any:
+        """A `regional` value for one region: its own entry, or the default."""
+        values = self.regional[name]
+        return values.get(region, values["default"])
+
+    def for_region(self, region: str) -> Registry:
+        """This registry with every `{name}` of a `regional` value in step arguments
+        replaced by that region's value. Tile results stay keyed by `digest`, which covers
+        every region's values, so changing one recomputes the tiles that read it."""
+        params = {name: self.regional_value(name, region) for name in self.regional}
+
+        def fill(value):
+            if not isinstance(value, str):
+                return value
+            whole = _REFERENCE.fullmatch(value)
+            if whole and whole.group(1) in params:
+                return params[whole.group(1)]
+            for name, resolved in params.items():
+                value = value.replace(f"{{{name}}}", str(resolved))
+            return value
+
+        tools = {
+            name: dataclasses.replace(
+                tool,
+                steps=tuple(
+                    dataclasses.replace(
+                        step, args={key: fill(value) for key, value in step.args.items()}
+                    )
+                    for step in tool.steps
+                ),
+            )
+            for name, tool in self.tools.items()
+        }
+        return dataclasses.replace(self, tools=tools, region=region, params=params)
 
     @property
     def digest(self) -> str:
@@ -202,7 +247,16 @@ def _zones(tool: str, body: dict | None) -> ZoneSpec | None:
     )
 
 
-def _tool(name: str, body: dict, grids: dict[str, Grid]) -> Tool:
+def _regional(body: dict | None) -> dict[str, dict[str, Any]]:
+    regional = {}
+    for name, values in (body or {}).items():
+        if not isinstance(values, dict) or "default" not in values:
+            raise RegistryError(f"regional {name}: needs a 'default', then optional regions")
+        regional[str(name)] = dict(values)
+    return regional
+
+
+def _tool(name: str, body: dict, grids: dict[str, Grid], regional=()) -> Tool:
     grid_name = _need(body, "grid", f"tool {name}")
     if grid_name not in grids:
         raise RegistryError(f"tool {name}: unknown grid '{grid_name}', use {list(grids)}")
@@ -213,11 +267,12 @@ def _tool(name: str, body: dict, grids: dict[str, Grid]) -> Tool:
             str(_need(raw, "tool", f"tool {name}")),
             dict(raw.get("args") or {}),
         )
-        known = {"dem"} | {s.id for s in steps}
+        known = {"dem"} | {s.id for s in steps} | set(regional)
         for ref in step.references():
             if ref not in known:
                 raise RegistryError(
-                    f"tool {name}, step {step.id}: '{{{ref}}}' is not the dem or an earlier step"
+                    f"tool {name}, step {step.id}: '{{{ref}}}' is not the dem, an earlier "
+                    "step or a regional value"
                 )
         steps.append(step)
     per_site = body.get("per_site")
@@ -240,8 +295,10 @@ def load(path: Path | str | None = None) -> Registry:
     path = Path(path) if path else DEFAULT_PATH
     raw = yaml.safe_load(path.read_text()) or {}
     grids = {name: _grid(name, body) for name, body in _need(raw, "grids", str(path)).items()}
+    regional = _regional(raw.get("regional"))
     tools = {
-        name: _tool(name, body, grids) for name, body in _need(raw, "tools", str(path)).items()
+        name: _tool(name, body, grids, regional)
+        for name, body in _need(raw, "tools", str(path)).items()
     }
     names = [fact.name for tool in tools.values() for fact in tool.facts]
     duplicated = sorted({n for n in names if names.count(n) > 1})
@@ -257,4 +314,5 @@ def load(path: Path | str | None = None) -> Registry:
         tools=tools,
         classify=dict(raw.get("classify") or {}),
         raw=raw,
+        regional=regional,
     )
