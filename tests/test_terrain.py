@@ -38,6 +38,7 @@ def test_the_shipped_registry_loads():
     assert set(REAL.tools) == {
         "wetness", "sink", "slope", "aspect", "position", "viewshed",
         "shelter", "damp",  # TM05-153, zones only, for the potential-campsite search
+        "cold_air",  # TM05-147
     }  # fmt: skip
     assert REAL.tools["wetness"].grid.resolution_m == 45
     assert REAL.tools["wetness"].grid.tile_cells is None  # whole region in one piece
@@ -58,6 +59,7 @@ def test_every_registered_geolibre_tool_is_in_the_v1_7_1_manifest():
     known = {
         "fill_depressions", "dinf_flow_accum", "slope", "wetness_index", "depth_in_sink",
         "aspect", "deviation_from_mean_elevation", "viewshed",
+        "elevation_percentile",
     }  # fmt: skip
     used = {name for tool in REAL.tools.values() for name in tool.geolibre_tools}
     assert used <= known
@@ -589,6 +591,19 @@ def test_zone_classes_can_be_a_band_or_below_a_value():
     in the raster is 0, no zone."""
     assert worker.reclass_values(REAL.tools["shelter"]) == "1,-1e30,-0.75;0,-0.75,1e+30"
     assert worker.reclass_values(REAL.tools["damp"]) == "0,-1e30,10.0;1,10.0,12.5;0,12.5,1e+30"
+
+
+def test_cold_air_zones_are_the_lowest_ground_around():
+    """TM05-147: high below the 10th elevation percentile, medium to the 25th, and the
+    layer is named `cold-air`, which the potential-campsite ranking reads."""
+    tool = REAL.tools["cold_air"]
+    assert tool.zones.layer == "cold-air"
+    assert [s.tool for s in tool.steps] == ["elevation_percentile"]
+    assert [(c.name, c.min, c.max) for c in tool.zones.classes] == [
+        ("high", None, 10.0),
+        ("medium", 10.0, 25.0),
+    ]
+    assert worker.reclass_values(tool) == "1,-1e30,10.0;2,10.0,25.0;0,25.0,1e+30"
 
 
 @pytest.mark.parametrize(

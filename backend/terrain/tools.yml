@@ -131,6 +131,28 @@ tools:
       min_area_m2: 20000
       simplify_m: 45
 
+  # TM05-147: cold-air pooling. On clear, calm nights air cooled by the ground runs
+  # downhill and settles in the lowest ground around, so a hollow or valley floor can be
+  # several degrees colder (and frostier, and damper with dew) than a bench 30 m above it.
+  # Elevation percentile over the same ~1 km window as `position`: the share of the
+  # surrounding ground that is lower than the site (0 = the lowest cell around).
+  cold_air:
+    grid: coarse
+    steps:
+      - {id: rank, tool: elevation_percentile, args: {input: "{dem}", filter_size_x: 33, filter_size_y: 33}}
+    facts:
+      elev_percentile: {sample: median, radius_m: 30}
+    zones:
+      # planning/candidates.yml ranks potential campsites on this layer by name.
+      layer: cold-air
+      # The same thresholds as a site's cold-air class (classify, below), so the map and
+      # the panel agree.
+      classes:
+        - {class: high, max: 10.0}
+        - {class: medium, min: 10.0, max: 25.0}
+      min_area_m2: 20000
+      simplify_m: 30
+
   viewshed:
     grid: coarse
     # One viewshed per campsite on a window around it, not a tiled raster.
@@ -165,6 +187,11 @@ classify:
     # On `dev`, standard deviations above the surrounding terrain.
     exposed_from: 1.0
     sheltered_below: -0.75
+  cold_air:
+    # On `elev_percentile`, the share (%) of the ground within ~1 km lower than the site.
+    # High: in the lowest tenth, where cold air settles; medium: the lowest quarter.
+    high_below: 10.0
+    medium_below: 25.0
   view:
     # Visible cells within this distance of the site don't count towards its direction.
     near_m: 200
