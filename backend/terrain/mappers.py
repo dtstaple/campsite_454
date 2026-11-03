@@ -123,6 +123,34 @@ def shelter(values: dict, cfg: dict) -> tuple[str, str]:
     return "moderate", "About level with the ground around it."
 
 
+def cold_air(values: dict, cfg: dict) -> tuple[str, str]:
+    """Cold-air pooling (TM05-147): low, medium or high, from the site's elevation
+    percentile, the share of the ground within about 1 km that lies lower than it.
+
+    On clear, calm nights air chilled by the ground drains downhill and settles in the
+    lowest ground around, so the lower a site sits among its surroundings, the colder,
+    frostier and damper with dew its nights. The zones (tools.yml `cold_air`) use the same
+    thresholds, so the map and the panel agree.
+    """
+    rank = values.get("elev_percentile")
+    if rank is None:
+        return "", ""
+    higher = round(100 - rank)
+    if rank < cfg["high_below"]:
+        return (
+            "high",
+            f"In the lowest ground around: higher than only {round(rank)}% of the land "
+            "within about 1 km, where cold air settles on clear, calm nights.",
+        )
+    if rank < cfg["medium_below"]:
+        return (
+            "medium",
+            f"Low-lying: {higher}% of the land within about 1 km is higher, so some cold "
+            "air drains down to here on calm nights.",
+        )
+    return "low", f"Cold air drains away: {round(rank)}% of the land within about 1 km is lower."
+
+
 # --- viewshed -----------------------------------------------------------------------
 
 

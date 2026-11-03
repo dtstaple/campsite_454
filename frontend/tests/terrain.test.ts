@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   area,
+  COLD_AIR_ESTIMATE,
   passesQuickFilters,
   TERRAIN_NOTE,
   terrainBadges,
@@ -14,12 +15,13 @@ const FULL: TerrainPayload = {
   pooling: { level: "low", reason: "Water drains away from here (wetness index 6.3)." },
   sun: { facing: "east", label: "morning sun" },
   shelter: { level: "sheltered", reason: "Lies lower than the ground around it, out of the wind." },
+  cold_air: { level: "high", reason: "In the lowest ground around." },
   view: { area_km2: 4.2, direction: "east", water: true },
   has_viewshed: true,
   note: TERRAIN_NOTE,
 };
 
-test("a site with every fact gets four lines in order, worded as the panel shows them", () => {
+test("a site with every fact gets five lines in order, worded as the panel shows them", () => {
   const lines = terrainLines(FULL);
   assert.deepEqual(
     lines.map((l) => [l.label, l.value]),
@@ -27,6 +29,7 @@ test("a site with every fact gets four lines in order, worded as the panel shows
       ["Water pooling risk", "low"],
       ["Sun", "Faces east: morning sun"],
       ["Wind", "Sheltered"],
+      ["Cold-air pooling", "high"],
       ["View", "4.2 km², mostly east · water view"],
     ],
   );
@@ -39,6 +42,7 @@ test("partial facts: each unknown fact is left out, never shown as zero or 'unkn
     ...FULL,
     sun: null,
     shelter: null,
+    cold_air: null,
     view: { area_km2: null, direction: null, water: null },
   });
   assert.deepEqual(
@@ -47,6 +51,16 @@ test("partial facts: each unknown fact is left out, never shown as zero or 'unkn
   );
   const noWater = terrainLines({ ...FULL, view: { area_km2: 0.35, direction: "all around", water: false } });
   assert.equal(noWater.at(-1)!.value, "0.35 km², all around");
+});
+
+test("cold-air pooling is labelled as a terrain estimate, with its reason (TM05-147)", () => {
+  const line = terrainLines(FULL).find((l) => l.key === "cold_air")!;
+  assert.equal(line.tone, "high");
+  assert.equal(line.detail, "In the lowest ground around.");
+  assert.equal(line.estimate, COLD_AIR_ESTIMATE);
+  assert.match(line.estimate!, /^Terrain estimate/);
+  const older: TerrainPayload = { ...FULL, cold_air: undefined };
+  assert.ok(!terrainLines(older).some((l) => l.key === "cold_air"), "an older payload has no line");
 });
 
 test("missing facts: no terrain block means no section", () => {

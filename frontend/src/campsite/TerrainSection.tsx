@@ -1,5 +1,6 @@
 /**
- * The campsite panel's Terrain section (TM05-142): pooling risk, sun, shelter and view,
+ * The campsite panel's Terrain section (TM05-142): pooling risk, sun, shelter, cold-air
+ * pooling (TM05-147) and view,
  * from the terrain pipeline's precomputed facts, so it shows instantly with the panel.
  * Wording lives in terrain/terrain.ts. "Show what I can see" draws the site's viewshed
  * on the map. Every estimate carries the bare-earth caveat.
@@ -27,6 +28,7 @@ export default function TerrainSection({ terrain, showing, onToggleView }: Props
             <dd>
               <span className={line.tone ? `terrain-value is-${line.tone}` : "terrain-value"}>{line.value}</span>
               {line.detail && <span className="campsite-sub">{line.detail}</span>}
+              {line.estimate && <span className="campsite-sub">{line.estimate}</span>}
             </dd>
           </div>
         ))}
