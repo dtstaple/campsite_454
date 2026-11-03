@@ -1367,6 +1367,7 @@ precomputed, so they cost nothing per request.
   "pooling": {"level": "low", "reason": "Water drains away from here (wetness index 7.2)."},
   "sun": {"facing": "southeast", "label": "morning and midday sun"},
   "shelter": {"level": "moderate", "reason": "About level with the ground around it."},
+  "cold_air": {"level": "medium", "reason": "Low-lying: 84% of the land within about 1 km is higher, so some cold air drains down to here on calm nights."},
   "view": {"area_km2": 7.1, "direction": "all around", "water": true},
   "has_viewshed": true,
   "note": "Terrain-model estimate from bare-earth elevation. Trees, buildings and recent changes aren't counted.",
@@ -1383,6 +1384,7 @@ values the app shows:
 | `pooling.level` | `low`, `medium` or `high` |
 | `sun.facing` | `north`, `northeast`, `east`, … or `flat` |
 | `shelter.level` | `sheltered`, `moderate` or `exposed` |
+| `cold_air.level` | `low`, `medium` or `high` (TM05-147): how much cold air settles here on clear, calm nights |
 | `view.direction` | a compass sector, or `all around` |
 | `view.water` | 1 ha or more of lake or pond visible within 2 km |
 
@@ -1505,8 +1507,9 @@ colours, with a legend, and lists the totals under "Terrain along the route", fo
 
 ### Map layers
 
-`/api/tiles/pooling-risk/…` and `/api/tiles/exposure/…` serve the zones, with the
-`zone_class` attribute, from zoom 8. See [Vector tiles](#vector-tiles-tm05-140).
+`/api/tiles/pooling-risk/…`, `/api/tiles/exposure/…` and `/api/tiles/cold-air/…`
+(TM05-147: `high` and `medium`) serve the zones, with the `zone_class` attribute, from
+zoom 8. See [Vector tiles](#vector-tiles-tm05-140).
 
 ## Conditions (TM05-120)
 

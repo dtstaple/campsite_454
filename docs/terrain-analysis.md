@@ -83,6 +83,7 @@ under [Resolutions](#resolutions-chosen-and-why).
 | Drainage, water pooling | `fill_depressions`, `breach_depressions_least_cost`, `d8_flow_accum`, `dinf_flow_accum`, `fd8_flow_accum`, `wetness_index` (TWI), `depth_in_sink`, `sink` | `fill_depressions` → `dinf_flow_accum` (SCA) → `wetness_index`, plus `depth_in_sink` |
 | Shelter / exposure | `deviation_from_mean_elevation` (DEV), `relative_topographic_position`, `openness`, `geomorphons`, `exposure_towards_wind_flux`, `sky_view_factor` | `deviation_from_mean_elevation` |
 | What you can see | `viewshed` (per station), `visibility_index`, `skyline_analysis` | `viewshed`, one station per site |
+| Cold-air pooling (TM05-147) | `elevation_percentile`, `relative_topographic_position`, `sky_view_factor`, `depth_in_sink` | `elevation_percentile` |
 | Zones as polygons | `reclass`, `raster_to_vector_polygons` | both |
 
 ## The DEM source: USGS 3DEP 1/3 arc-second, verified live
@@ -260,7 +261,8 @@ These are Sprint 8 candidates; none needs a new dependency:
 - `exposure_towards_wind_flux`: wind exposure to the prevailing westerlies.
 - `geomorphons`: landform classes such as ridge, hollow or valley.
 - `openness`.
-- `sky_view_factor` at 30 m, as a cold-air-pooling helper.
+- `sky_view_factor` at 30 m, as a cold-air-pooling helper. TM05-147 uses
+  `elevation_percentile` instead (see [Cold-air pooling](#cold-air-pooling-tm05-147)).
 
 ## Disk and caching
 
@@ -327,6 +329,7 @@ The code is in `backend/terrain/`:
    - pooling risk, from sink depth and the wetness index (the higher wins)
    - facing and sun, from aspect, or "flat" under 4°
    - shelter, from DEV
+   - cold-air pooling, from the elevation percentile (TM05-147)
    - water view: at least 5,000 m² of NHD lake or pond inside the viewshed
 
 **Idempotent and resumable.**
@@ -398,9 +401,9 @@ site facts, can be ranked on the same ground classes a campsite gets
 
 Each recomputes its tool's chain rather than sharing it, because a tool writes one zone
 layer. That costs one more DEV pass (about 1 min CPU) and one more whole-region hydrology
-pass (about 1.5 min). TM05-147 (cold-air pooling) and TM05-148 (wind exposure) plug into the
-same ranking by writing layers named `cold-air` and `wind-exposure`
-(`backend/planning/candidates.yml`).
+pass (about 1.5 min). TM05-147 (cold-air pooling, the `cold_air` tool) and TM05-148 (wind
+exposure) plug into the same ranking by writing layers named `cold-air` and
+`wind-exposure` (`backend/planning/candidates.yml`).
 
 A new **class** shown in the app (like `pooling` or `shelter`) needs one small function in
 `mappers.py`, plus a column on `TerrainFacts` if scoring or filtering reads it. A new
@@ -410,6 +413,53 @@ sampling method or per-site mapper is added to `SAMPLE_METHODS` or `MAPPERS` in
 A grid's `overlap_m` must be at least the widest neighbourhood any of its tools reads.
 `tests/test_terrain.py::test_tiling_with_overlap_has_no_seams` shows what happens
 otherwise.
+
+### Cold-air pooling (TM05-147)
+
+On clear, calm nights the ground cools the air touching it. That air is denser than the
+air above it, so it drains downhill and settles in the lowest ground around. A site in a
+hollow or on a valley floor can be several degrees colder than a bench 30 m above it, with
+more frost and heavier dew. The `cold_air` tool says where.
+
+**The tool.** `elevation_percentile` on the 30 m `coarse` grid, over a 33 × 33-cell (about
+1 km) window, the same window as `position`. Each cell gets the share (0–100%) of the
+ground in the window that is lower than it: 0 is the lowest cell around, 50 a mid-slope,
+100 a summit. Each site samples the median within 30 m, as `elev_percentile`.
+
+| Class | `elev_percentile` | The panel says |
+|---|---|---|
+| `high` | below 10 | "In the lowest ground around: higher than only 4% of the land within about 1 km, where cold air settles on clear, calm nights." |
+| `medium` | 10 to 25 | "Low-lying: 84% of the land within about 1 km is higher, so some cold air drains down to here on calm nights." |
+| `low` | 25 and up | "Cold air drains away: 60% of the land within about 1 km is lower." |
+
+- **The thresholds** are `classify.cold_air` (`high_below`, `medium_below`), and the
+  `cold-air` zone layer uses the same values. A test keeps the map and the panel in
+  agreement.
+- **The zones.** `high` and `medium` are polygonised, at least 2 ha each and simplified
+  to 30 m. `/api/tiles/cold-air/…` serves them, and the potential-campsite ranking reads
+  the layer by its name (`planning/candidates.yml`, `cold_air`).
+- **Why this tool.**
+  - It is one number that explains itself ("lower than 96% of the ground around").
+  - It is scale-free: a 20 m hollow on a plateau and a valley floor 300 m down both rank
+    low. Cold air drains to whatever is lowest nearby.
+  - It is cheap. On a synthetic 30 m DEM it took 2.5 s per million cells with 35 MB of
+    WASM memory (geolibre-wasm 1.7.1, WSL on a Windows laptop), so about 4 CPU-minutes
+    for the region's nine 30 m tiles.
+  - `relative_topographic_position` gives a similar signal about 100× slower (see
+    [Measurements](#measurements)).
+  - `sky_view_factor` measures enclosure, not lowness, and is too slow at region scale.
+  - `depth_in_sink` sees only closed depressions, not open valley floors, which are where
+    most Adirondack cold-air pools form.
+- **The 1 km window** fits the `coarse` grid's 1,500 m tile overlap, so tiling adds no
+  seams (`test_tiling_with_overlap_has_no_seams`).
+- **What it leaves out.**
+  - Cold air only pools on calm, clear nights. Wind or cloud mixes it away, and the
+    model doesn't know the weather.
+  - A valley that is open downhill drains some of its cold air on down. The percentile
+    can't tell a closed frost hollow from an open valley floor at the same rank, which is
+    why `high` means the lowest tenth.
+  - Bare earth: forest cover, which slows the drainage, isn't counted.
+  - The thresholds are first estimates, not yet tuned against a full region run.
 
 ### Measured: the Adirondacks (2026-10-23)
 
