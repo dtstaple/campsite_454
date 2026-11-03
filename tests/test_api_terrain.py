@@ -88,6 +88,9 @@ def full_facts(site):
         shelter_reason="Lies lower than the ground around it, out of the wind.",
         cold_air="high",
         cold_air_reason="In the lowest ground around.",
+        wind="exposed",
+        wind_reason="Open to a west wind: about 2.5 km of open ground upwind.",
+        wind_from_deg=270,
         view_area_km2=4.2,
         view_direction="east",
         water_view=True,
@@ -111,6 +114,12 @@ def test_detail_carries_every_terrain_fact_with_its_reason_and_the_caveat(client
     assert terrain["sun"] == {"facing": "east", "label": "morning sun"}
     assert terrain["shelter"]["level"] == "sheltered"
     assert terrain["cold_air"] == {"level": "high", "reason": "In the lowest ground around."}
+    assert terrain["wind"] == {
+        "level": "exposed",
+        "reason": "Open to a west wind: about 2.5 km of open ground upwind.",
+        "from_deg": 270,
+        "from": "west",
+    }
     assert terrain["view"] == {"area_km2": 4.2, "direction": "east", "water": True}
     assert terrain["has_viewshed"] is True
     assert terrain["note"] == NOTE
@@ -125,6 +134,7 @@ def test_partial_facts_are_null_one_by_one(client):
     assert terrain["sun"] is None
     assert terrain["shelter"] is None
     assert terrain["cold_air"] is None
+    assert terrain["wind"] is None
     assert terrain["view"] is None
     assert terrain["has_viewshed"] is False
 

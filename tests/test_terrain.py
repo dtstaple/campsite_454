@@ -282,6 +282,42 @@ def test_cold_air_zones_and_site_classes_share_thresholds():
     assert (medium.min, medium.max) == (cfg["high_below"], cfg["medium_below"])
 
 
+WIND = REAL.classify["wind"]
+
+
+@pytest.mark.parametrize(
+    ("fetch", "expected"),
+    [
+        (30.0, "sheltered"),  # a valley wall right upwind
+        (299.0, "sheltered"),
+        (300.0, "moderate"),  # at the moderate threshold
+        (999.0, "moderate"),
+        (1000.0, "exposed"),
+        (2500.0, "exposed"),
+        (-1500.0, "exposed"),  # nothing rose in the 1.5 km searched
+        (-400.0, ""),  # the region's edge cut the search short: unknown, not exposed
+        (None, ""),
+    ],
+)
+def test_wind_classification(fetch, expected):
+    """TM05-148: sheltered when ground rises against the wind within 300 m upwind, exposed
+    with 1 km or more of open ground, moderate between."""
+    values = {} if fetch is None else {"wind_fetch_m": fetch}
+    level, reason = mappers.wind(values, WIND, 270)
+    assert level == expected
+    assert bool(reason) == bool(expected)
+
+
+def test_wind_reasons_name_the_direction_assumed():
+    assert "west wind" in mappers.wind({"wind_fetch_m": 120.0}, WIND, 270)[1]
+    assert "about 120 m upwind" in mappers.wind({"wind_fetch_m": 123.0}, WIND, 270)[1]
+    assert "northwest wind" in mappers.wind({"wind_fetch_m": 500.0}, WIND, 300)[1]
+    assert "at least 1.5 km" in mappers.wind({"wind_fetch_m": -1500.0}, WIND, 270)[1]
+    assert "2.5 km of open ground" in mappers.wind({"wind_fetch_m": 2500.0}, WIND, 270)[1]
+    # No direction configured, no class.
+    assert mappers.wind({"wind_fetch_m": 2500.0}, WIND, None) == ("", "")
+
+
 def test_view_stats_area_and_main_direction():
     # 21x21 cells of 30 m, site in the middle; a wedge opening to the east visible.
     width = height = 21
@@ -464,9 +500,11 @@ class FakeGeoLibre:
 
     def __init__(self):
         self.calls = []
+        self.args = []
 
     def __call__(self, wasm, tool, args, inputs):
         self.calls.append(tool)
+        self.args.append((tool, dict(args)))
         if tool == "raster_to_vector_polygons":
             return self._polygons(inputs[Path(args["input"]).name])
         source_arg = next(k for k in ("input", "dem", "sca") if k in args)
@@ -495,6 +533,9 @@ class FakeGeoLibre:
             values = [90.0] * len(values)
         elif tool == "deviation_from_mean_elevation":
             values = [(v - 620) / 20 for v in values]
+        elif tool == "fetch_analysis":
+            # Open ground upwind everywhere but the bowl's floor, which its rim shelters.
+            values = [120.0 if v < 602 else 1500.0 for v in values]
         elif tool == "elevation_percentile":
             # The bowl's floor is the lowest ground around; everywhere else mid-slope.
             values = [5.0 if v < 602 else 50.0 for v in values]
@@ -574,6 +615,9 @@ def synthetic(tmp_path, monkeypatch, settings):
     raw["tools"]["wetness"]["zones"]["min_area_m2"] = 0
     raw["tools"]["position"]["zones"]["min_area_m2"] = 0
     raw["tools"]["cold_air"]["zones"]["min_area_m2"] = 0
+    raw["grids"]["wind"].update(resolution_m=30, tile_cells=30, overlap_m=150)
+    raw["tools"]["wind"]["zones"]["min_area_m2"] = 0
+    raw["tools"]["wind"]["facts"]["wind_fetch_m"]["radius_m"] = 30  # 3x3 cells, as at 90 m
     path = tmp_path / "tools.yml"
     path.write_text(yaml.safe_dump(raw))
 
@@ -615,6 +659,17 @@ def test_the_pipeline_writes_facts_zones_and_provenance(synthetic):
     cold = TerrainZone.objects.filter(region="testland", layer="cold-air", tile="")
     assert set(cold.values_list("zone_class", flat=True)) == {"high"}
     assert run.counts["coverage"]["cold_air"] == 2
+    # TM05-148: fetch ran towards the region's prevailing wind (testland: the default).
+    azimuths = {
+        args["azimuth"] for tool, args in synthetic["fake"].args if tool == "fetch_analysis"
+    }
+    assert azimuths == {270}
+    assert bowl.wind == "sheltered" and "west wind" in bowl.wind_reason
+    assert rim.wind == "exposed" and rim.wind_from_deg == 270
+    assert bowl.wind_from_deg == 270
+    wind = TerrainZone.objects.filter(region="testland", layer="wind-exposure", tile="")
+    assert set(wind.values_list("zone_class", flat=True)) == {"exposed"}
+    assert run.counts["coverage"]["wind"] == 2
 
     pooling = TerrainZone.objects.filter(region="testland", layer="pooling-risk", tile="")
     assert pooling.exists()

@@ -234,12 +234,16 @@ WATER_VIEW_SQL = """
 def classify(registry: Registry, site_ids: list[int]) -> None:
     """The classes the app shows, from each site's sampled values."""
     cfg = registry.classify
+    # TM05-148: the region's prevailing wind, from Registry.for_region().
+    wind_from = registry.params.get("wind_from_deg")
     rows = TerrainFacts.objects.filter(campsite_id__in=site_ids)
     for row in rows.iterator():
         row.pooling, row.pooling_reason = mappers.pooling(row.values, cfg["pooling"])
         row.facing, row.sun = mappers.sun(row.values, cfg["sun"])
         row.shelter, row.shelter_reason = mappers.shelter(row.values, cfg["shelter"])
         row.cold_air, row.cold_air_reason = mappers.cold_air(row.values, cfg["cold_air"])
+        row.wind, row.wind_reason = mappers.wind(row.values, cfg["wind"], wind_from)
+        row.wind_from_deg = wind_from if row.wind else None
         if row.viewshed is not None:
             with connection.cursor() as cursor:
                 cursor.execute(
@@ -263,6 +267,8 @@ def run(
 ) -> TerrainRun:
     started = time.perf_counter()
     aoi = get_region(region)
+    # Per-region values (the prevailing wind) filled into the tools' arguments.
+    registry = registry.for_region(region)
     srid, nodata = int(registry.dem["srid"]), float(registry.dem["nodata"])
     tools = [t for name, t in registry.tools.items() if not only or name in only]
 
@@ -405,6 +411,7 @@ def run(
         "facing": facts.exclude(facing="").count(),
         "shelter": facts.exclude(shelter="").count(),
         "cold_air": facts.exclude(cold_air="").count(),
+        "wind": facts.exclude(wind="").count(),
         "viewshed": facts.exclude(viewshed=None).count(),
         "water_view": facts.filter(water_view=True).count(),
     }
