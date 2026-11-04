@@ -5,7 +5,9 @@ read from the code on 2026-11-03: `backend/*/models.py`, after TM05-149.
 
 - **Source.** The Mermaid block below is the source. GitHub renders it in place.
 - **Image.** [`class-diagram.svg`](class-diagram.svg) is the same diagram, rendered with
-  mermaid-cli (see [Re-rendering](#re-rendering)).
+  mermaid-cli 11.4.2 (see [Re-rendering](#re-rendering)).
+  [`class-diagram.png`](class-diagram.png) is a 2400 px PNG of it, for attaching
+  elsewhere.
 - **Visual Paradigm.** The course's version is redrawn from this one and attached to
   TM05-150 in Jira.
 
