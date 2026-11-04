@@ -21,7 +21,9 @@ Building the trail graph for a region (TM05-119, made forgiving in TM05-137).
 5. **Climb.** Each edge is sampled every `sample_spacing_m` metres, and its ascent and
    descent are the sums of the rises and drops between samples. A way the previous build
    measured reuses that build's samples by distance along the way, so a rebuild only
-   asks 3DEP about new ways. The raster is never stored.
+   measures new ways. New samples come from the terrain pipeline's cached 3DEP mosaic
+   when it is on disk, otherwise from 3DEP's getSamples (TM05-149,
+   routing/elevation_source.py). The raster is never stored.
 6. **Store.** The region's edges are replaced in one transaction, with a TrailGraphBuild.
 """
 
@@ -48,6 +50,7 @@ from analysis.base import AnalysisError
 from geodata.models import METRIC_SRID, Connector, Trail
 from pipeline.regions import get_region
 
+from . import elevation_source
 from .models import TrailEdge, TrailGraphBuild
 
 CONFIG_PATH = Path(__file__).with_name("routing.yml")
@@ -555,15 +558,24 @@ def climb(
 
 def build_region(
     region: str,
-    fetch: Callable = fetch_elevations,
+    fetch: Callable | None = None,
     spacing_m: float | None = None,
     workers: int = FETCH_WORKERS,
     log=print,
+    elevation: str = "auto",
 ) -> TrailGraphBuild:
+    """`fetch` overrides the elevation source (tests); otherwise `elevation` picks it:
+    "auto" (the cached mosaic when it is on disk, else 3DEP), "cache" or "3dep"."""
     settings = build_settings()
     connectors = config()["connectors"]
     spacing_m = float(spacing_m or settings["sample_spacing_m"])
     aoi = get_region(region)
+    if fetch is None:
+        choice = elevation_source.choose(region, aoi.bbox, elevation)
+        fetch, elevation_provenance = choice.fetch, choice.provenance
+    else:
+        elevation_provenance = {"elevation_source": "given"}
+    log(f"{region}: elevation from {elevation_provenance['elevation_source']}")
     started, clock = timezone.now(), time.perf_counter()
     box = Polygon.from_bbox(aoi.bbox)
     box.srid = 4326
@@ -640,6 +652,7 @@ def build_region(
         build.finished_at = timezone.now()
         build.provenance = {
             **provenance,
+            **elevation_provenance,
             "edge_kinds": dict(kinds),
             "bridged_gaps": len(bridges),
             "crossings_joined": crossings,

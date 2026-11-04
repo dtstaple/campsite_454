@@ -12,6 +12,18 @@ build:
   # Ways tagged like this are never joined where they cross: they pass over or under.
   no_crossing_tags: [bridge, tunnel, layer]
 
+elevation_check:
+  # `compare_graph_elevation` (TM05-149): how far the cached 3DEP mosaic may differ from
+  # the getSamples elevations of the current graph. getSamples serves 1 m LiDAR where it
+  # has it and the mosaic is 1/3 arc-second (~10 m), so the two are not identical.
+  # Per sample |difference|, metres: median and 95th percentile.
+  sample_median_m: 1.5
+  sample_p95_m: 5
+  # The region's total edge ascent, percent.
+  total_ascent_pct: 5
+  # Naismith time of seeded random trips, 95th percentile, percent.
+  trip_time_p95_pct: 3
+
 connectors:
   # Roads and sidewalks (geodata.Connector) are kept only this far, by road, from the
   # trail network, so a road walk between two trails is at most about twice this.

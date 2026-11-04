@@ -14,6 +14,7 @@ from django.core.management.base import BaseCommand, CommandError
 from analysis.base import AnalysisError
 from pipeline.regions import RegionConfigError
 from routing.build import FETCH_WORKERS, SPACING_M, build_region
+from routing.elevation_source import MODES
 
 
 class Command(BaseCommand):
@@ -23,11 +24,24 @@ class Command(BaseCommand):
         parser.add_argument("region")
         parser.add_argument("--spacing", type=float, default=SPACING_M, help="Sample spacing, m.")
         parser.add_argument("--workers", type=int, default=FETCH_WORKERS)
+        parser.add_argument(
+            "--elevation",
+            choices=MODES,
+            default="auto",
+            help="Where new elevation samples come from: the terrain pipeline's cached 3DEP "
+            "mosaic when it is on disk (auto), only the mosaic (cache), or 3DEP getSamples.",
+        )
 
-    def handle(self, *args, region, spacing, workers, **options):
+    def handle(self, *args, region, spacing, workers, elevation, **options):
         try:
-            build = build_region(region, spacing_m=spacing, workers=workers, log=self.stdout.write)
-        except RegionConfigError as error:
+            build = build_region(
+                region,
+                spacing_m=spacing,
+                workers=workers,
+                log=self.stdout.write,
+                elevation=elevation,
+            )
+        except (RegionConfigError, FileNotFoundError) as error:
             raise CommandError(str(error)) from error
         except AnalysisError as error:
             raise CommandError(f"3DEP failed, nothing was replaced: {error}") from error
@@ -35,6 +49,6 @@ class Command(BaseCommand):
         self.stdout.write(
             f"{region}: {build.edges} edges, {build.nodes} nodes from {build.ways} ways "
             f"({build.ways_skipped} skipped); {build.elevation_samples} elevation samples "
-            f"({build.elevation_nodata} no data); {timing['total']} s "
-            f"(cut {timing['cut']} s, 3DEP {timing['climb']} s)"
+            f"({build.elevation_nodata} no data) from {build.provenance['elevation_source']}; "
+            f"{timing['total']} s (cut {timing['cut']} s, elevation {timing['climb']} s)"
         )
