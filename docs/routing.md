@@ -9,6 +9,7 @@ export all work on it.
 | Piece | Where |
 |---|---|
 | Graph build | `backend/routing/build.py`, `manage.py build_trail_graph <region>` |
+| Edge elevation source (TM05-149) | `backend/routing/elevation_source.py` |
 | Stored graph | `routing.TrailEdge`, `routing.TrailGraphBuild` (`backend/routing/models.py`) |
 | **Engine** (the replaceable part) | `backend/routing/engine.py` |
 | Snapping, route ids, assembly | `backend/routing/service.py` |
@@ -25,7 +26,9 @@ A `Trail` row is one OSM way, and its `osm_node_ids` line up with its vertices
 - **Edges** are the stretch of one way between two consecutive nodes. Nothing joins or
   leaves an edge in between. Each edge is walkable both ways.
 - **Length** is measured on the way's metre geometry (EPSG:5070, `geom_m`).
-- **Climb.** Each edge is sampled every 50 m (and at both ends) from 3DEP. `ascent_m` is
+- **Climb.** Each edge is sampled every 50 m (and at both ends) from 3DEP: the terrain
+  pipeline's cached mosaic when it is on disk, otherwise 3DEP's getSamples (TM05-149, see
+  [Elevation from the cached DEM](#elevation-from-the-cached-dem-tm05-149)). `ascent_m` is
   the sum of every rise between consecutive samples walking start to end, and `descent_m`
   every drop; the other way round they swap. At 50 m spacing that is already smoothed,
   and a per-edge threshold would lose the many small climbs of short edges. The samples
@@ -36,7 +39,8 @@ A `Trail` row is one OSM way, and its `osm_node_ids` line up with its vertices
   ingested (only paths, footways, tracks and bridleways), so routes never use them.
 
 `build_trail_graph <region>` replaces the region's edges in one transaction and writes a
-`TrailGraphBuild` with the counts, the 3DEP provenance and the timings. Run it after
+`TrailGraphBuild` with the counts, the elevation provenance (`elevation_source`, and the
+mosaic and its tiles when it was used) and the timings. Run it after
 `ingest osm-trails <region>`. The web process loads a region's graph once and reloads it
 when a newer build exists.
 
@@ -199,7 +203,91 @@ connected trails join these points: Big Pond Trail / Pinnacle Ridge Trail".
 - **Added nodes.** Bridge ends and crossings get deterministic ids, `SYNTHETIC_BASE`
   (5 × 10¹⁵) plus the point's decimetre coordinates, so a rebuild reproduces them.
 - **Elevation is reused.** A rebuild reads each way's elevation from the previous build's
-  samples by distance along the way, so only new ways go to 3DEP.
+  samples by distance along the way, so only new ways are sampled at all.
+
+## Elevation from the cached DEM (TM05-149)
+
+Before TM05-149, every new edge sample was a 3DEP getSamples request over the network.
+On the first build with roads, that was most of the 895 s. `make terrain` already keeps
+the region's 3DEP 1/3 arc-second source tiles on disk (`docs/terrain-analysis.md`, "Disk
+and caching"), so the build now reads them there.
+
+| Piece | Where |
+|---|---|
+| Choosing the source, sampling the mosaic | `backend/routing/elevation_source.py` |
+| Comparing with the current graph | `backend/routing/compare.py`, `manage.py compare_graph_elevation <region>` |
+| Tolerances | `elevation_check` in `backend/routing/routing.yml` |
+| Tests (synthetic DEM) | `tests/test_routing_elevation_source.py` |
+
+**Which source a build uses** (`build_trail_graph <region> --elevation auto|cache|3dep`):
+
+- **`auto` (default).** It uses the mosaic when every 3DEP tile for the region's bbox is
+  in `<TERRAIN_CACHE_DIR>/3dep-13/` (default `~/.cache/campsite/terrain/`) and listed in
+  its `signature.json`. The VRT over them is `mosaic/<region>-<digest>.vrt`, the same one
+  the terrain pipeline uses. If any tile is missing, the build uses 3DEP getSamples, as
+  before.
+- **`cache`** insists on the mosaic and fails, naming `make terrain`, if it isn't there.
+- **`3dep`** ignores the cache. It is for measuring the old path.
+- **Point by point.** A sample the mosaic has no data for is still asked of getSamples,
+  so a gap never becomes a flat edge. The build's provenance counts these in
+  `fallback_points`.
+- **Nothing is downloaded or stored.** The build only reads tiles `make terrain` already
+  fetched, and keeps the samples on each edge, as before.
+
+**Sampling.** Each point is transformed to the tiles' CRS (NAD83) and read with bilinear
+interpolation between the four nearest cell centres, as getSamples does
+(`RSP_BilinearInterpolation`). Each worker thread opens its own copy of the VRT.
+
+**Order in `make data`.** The graph build runs before `make terrain`, so on a machine
+that has never run terrain, the first `make data` still uses getSamples. Every later
+build or `make refresh` uses the mosaic. To get the saving on a fresh machine, run
+`make terrain REGION=<region>` before `build_trail_graph`.
+
+### Tolerance: how close the mosaic must be to the current graph
+
+The two sources are not identical. Where 3DEP has 1 m LiDAR, getSamples serves it, while
+the mosaic is the 1/3″ (about 10 m) product, so a sample can differ by a metre or more on
+a steep sidehill. `compare_graph_elevation` samples the mosaic at exactly the current
+graph's sample points and checks:
+
+| Check | Tolerance | Why |
+|---|---|---|
+| Per-sample \|difference\|, median | ≤ 1.5 m | Typical 10 m vs LiDAR agreement on a trail |
+| Per-sample \|difference\|, 95th percentile | ≤ 5 m | Allows steep sidehills, catches a misplaced tile or datum |
+| Region total edge ascent | within 5% | The climb drives the Naismith cost |
+| Naismith time of 50 seeded random trips on the largest piece, 95th percentile | within 3% | What a user sees |
+
+It also reports how many of those trips take exactly the same edges. Ties between
+near-equal paths can flip, so this is reported but not a check. The command exits non-zero
+when a check fails, and writes nothing.
+
+### How to measure it
+
+The DEM cache was not on the machine used for TM05-149, so the dev-DB figures below
+still have to be filled in. Steps, on a machine with the dev DB:
+
+```
+make terrain REGION=adirondacks                       # once: the tiles and the VRT
+.venv/bin/python backend/manage.py shell -c "from routing.models import TrailEdge; TrailEdge.objects.filter(region='adirondacks').delete()"
+time .venv/bin/python backend/manage.py build_trail_graph adirondacks --elevation 3dep   # before
+.venv/bin/python backend/manage.py compare_graph_elevation adirondacks > artifacts/routing/tm05-149-compare.json
+.venv/bin/python backend/manage.py shell -c "from routing.models import TrailEdge; TrailEdge.objects.filter(region='adirondacks').delete()"
+time .venv/bin/python backend/manage.py build_trail_graph adirondacks --elevation cache  # after
+```
+
+- **Empty the edges first.** A rebuild reuses the previous build's samples for every way
+  it already measured, so without deleting them neither build samples much. The two
+  timed builds are the full-region case: all 92,663 edges from scratch.
+- **The times** are each build's `timing_s.climb` and `timing_s.total` in its
+  `TrailGraphBuild.provenance`, also printed at the end of the build.
+- **The estimate** is about 650 s saved of the 895 s build.
+
+| | 3DEP getSamples | Cached mosaic |
+|---|---|---|
+| Elevation step (`timing_s.climb`) | *to measure* | *to measure* |
+| Whole build (`timing_s.total`) | *to measure* | *to measure* |
+| `compare_graph_elevation`: sample median / p95 \|Δ\| | – | *to measure* |
+| Total ascent difference / trip time p95 difference | – | *to measure* |
 
 ## Measured (dev DB, 2026-10-23)
 
