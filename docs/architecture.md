@@ -494,6 +494,9 @@ timings as meaningful performance numbers.
 
 ## Where the code lives
 
+Every model and how they relate is drawn in [`class-diagram.md`](class-diagram.md)
+(TM05-150).
+
 ```
 backend/pipeline/
   aoi.py                          a region: name, label, bounding box, states, notes
