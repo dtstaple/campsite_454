@@ -5,10 +5,11 @@ Welcome. This page is orientation only. **Installing and running the project is 
 
 ## 1. Get running
 
-Follow [setup.md](setup.md) for your OS. On a fresh clone that is:
+Follow [setup.md](setup.md) and pick one of its three paths. The quickest is a GitHub
+Codespace (path A), which needs nothing installed. On a fresh clone with Docker (path B):
 
     make setup
-    make restore DUMP=https://github.com/dtstaple/campsite_454/releases/download/dev-data-2026-10-13/campsite-2026-10-13.dump
+    make restore DUMP=$(make -s snapshot-url)
     make doctor
     make dev
 

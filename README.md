@@ -9,16 +9,21 @@ MapLibre.
 
 ## Get running
 
+With nothing installed: **Code → Codespaces → Create codespace on main**. The dev container
+sets everything up and loads the data; then run `make dev`.
+
+On your own machine, with Docker:
+
 ```
 make setup
-make restore DUMP=https://github.com/dtstaple/campsite_454/releases/download/dev-data-2026-10-13/campsite-2026-10-13.dump
+make restore DUMP=$(make -s snapshot-url)   # the latest team data snapshot
 make doctor
-make dev                        # http://localhost:5173
+make dev                                    # http://localhost:5173
 ```
 
-`make data` rebuilds from the sources instead, and a small sample is one command away.
-Prerequisites per OS, the data options, and troubleshooting are in
-**[docs/setup.md](docs/setup.md)**, the one setup guide.
+The three setup paths (dev container, local Docker, hosted dev database), prerequisites per
+OS, the data options, and troubleshooting are in **[docs/setup.md](docs/setup.md)**, the
+one setup guide.
 
 ## More
 

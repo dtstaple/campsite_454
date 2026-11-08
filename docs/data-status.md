@@ -6,6 +6,60 @@ published. Setup and restore instructions are in `docs/setup.md`.
 
 ## Current snapshot
 
+[dev-data-2026-11-08](https://github.com/dtstaple/campsite_454/releases/tag/dev-data-2026-11-08)
+(380 MB download, about 1.16 GB restored), published 2026-11-08 under TM05-160.
+
+```
+make restore DUMP=https://github.com/dtstaple/campsite_454/releases/download/dev-data-2026-11-08/campsite-2026-11-08.dump
+```
+
+It was dumped with `make dump` (now `scripts/snapshot.py`) from the data owner's database,
+which holds everything the app reads. Nothing personal is in it: the tables matching
+`PERSONAL_TABLES` (accounts, tokens, sessions, the admin log, saved campsites, scoring
+weights, waypoints, trip plans, hikes, saved trails) are dumped empty, and the dump's own
+check confirmed no personal table has rows.
+
+| Table | Rows | Region |
+|---|---|---|
+| Campsites | 1,500 | both |
+| Campsite facts (enrichment) | 1,499 | both |
+| Trails | 25,663 | both |
+| Named routes, route facts | 452, 452 | both |
+| Water features | 76,551 | both |
+| Public land | 2,488 | both |
+| Peaks and trailheads | 2,480 (1,861 + 619) | both; `osm-landmarks` re-run on 2026-11-08 for both regions |
+| Road connectors | 70,773 | Adirondacks (TM05-137) |
+| Routing graph edges, graph builds | 92,663, 4 | Adirondacks (TM05-119/137/149) |
+| Terrain facts, zones | 743, 694,544 | Adirondacks (TM05-141..143, the 2026-11-02 terrain run) |
+| Cached analyses | 8,540 | both |
+
+**New since dev-data-2026-10-13:** the routing graph and road connectors, terrain facts and
+zones, and peaks and trailheads for the White Mountains.
+
+**Known gap: cold air and wind.** The `cold_air` and `wind` terrain facts (TM05-147/148)
+are empty. `make terrain adirondacks` was re-run on 2026-11-08 to fill them and failed
+twice (3 workers, then 1) in the `elevation_percentile` tool with a WASM trap ("wasm
+`unreachable` instruction executed"). The failed runs wrote no facts or zones, so the
+terrain data is from the last successful run, 2026-11-02. Campsite panels show cold air
+and wind as not available until the terrain run is fixed and a new snapshot is published.
+
+**How it was checked (2026-11-08).** Restored with `make restore` into a throwaway
+`postgis/postgis:16-3.4` container with TLS on and `sslmode=require`, after dropping its
+PostGIS extension: the restore created PostGIS, restored in 88 s from the local file, and
+`migrate` found nothing to apply. Every row count above matched the source; every personal
+table was empty; `pytest -m data` passed 4/4. A second `make restore` without `FORCE=1`
+refused, naming the tables with data. With `NO_TERRAIN=1` (every terrain table restored
+empty, for a 1 GB hosted free tier; docs/setup.md, path C) the restored database is
+506 MB. The throwaway containers were then deleted.
+
+The sections below describe how the data in it was built, oldest first. The previous
+snapshot, [dev-data-2026-10-13](https://github.com/dtstaple/campsite_454/releases/tag/dev-data-2026-10-13)
+(104 MB, TM05-90), is kept as a release but no longer matches the app: it has no routing
+graph or terrain. The sections from here to "How the 2026-10-13 snapshot was
+checked" describe it.
+
+## The 2026-10-13 snapshot
+
 [dev-data-2026-10-13](https://github.com/dtstaple/campsite_454/releases/tag/dev-data-2026-10-13)
 (104 MB), published 2026-10-13 under TM05-90.
 
@@ -63,7 +117,7 @@ which carries no OSM tags.
   enrichment run selects it. How it came to be ingested was not investigated. Left as it
   is.
 
-## Adirondacks runs for this snapshot (2026-10-13)
+## Adirondacks runs for the 2026-10-13 snapshot
 
 The previous snapshot predated the lean-tos (TM05-75) and the peaks and trailheads
 (TM05-89), so these were run before the snapshot was taken.
@@ -81,7 +135,7 @@ both ingests and the retries recovered.
 
 `pytest -m data` was not run against this database.
 
-## How the snapshot was checked
+## How the 2026-10-13 snapshot was checked
 
 1. `make dump` wrote `dumps/campsite-2026-10-13.dump`. From TM05-90 it also excludes the
    data of every `planning_*` table (waypoints, trip plans, plan stops, saved trails),
