@@ -363,3 +363,133 @@ def test_main_exit_code_follows_the_failures(doctor, monkeypatch, capsys):
     monkeypatch.setattr(doctor, "check_node", lambda: doctor.report("FAIL", "node", "x"))
     assert doctor.main() == 1
     assert "1 check(s) FAILED" in capsys.readouterr().out
+
+
+# --- TM05-160: the three development paths ---------------------------------------------------
+
+
+@pytest.mark.unit
+def test_compose_checks_only_on_the_docker_path(doctor, capsys):
+    mismatched = env(SECRET_KEY="k", POSTGRES_PORT="", DATABASE_URL="postgis://c:x@db:5432/c")
+    doctor.check_env(mismatched, "devcontainer")
+    out = capsys.readouterr().out
+    assert doctor.failures == 0
+    assert "PASS .env: all 2 required variables set" in out
+
+
+@pytest.mark.unit
+def test_hosted_url_without_sslmode_warns(doctor, capsys):
+    url = "postgres://u:p@ep-x.neon.tech/campsite"
+    doctor.check_env(env(SECRET_KEY="k", DATABASE_URL=url), "hosted")
+    assert "append ?sslmode=require" in capsys.readouterr().out
+    doctor.check_env(env(SECRET_KEY="k", DATABASE_URL=url + "?sslmode=require"), "hosted")
+    assert "sslmode" not in capsys.readouterr().out
+    assert doctor.failures == 0
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "path, fix", [("devcontainer", "Rebuild Container"), ("hosted", "dashboard")]
+)
+def test_database_reachable(doctor, monkeypatch, capsys, path, fix):
+    import socket
+
+    with socket.socket() as server:
+        server.bind(("127.0.0.1", 0))
+        server.listen()
+        port = server.getsockname()[1]
+        url = f"postgis://c:p@127.0.0.1:{port}/campsite"
+        assert doctor.check_database_reachable({"DATABASE_URL": url}, path) is True
+    assert f"PASS database host: 127.0.0.1:{port} reachable" in capsys.readouterr().out
+    assert doctor.check_database_reachable({"DATABASE_URL": url}, path) is False
+    out = capsys.readouterr().out
+    assert "FAIL database host: cannot reach" in out and fix in out
+    assert doctor.check_database_reachable({"DATABASE_URL": "nonsense"}, path) is False
+    assert "names no host" in capsys.readouterr().out
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "major, docker, path, expected",
+    [
+        (16, None, "docker", "PASS pg tools: pg_restore 16"),
+        (14, "/usr/bin/docker", "docker", "PASS pg tools: pg_restore runs in Docker"),
+        (14, None, "hosted", "WARN pg tools: pg_restore 14 is too old"),
+        (None, None, "hosted", "brew install libpq"),
+        (None, None, "devcontainer", "rebuild the dev container"),
+    ],
+)
+def test_restore_tools(doctor, monkeypatch, capsys, major, docker, path, expected):
+    monkeypatch.setattr(doctor.snapshot, "tools_major", lambda binary: major)
+    monkeypatch.setattr(doctor.shutil, "which", lambda name: docker)
+    doctor.check_restore_tools(path)
+    assert expected in capsys.readouterr().out
+    assert doctor.failures == 0
+
+
+@pytest.mark.unit
+def test_ports_skip_the_database_off_the_docker_path(doctor, monkeypatch, capsys):
+    monkeypatch.setattr(doctor, "port_owner", lambda port: None)
+    fake_run(monkeypatch, doctor, {})
+    doctor.check_ports({}, "hosted")
+    out = capsys.readouterr().out
+    assert "5432" not in out and "PASS port 8000" in out and "PASS port 5173" in out
+
+
+@pytest.mark.django_db
+def test_missing_postgis_gets_its_own_fix(doctor, monkeypatch, capsys):
+    from django.db.backends.utils import CursorWrapper
+
+    def no_postgis(self, sql, params=None):
+        raise RuntimeError("function postgis_lib_version() does not exist")
+
+    monkeypatch.setattr(doctor.sys, "base_prefix", "/usr")
+    monkeypatch.setattr(CursorWrapper, "execute", no_postgis)
+    doctor.check_django({}, db_up=True)
+    assert "CREATE EXTENSION postgis" in capsys.readouterr().out
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "url, environ, path, database_check",
+    [
+        ("postgis://c:p@localhost:5432/c", {}, "B, local Docker", "check_docker"),
+        (
+            "postgis://c:p@localhost:5432/c",
+            {"CAMPSITE_DEVCONTAINER": "1"},
+            "A, the dev container",
+            "check_database_reachable",
+        ),
+        (
+            "postgres://u:p@h.example/db?sslmode=require",
+            {},
+            "C, a hosted PostGIS",
+            "check_database_reachable",
+        ),
+    ],
+)
+def test_main_picks_the_checks_for_the_path(
+    doctor, monkeypatch, capsys, url, environ, path, database_check
+):
+    (doctor.ROOT / ".env").write_text(f"DATABASE_URL={url}\n")
+    for key in ("CAMPSITE_DEVCONTAINER", *doctor.OVERRIDABLE):
+        monkeypatch.delenv(key, raising=False)
+    for key, value in environ.items():
+        monkeypatch.setenv(key, value)
+    called = []
+    for name in (
+        "check_python",
+        "check_requirements",
+        "check_node",
+        "check_env",
+        "check_ports",
+        "check_restore_tools",
+        "check_django",
+    ):
+        monkeypatch.setattr(doctor, name, lambda *args: None)
+    for name in ("check_docker", "check_database_reachable"):
+        monkeypatch.setattr(doctor, name, lambda *args, name=name: called.append(name) or True)
+    monkeypatch.setattr(doctor.db_path, "ROOT", doctor.ROOT)
+    assert doctor.main() == 0
+    assert f"Path: {path}" in capsys.readouterr().out
+    assert called == [database_check]
