@@ -5,12 +5,15 @@ Create .env from .env.example if it is missing, and fill in what can be detected
 
 Never overwrites an existing .env. On macOS with Homebrew GDAL/GEOS installed, it fills
 GDAL_LIBRARY_PATH and GEOS_LIBRARY_PATH (Django 5.1 cannot find GDAL 3.9+ by itself);
-elsewhere it leaves them unset, which means "search the system default paths".
+elsewhere it leaves them unset, which means "search the system default paths". Inside the
+dev container (TM05-160, CAMPSITE_DEVCONTAINER=1) the database is the `db` service, so
+DATABASE_URL points there instead of localhost.
 Standard library only, so it runs before the virtualenv exists.
 """
 
 from __future__ import annotations
 
+import os
 import platform
 import secrets
 import shutil
@@ -41,7 +44,10 @@ def main() -> int:
     text = text.replace(
         "SECRET_KEY=change-me-locally", f"SECRET_KEY={secrets.token_urlsafe(40)}", 1
     )
-    if platform.system() == "Darwin":
+    if os.environ.get("CAMPSITE_DEVCONTAINER") == "1":
+        text = text.replace("@localhost:5432/", "@db:5432/", 1)
+        print("OK   dev container: DATABASE_URL points at the db service.")
+    elif platform.system() == "Darwin":
         gdal, geos = brew_prefix("gdal"), brew_prefix("geos")
         if gdal and geos:
             text = text.replace(

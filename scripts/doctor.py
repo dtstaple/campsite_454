@@ -23,9 +23,16 @@ import socket
 import subprocess
 import sys
 from pathlib import Path
+from urllib.parse import urlsplit
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import db_path  # noqa: E402 -- scripts/db_path.py, the TM05-160 path detection
+import snapshot  # noqa: E402 -- scripts/snapshot.py, for its client-tools check
 
 ROOT = Path(__file__).resolve().parent.parent
 BACKEND = ROOT / "backend"
+# What each development path needs in .env. POSTGRES_* only configure the local Compose
+# database (path B); the dev container and a hosted database only need DATABASE_URL.
 REQUIRED_ENV = [
     "POSTGRES_DB",
     "POSTGRES_USER",
@@ -34,6 +41,14 @@ REQUIRED_ENV = [
     "DATABASE_URL",
     "CORS_ALLOWED_ORIGINS",
 ]
+REQUIRED_ENV_NO_COMPOSE = ["DATABASE_URL", "CORS_ALLOWED_ORIGINS"]
+# Variables the process environment may set over .env (the dev container sets several).
+OVERRIDABLE = {"DATABASE_URL", "DEBUG", "SECRET_KEY", "CORS_ALLOWED_ORIGINS"}
+PATH_NAMES = {
+    "devcontainer": "A, the dev container (database: its db service)",
+    "docker": "B, local Docker (database: the Compose container)",
+    "hosted": "C, a hosted PostGIS (database: DATABASE_URL)",
+}
 
 failures = 0
 
@@ -132,11 +147,12 @@ def check_node() -> None:
         report("FAIL", "node", "frontend/node_modules missing", "cd frontend && npm ci")
 
 
-def check_env(env: dict[str, str]) -> None:
+def check_env(env: dict[str, str], path: str = "docker") -> None:
     if not (ROOT / ".env").exists():
         report("FAIL", ".env", "missing", "make setup (copies .env.example to .env)")
         return
-    missing = [key for key in REQUIRED_ENV if not env.get(key)]
+    required = REQUIRED_ENV if path == "docker" else REQUIRED_ENV_NO_COMPOSE
+    missing = [key for key in required if not env.get(key)]
     if missing:
         report(
             "FAIL",
@@ -145,24 +161,12 @@ def check_env(env: dict[str, str]) -> None:
             "copy the missing lines from .env.example into .env",
         )
     else:
-        report("PASS", ".env", f"all {len(REQUIRED_ENV)} required variables set")
+        report("PASS", ".env", f"all {len(required)} required variables set")
     url = env.get("DATABASE_URL", "")
-    port = env.get("POSTGRES_PORT", "5432")
-    if url and f":{port}/" not in url:
-        report(
-            "FAIL",
-            ".env",
-            f"DATABASE_URL does not use POSTGRES_PORT={port}",
-            f"set the port in DATABASE_URL to {port}",
-        )
-    password = env.get("POSTGRES_PASSWORD", "")
-    if url and password and f":{password}@" not in url:
-        report(
-            "FAIL",
-            ".env",
-            "DATABASE_URL password differs from POSTGRES_PASSWORD",
-            "make the password in DATABASE_URL match POSTGRES_PASSWORD",
-        )
+    if path == "docker":
+        check_compose_env(env, url)
+    elif path == "hosted":
+        check_hosted_env(url)
     if ":5173" not in env.get("CORS_ALLOWED_ORIGINS", ""):
         report(
             "FAIL",
@@ -185,6 +189,89 @@ def check_env(env: dict[str, str]) -> None:
             )
     if not env.get("RIDB_API_KEY"):
         report("WARN", ".env", "RIDB_API_KEY empty -- fine; only the optional ridb ingest needs it")
+
+
+def check_compose_env(env: dict[str, str], url: str) -> None:
+    """Path B: DATABASE_URL must reach the Compose container docker-compose.yml creates."""
+    port = env.get("POSTGRES_PORT", "5432")
+    if url and f":{port}/" not in url:
+        report(
+            "FAIL",
+            ".env",
+            f"DATABASE_URL does not use POSTGRES_PORT={port}",
+            f"set the port in DATABASE_URL to {port}",
+        )
+    password = env.get("POSTGRES_PASSWORD", "")
+    if url and password and f":{password}@" not in url:
+        report(
+            "FAIL",
+            ".env",
+            "DATABASE_URL password differs from POSTGRES_PASSWORD",
+            "make the password in DATABASE_URL match POSTGRES_PASSWORD",
+        )
+
+
+def check_hosted_env(url: str) -> None:
+    """Path C: a hosted database is reached over the internet, so it needs TLS."""
+    if "sslmode=" not in url:
+        report(
+            "WARN",
+            ".env",
+            "DATABASE_URL has no sslmode -- hosted providers require TLS",
+            "append ?sslmode=require to DATABASE_URL",
+        )
+
+
+def check_database_reachable(env: dict[str, str], path: str) -> bool:
+    """Paths A and C: a TCP connection to the database host. (Path B uses check_docker.)"""
+    url = env.get("DATABASE_URL", "")
+    try:
+        target = urlsplit(url)
+        host, port = target.hostname or "", target.port or 5432
+    except ValueError:
+        host, port = "", 5432
+    if not host:
+        report("FAIL", "database host", "DATABASE_URL names no host", "see .env.example")
+        return False
+    if path == "devcontainer":
+        fix = (
+            "the dev container's db service is not running. VS Code: Dev Containers: Rebuild "
+            "Container. Codespaces: Codespaces: Rebuild Container. (On the host: docker compose "
+            "-f .devcontainer/docker-compose.yml up -d db)"
+        )
+    else:
+        fix = (
+            "check the host and port in DATABASE_URL against the provider's dashboard, that the "
+            "database is not paused or deleted, and that the provider allows your IP address"
+        )
+    try:
+        with socket.create_connection((host, port), timeout=5):
+            pass
+    except OSError as error:
+        report("FAIL", "database host", f"cannot reach {host}:{port} ({error})", fix)
+        return False
+    report("PASS", "database host", f"{host}:{port} reachable")
+    return True
+
+
+def check_restore_tools(path: str) -> None:
+    """make restore and make dump need PostgreSQL 16 client tools, or Docker to run them."""
+    major = snapshot.tools_major("pg_restore")
+    if (major or 0) >= snapshot.MIN_TOOLS_MAJOR:
+        report("PASS", "pg tools", f"pg_restore {major} (for make restore / make dump)")
+    elif shutil.which("docker"):
+        report("PASS", "pg tools", "pg_restore runs in Docker (postgis/postgis:16-3.4)")
+    else:
+        fix = (
+            "rebuild the dev container (its image has postgresql-client-16)"
+            if path == "devcontainer"
+            else "macOS: brew install libpq && brew link --force libpq; Ubuntu: "
+            "sudo apt install postgresql-client-16 (apt.postgresql.org); or install Docker"
+        )
+        found = f"pg_restore {major} is too old (the snapshot is a PG16 dump)" if major else ""
+        report(
+            "WARN", "pg tools", found or "no pg_restore 16+ and no Docker: make restore fails", fix
+        )
 
 
 def check_docker(env: dict[str, str]) -> bool:
@@ -220,11 +307,15 @@ def check_docker(env: dict[str, str]) -> bool:
     return True
 
 
-def check_ports(env: dict[str, str]) -> None:
+def check_ports(env: dict[str, str], path: str = "docker") -> None:
     name = env.get("DB_CONTAINER_NAME") or "campsite_db"
-    db_port = int(env.get("POSTGRES_PORT") or 5432)
-    mapped = run(["docker", "port", name, "5432"]).stdout
-    for port, ours in ((db_port, "database"), (8000, "backend"), (5173, "frontend")):
+    ports = [(8000, "backend"), (5173, "frontend")]
+    db_port, mapped = None, ""
+    if path == "docker":  # elsewhere the database is not on this machine's ports
+        db_port = int(env.get("POSTGRES_PORT") or 5432)
+        mapped = run(["docker", "port", name, "5432"]).stdout
+        ports.insert(0, (db_port, "database"))
+    for port, ours in ports:
         owner = port_owner(port)
         if owner is None:
             if port == db_port:
@@ -325,12 +416,15 @@ def check_django(env: dict[str, str], db_up: bool) -> None:
             postgis = cursor.fetchone()[0]
         report("PASS", "database connection", f"PostGIS {postgis} via DATABASE_URL")
     except Exception as error:  # noqa: BLE001
-        report(
-            "FAIL",
-            "database connection",
-            f"{type(error).__name__}: {str(error)[:200]}",
-            "check DATABASE_URL credentials and port match POSTGRES_* in .env",
-        )
+        text = str(error)
+        if "postgis_lib_version" in text:
+            fix = (
+                "PostGIS is not enabled in this database. make restore enables it; or run "
+                "CREATE EXTENSION postgis; as the database's admin role"
+            )
+        else:
+            fix = "check DATABASE_URL credentials and port (path B: match POSTGRES_* in .env)"
+        report("FAIL", "database connection", f"{type(error).__name__}: {text[:200]}", fix)
         return
 
     from django.core.management import call_command
@@ -364,6 +458,9 @@ def check_data() -> None:
         ("geodata", "PublicLand"),
         ("enrichment", "CampsiteFacts"),
         ("analysis", "AnalysisResult"),
+        ("geodata", "Landmark"),
+        ("routing", "TrailEdge"),
+        ("terrain", "TerrainFacts"),
     ]
     counts = {}
     try:
@@ -397,12 +494,21 @@ def check_data() -> None:
 def main() -> int:
     print(f"CampSite doctor -- {platform.system()} {platform.machine()}, repo {ROOT}\n")
     env = read_env()
+    # The process environment wins over .env, as it does for Django (the dev container sets
+    # DATABASE_URL), so the checks look at what Django will actually use.
+    env.update({key: os.environ[key] for key in OVERRIDABLE if os.environ.get(key)})
+    path = db_path.detect(env)
+    print(f"Path: {PATH_NAMES[path]} -- docs/setup.md\n")
     check_python()
     check_requirements()
     check_node()
-    check_env(env)
-    db_up = check_docker(env)
-    check_ports(env)
+    check_env(env, path)
+    if path == "docker":
+        db_up = check_docker(env)
+    else:
+        db_up = check_database_reachable(env, path)
+    check_restore_tools(path)
+    check_ports(env, path)
     check_django(env, db_up)
     print()
     if failures:

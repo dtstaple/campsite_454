@@ -1,0 +1,37 @@
+// CampSite dev container (TM05-160). Opens in GitHub Codespaces, or locally with VS Code's
+// Dev Containers extension. docs/setup.md, path A.
+{
+  "name": "CampSite",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "app",
+  "runServices": ["app", "db"],
+  "workspaceFolder": "/workspaces/campsite_454",
+  "shutdownAction": "stopCompose",
+  "remoteUser": "vscode",
+  "features": {
+    // Node 22, matching .nvmrc and CI (the frontend tests need 22.18+).
+    "ghcr.io/devcontainers/features/node:1": { "version": "22" },
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "forwardPorts": [5173, 8000],
+  "portsAttributes": {
+    "5173": { "label": "CampSite (frontend)", "onAutoForward": "openBrowser" },
+    "8000": { "label": "Django API and admin", "onAutoForward": "silent" }
+  },
+  // make setup, then the latest team snapshot (skipped when the database already has data,
+  // e.g. after a rebuild that kept the volume).
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-python.python", "charliermarsh.ruff", "oxc.oxc-vscode"],
+      "settings": {
+        "python.defaultInterpreterPath": "/workspaces/campsite_454/.venv/bin/python"
+      }
+    },
+    "codespaces": {
+      "openFiles": ["docs/setup.md"]
+    }
+  },
+  // 4 cores / 8 GB: PostGIS runs alongside the app, and the snapshot restore builds indexes.
+  "hostRequirements": { "cpus": 4, "memory": "8gb" }
+}

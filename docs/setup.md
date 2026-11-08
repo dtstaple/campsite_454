@@ -3,25 +3,119 @@
 This is the one setup guide. The README, `docs/onboarding.md` and `CLAUDE.md` all point
 here. Run every command from the repo root unless a step says otherwise.
 
-The short version, once the prerequisites are installed:
+## Choose a path (TM05-160)
+
+There are three ways to get a working CampSite with real data. They run the same code, use
+the same `make` commands, and load the same snapshot. They differ in where the tools and
+the database live.
+
+| Path | What you install | Where the database is | Clone to running app with data |
+|---|---|---|---|
+| **A. Dev container** (GitHub Codespaces, or VS Code locally) | Nothing (Codespaces), or Docker + VS Code | A PostGIS container next to the app container | about 3 min on a Mac (measured); a Codespace not yet measured |
+| **B. Local Docker** | Python 3.12, Node 22, GDAL, Docker | `campsite_db` in Docker on your machine | about 2 min (116 s measured) |
+| **C. Hosted dev database** | Python 3.12, Node 22, GDAL; **no Docker** | Your own branch of a hosted PostGIS (Neon) | not measured yet (needs the hosted database) |
+
+How the times were measured is under [Measured setup times](#measured-setup-times).
+
+- **New to the project, or Docker Desktop keeps failing you:** path A in a Codespace. It
+  needs only a browser.
+- **Day-to-day development on your own machine:** path B. It is the fastest once set up
+  and works offline.
+- **A machine where Docker is not an option** (a locked-down laptop, a low-memory
+  machine): path C.
+
+`make doctor` tells you which path it detected, and checks that path:
 
 ```
-git clone https://github.com/dtstaple/campsite_454.git
-cd campsite_454
-make setup
-make restore DUMP=https://github.com/dtstaple/campsite_454/releases/download/dev-data-2026-10-13/campsite-2026-10-13.dump
-make doctor
-make dev
+Path: A, the dev container (database: its db service) -- docs/setup.md
 ```
 
-Then open http://localhost:5173.
+The data is the same everywhere: the team snapshot
+[dev-data-2026-11-08](https://github.com/dtstaple/campsite_454/releases/tag/dev-data-2026-11-08) (380 MB download, about 1.16 GB restored).
+It holds every ingested layer for the Adirondacks and the White Mountains, enrichment,
+the routing graph and terrain facts and zones (both for the Adirondacks), and peaks and
+trailheads. It holds **no user data**. What is in it is in [data-status.md](data-status.md).
 
-## 1. Prerequisites
+## Path A: dev container (Codespaces or VS Code)
+
+Everything is defined in `.devcontainer/`:
+
+- an app container with Python 3.12, Node 22, GDAL/GEOS and the PostgreSQL 16 client
+  tools, and
+- a `db` service on `postgis/postgis:16-3.4`, the same image as CI.
+
+When the container is created, `.devcontainer/post-create.sh` runs `make setup` and then
+restores the latest snapshot. Nothing else is needed.
+
+### In GitHub Codespaces
+
+1. On https://github.com/dtstaple/campsite_454, click **Code → Codespaces → Create
+   codespace on main**. Choose a **4-core** machine if asked (`hostRequirements` asks for
+   4 cores and 8 GB).
+2. Wait for the post-create step to finish. The terminal ends with
+   `Dev container ready in N s`. The first creation builds the image, installs the Python and Node
+   packages, and downloads and restores the snapshot: about 3 minutes on a Mac once the base
+   image is pulled (see [Measured setup times](#measured-setup-times)). A Codespace also pulls
+   the 2.3 GB base image the first time.
+3. In the terminal, run `make doctor`, then `make dev`.
+4. Open the **Ports** tab and click the globe next to **5173 CampSite (frontend)**.
+   Codespaces usually opens it for you.
+
+How it works in a Codespace:
+
+- The page is served at `https://<codespace>-5173.app.github.dev`. Vite **proxies
+  `/api`** to Django inside the container, so the page and the API share an origin and no
+  CORS is involved. The ports stay **private** (only you, signed in to GitHub, can open
+  them), and that still works because the API calls never leave the page's origin.
+- The Django admin is on the forwarded port 8000. In development only (`DEBUG=True`),
+  `settings.py` trusts the Codespace's own forwarded hosts for the admin's login form.
+- **The basemap.** Stadia serves its keyless basemap to `localhost` only, by its terms.
+  On an `app.github.dev` address the basemap may be blank or refused. The data layers
+  still draw. To get the basemap, either forward the port to your own machine with
+  `gh codespace ports forward 5173:5173` and open http://localhost:5173, or set
+  `VITE_MAP_STYLE_URL` in `frontend/.env` to a style URL with your own Stadia key.
+- **Quota.** GitHub Free gives 120 core-hours of Codespaces a month, which is about 30
+  hours on a 4-core machine. Stop the codespace when you are done (it also stops itself
+  after 30 idle minutes), and delete old ones under https://github.com/codespaces.
+
+### In VS Code on your own machine
+
+1. Install Docker Desktop and VS Code with the **Dev Containers** extension.
+2. Open the repo folder, then run **Dev Containers: Reopen in Container** from the
+   command palette.
+3. As above: wait for `Dev container ready`, then `make doctor` and `make dev`, and open
+   http://localhost:5173.
+
+The dev container keeps to itself:
+
+- Its database is a separate Compose project (`campsite-devcontainer`) with its own volume,
+  and is **not published** on your machine's ports, so it never clashes with a local
+  `campsite_db` on 5432.
+- `.venv` and `frontend/node_modules` inside the container are separate Docker volumes.
+  Your macOS or Windows copies are neither used nor changed.
+- The container's environment sets `DATABASE_URL` to the `db` service and clears the
+  Homebrew GDAL paths. Those win over the values in your `.env`, which is shared with the
+  host, so the same `.env` works on both sides.
+
+Rebuilding the container (**Dev Containers: Rebuild Container**) keeps the database
+volume. The post-create step then sees a database with data and skips the restore. To
+start from a fresh snapshot, run `make restore DUMP=$(make -s snapshot-url) FORCE=1`.
+
+The same works without VS Code, with the Dev Containers CLI:
+
+```
+npx @devcontainers/cli up --workspace-folder .
+npx @devcontainers/cli exec --workspace-folder . make doctor
+```
+
+## Path B: local Docker
+
+### Prerequisites
 
 The versions match CI: Python **3.12** (`.python-version`) and Node **22** (22.18 or newer)
 (`.nvmrc`).
 
-### macOS
+#### macOS
 
 1. Install [Homebrew](https://brew.sh), then the tools:
 
@@ -36,7 +130,7 @@ The versions match CI: Python **3.12** (`.python-version`) and Node **22** (22.1
 
 `make` and `git` come with the Xcode Command Line Tools: `xcode-select --install`.
 
-### Windows: use WSL2
+#### Windows: use WSL2
 
 The project runs inside Ubuntu on WSL2. It is not supported natively on Windows: the
 Makefile, the shell scripts and GDAL all assume a Unix environment.
@@ -55,7 +149,7 @@ Makefile, the shell scripts and GDAL all assume a Unix environment.
 `localhost:5173` and `localhost:8000` in a Windows browser reach the servers running in
 WSL.
 
-### Linux (Ubuntu 24.04, including WSL)
+#### Linux (Ubuntu 24.04, including WSL)
 
 ```
 sudo apt update
@@ -78,7 +172,111 @@ Docker on native Linux: install Docker Engine and the compose plugin from
 On Ubuntu 22.04, `python3.12` is not in the default repositories. Add it with
 `sudo add-apt-repository ppa:deadsnakes/ppa` first.
 
-## 2. `make setup`
+### Then
+
+```
+git clone https://github.com/dtstaple/campsite_454.git
+cd campsite_454
+make setup
+make restore DUMP=$(make -s snapshot-url)
+make doctor
+make dev
+```
+
+Then open http://localhost:5173. `make setup` is explained [below](#make-setup).
+
+## Path C: a hosted dev database (no Docker)
+
+The code is unchanged; only `DATABASE_URL` points somewhere else. Install the same tools as
+path B (Python 3.12, Node 22, GDAL/GEOS), but **not Docker**. You also need the PostgreSQL
+16 client tools for the restore: `brew install libpq && brew link --force libpq` on macOS,
+or `sudo apt install postgresql-client-16` from [apt.postgresql.org](https://wiki.postgresql.org/wiki/Apt)
+on Ubuntu/WSL. (`make doctor` checks them, as `pg tools`.)
+
+### Size first
+
+The full snapshot is about 1.16 GB once restored. The provider must allow that much
+storage, with headroom for indexes and the cache tables the app writes as you use it.
+**That is more than Neon's Free plan (1 GB per project).** Two ways round it:
+
+- **Free, without terrain.** Restore with `NO_TERRAIN=1`. Every terrain table is restored
+  empty (the zones alone are about 0.6 GB), and the restored database is then
+  506 MB (measured 2026-11-08). The app works as it does in any region `make
+  terrain` hasn't reached: no terrain facts in campsite panels, no terrain zone overlays,
+  and Find campsites says "Water pooling risk not checked: no terrain data here yet". It is
+  all of the terrain tables or none, because the app decides whether terrain was checked
+  from the terrain runs; leaving only the zones out would make that check pass everywhere.
+- **Everything, on a paid plan.** Neon's paid plans have no 1 GB cap; check the current
+  pricing at https://neon.com/pricing before choosing.
+
+### Recommended: Neon, one branch per developer
+
+[Neon](https://neon.com) is hosted PostgreSQL with PostGIS and **branches**: a branch is
+an instant copy-on-write copy of the database, so each developer gets their own writable
+copy of the data, and storage that is the same as on the parent branch is not counted
+twice.
+
+One person (the team's data owner) does this once:
+
+1. Sign up at https://console.neon.tech and create a project named `campsite-dev`,
+   **PostgreSQL 16**, in the region nearest the team (US East).
+2. In the project's **SQL Editor**, run `CREATE EXTENSION postgis;`. (The restore also
+   tries this, but only the owner role is certain to be allowed.)
+3. Copy the connection string of the `main` branch (**Connect**, with "Pooled connection"
+   **off**: pg_restore needs a direct connection). It looks like
+   `postgresql://<user>:<password>@ep-<name>.<region>.aws.neon.tech/neondb?sslmode=require`.
+4. Restore the snapshot into `main`, from a checkout with `make setup` done:
+
+   ```
+   DATABASE_URL='postgresql://...?sslmode=require' \
+       make restore DUMP=$(make -s snapshot-url) NO_TERRAIN=1
+   ```
+
+   Leave out `NO_TERRAIN=1` on a paid plan.
+
+5. Under **Branches**, create one branch per developer from `main`: `dev-davis`,
+   `dev-bleron`, `dev-abdulrahman`, `dev-sahaj`. Then invite each teammate to the project
+   (**Settings → Collaborators**) or send each one their branch's connection string
+   privately (never in Jira, Slack channels or git).
+
+Each developer then:
+
+1. Puts their own branch's connection string in `.env` as `DATABASE_URL`, keeping
+   `?sslmode=require`. Percent-encode special characters in the password (`@` becomes
+   `%40`).
+2. Runs `make setup`. It sees a hosted URL and starts no Docker container
+   (`==> Database: the hosted path`), then migrates.
+3. Runs `make doctor`, then `make dev`.
+
+A branch already has the data, so there is nothing to restore. To reset your branch to
+the team's data, use **Branches → your branch → Reset from parent** in the Neon console.
+After a new team snapshot, the data owner restores it into `main` with `FORCE=1`, and
+everyone resets their branch.
+
+**Free plan limits (checked 2026-11-08; check the pricing page before relying on them).**
+Neon's Free plan gives 1 GB of storage per project and 10 branches per project; writes
+fail above 1 GB until space is freed. Compute suspends after 5 idle minutes and wakes on
+the next connection, which adds a second or so to the first request.
+
+**Other providers.** Any PostgreSQL 16 with PostGIS works the same way: one database per
+developer instead of one branch. Supabase and Render both offer PostGIS. Render's free
+database expires after 30 days, so it is not suited to a dev database.
+
+**Hosted means slower.** Every API request makes a round trip to the provider. Map panning
+and trail panels feel noticeably slower than on paths A and B. Use path C when you cannot
+run Docker, not as the default.
+
+### What `make restore` does on a hosted database
+
+- It reads `DATABASE_URL` from the environment, else from `.env`, and passes `sslmode`
+  and the other connection settings on to the PostgreSQL tools.
+- It **refuses a database that already has data**, and names the tables, unless you add
+  `FORCE=1`. A restore replaces every table, including accounts.
+- It creates the PostGIS extension when it is missing, and explains what to do if the
+  role is not allowed to.
+- It restores, then runs Django's migrations, then prints row counts.
+
+## make setup
 
 ```
 make setup
@@ -91,48 +289,69 @@ It is safe to re-run. It does the following:
 2. Runs `npm ci` in `frontend/`.
 3. Creates `.env` from `.env.example`, **only if `.env` does not exist**, with a random
    `SECRET_KEY`. On macOS it also fills in the Homebrew GDAL/GEOS paths (see
-   [Troubleshooting](#gdal)).
-4. Starts PostgreSQL 16 + PostGIS 3.4 in Docker (`docker compose up -d --wait`). The
-   container is `campsite_db`, and its data lives in a named volume that survives restarts.
+   [Troubleshooting](#gdal)); in the dev container it points `DATABASE_URL` at the `db`
+   service.
+4. **Path B only:** starts PostgreSQL 16 + PostGIS 3.4 in Docker
+   (`docker compose up -d --wait`). The container is `campsite_db`, and its data lives in
+   a named volume that survives restarts. On paths A and C it prints which path it
+   detected and starts nothing.
 5. Applies the migrations.
 
 `.env` holds every variable the backend and Docker read. Each one is explained in
 `.env.example`. `RIDB_API_KEY` is optional: only the `ridb` ingest uses it, and it skips
 cleanly without one.
 
-## 3. Get data
+## Get data
 
 A fresh database is empty. Choose one of three ways to fill it:
 
-| Path | Command | Time | What you get |
+| Way | Command | Time | What you get |
 |---|---|---|---|
-| **Restore a dump** (recommended) | `make restore DUMP=<url-or-path>` | ~15 s + downloading ~110 MB | Everything a teammate has: every region ingested so far, routes, profiles, enrichment |
-| Full rebuild | `make data` | ~30 min to 3+ h (estimate; see below) | The Adirondacks rebuilt from the live sources |
+| **Restore the snapshot** (recommended) | `make restore DUMP=$(make -s snapshot-url)` | 81 s including the 380 MB download (measured) | Everything: both regions, routes, profiles, enrichment, the routing graph, terrain, peaks and trailheads |
+| Full rebuild | `make data` | ~30 min to 3+ h (see below) | The Adirondacks rebuilt from the live sources |
 | Sample | `.venv/bin/python backend/manage.py seed` | seconds | One 7 × 7 km patch, the Essex Chain Lakes; enough for UI work |
 
-### Restore a dump
+### Restore the snapshot
 
 ```
-make restore DUMP=https://github.com/dtstaple/campsite_454/releases/download/dev-data-2026-10-13/campsite-2026-10-13.dump
+make restore DUMP=$(make -s snapshot-url)
 ```
 
-That is the current snapshot, [dev-data-2026-10-13](https://github.com/dtstaple/campsite_454/releases/tag/dev-data-2026-10-13) (104 MB): the Adirondacks and the White Mountains, with routes, profiles and enrichment for both regions, the Adirondack lean-tos, and peaks and trailheads. What it holds and how it was checked is in [data-status.md](data-status.md). `make restore` with no `DUMP` prints the latest URL too.
+`make -s snapshot-url` prints the current snapshot's URL, which is `SNAPSHOT_URL` in the
+`Makefile`:
 
-`DUMP` can be a URL or a local path. Restoring **replaces** the data in your local
-database.
+```
+https://github.com/dtstaple/campsite_454/releases/download/dev-data-2026-11-08/campsite-2026-11-08.dump
+```
 
-Dumps never contain accounts, tokens, sessions, saved campsites, waypoints, trip plans or
-saved trails, so make yourself a login
-afterwards (see [section 5](#5-log-in)).
+- `DUMP` can be a URL or a local path. A URL is downloaded into `dumps/` once and reused.
+- It works on every path: it talks to whatever `DATABASE_URL` points at, using
+  `pg_restore` 16+ if you have it and the `postgis/postgis:16-3.4` image through Docker if
+  you don't.
+- **It refuses a database that already has data**, because a restore replaces every table,
+  your local accounts included. To replace it anyway: `make restore DUMP=... FORCE=1`.
+- It creates PostGIS if it is missing, restores, runs the migrations, and prints the row
+  counts of the main tables.
 
-To publish a dump for the team:
+Snapshots never contain accounts, tokens, sessions, saved campsites, waypoints, trip
+plans, hikes or saved trails, so make yourself a login afterwards (see
+[Log in](#log-in)).
+
+### Publishing a new snapshot
 
 ```
 make dump
 ```
 
-This writes `dumps/campsite-<date>.dump`; `dumps/` is gitignored. Then upload it as a
-GitHub Release asset:
+This writes `dumps/campsite-<date>.dump` (`dumps/` is gitignored) from whatever
+`DATABASE_URL` points at. Every person's data is left out: the tables matching
+`PERSONAL_TABLES` in `scripts/snapshot.py` (`auth_user*`, `authtoken_token`,
+`accounts_*`, `planning_*`, `django_session`, `django_admin_log`) are dumped empty. The
+dump is then checked, and deleted if any of them has rows. A test
+(`tests/test_snapshot.py`) fails if a new model that points at a user is not covered by
+those patterns. To check any dump: `.venv/bin/python scripts/snapshot.py check <file>`.
+
+Then upload it as a GitHub Release asset:
 
 ```
 gh release create dev-data-<date> dumps/campsite-<date>.dump \
@@ -140,7 +359,8 @@ gh release create dev-data-<date> dumps/campsite-<date>.dump \
     --notes "Public geodata only, no user accounts. Restore with: make restore DUMP=<asset URL>"
 ```
 
-Then point `SNAPSHOT_URL` in the `Makefile` and the URLs in this file at the new asset.
+Then point `SNAPSHOT_URL` in the `Makefile` at the new asset, and update
+[data-status.md](data-status.md). The dev container picks up the new URL by itself.
 
 ### Full rebuild
 
@@ -258,25 +478,36 @@ and that is expected.**
 `.venv/bin/python backend/manage.py reset_db` wipes the database back to the sample. Add
 `--noinput` to skip the confirmation.
 
-## 4. Check and run
+
+## Check and run
 
 ```
 make doctor
 ```
 
-`make doctor` prints `PASS`, `FAIL` or `WARN` for each of these:
+`make doctor` first prints the path it detected, then `PASS`, `FAIL` or `WARN` for each
+check. The path comes from `scripts/db_path.py`:
 
-- Python and Node versions
-- `.env` and its required variables
-- Docker, and the `campsite_db` container's health
-- the database connection
-- GDAL loading inside Django
-- migrations
-- row counts for each data table
-- ports 5432, 8000 and 5173: free, or used by our own processes
+- **A, dev container:** inside the dev container (it sets `CAMPSITE_DEVCONTAINER=1`), with
+  `DATABASE_URL` on the `db` service.
+- **C, hosted:** `DATABASE_URL` points at any host other than this machine or `db`.
+- **B, local Docker:** everything else.
 
-Every `FAIL` comes with a `FIX:` line giving the command to run. Paste the output into
-Claude Code if the fix is not obvious. The command exits non-zero while anything fails.
+| Check | A | B | C |
+|---|---|---|---|
+| Python 3.12, the pinned requirements, Node 22, `node_modules` | ✓ | ✓ | ✓ |
+| `.env` and its required variables | `DATABASE_URL`, CORS | also `POSTGRES_*`, and that `DATABASE_URL` matches them | also warns without `sslmode` |
+| The database server | `db:5432` reachable | Docker running, `campsite_db` healthy | the host reachable |
+| PostgreSQL 16 client tools, for `make restore`/`make dump` | ✓ | ✓ (Docker counts) | ✓ |
+| Ports | 8000, 5173 | 5432, 8000, 5173 | 8000, 5173 |
+| GDAL inside Django, the connection and PostGIS, migrations | ✓ | ✓ | ✓ |
+| Row counts: campsites, trails, routes, water, land, facts, landmarks, graph edges, terrain facts | ✓ | ✓ | ✓ |
+
+Every `FAIL` comes with a `FIX:` line giving the command or setting that fixes it for that
+path; for example, a dev container whose `db` service is down is told to rebuild the
+container, and a hosted database without PostGIS is told how to enable it. Paste the output
+into Claude Code if the fix is not obvious. The command exits non-zero while anything
+fails.
 
 ```
 make dev
@@ -284,7 +515,8 @@ make dev
 
 `make dev` runs the backend on http://localhost:8000 and the frontend on
 http://localhost:5173 together, and Ctrl-C stops both. To run them in separate terminals,
-use `make backend` and `make frontend`.
+use `make backend` and `make frontend`. In a Codespace, open the forwarded port 5173
+instead (path A).
 
 Open **http://localhost:5173** (see [Troubleshooting](#the-basemap-is-blank) for why
 `localhost`).
@@ -373,7 +605,7 @@ it on a real phone:
   Security → Location Services → Safari Websites** and choose **While Using the App**. Then
   reload.
 
-## 5. Log in
+## Log in
 
 - **The app:** click **Create account** (top right) on http://localhost:5173. The account lives
   only in your local database.
@@ -385,9 +617,10 @@ it on a real phone:
 
   The admin is the quickest way to inspect ingested rows and `IngestRun` provenance.
 
-`make restore` removes local accounts, so repeat both steps after a restore.
+A forced restore (`make restore ... FORCE=1`) removes local accounts, so repeat both steps
+after one.
 
-## 6. Checking the data makes sense
+## Checking the data makes sense
 
 The unit suite (`pytest`) tests code against fixtures and never looks at your database.
 `pytest -m data` does. It runs read-only against whatever `DATABASE_URL` points at, and both
@@ -401,7 +634,7 @@ a plain `pytest` and CI skip it. It checks that:
 The thresholds and the reasoning behind them are at the top of
 `tests/data_checks/test_data_coherence.py`.
 
-## 7. Before you push
+## Before you push
 
 ```
 source .venv/bin/activate
@@ -412,7 +645,7 @@ cd frontend && npm run lint && npm run build && npm test
 CI runs the same checks. Branch, commit and Jira rules are in `CLAUDE.md` and
 `docs/CONTRIBUTING.md`.
 
-## 8. Troubleshooting
+## Troubleshooting
 
 ### GDAL
 
@@ -544,4 +777,36 @@ volumes never touch.
 ### Pointing at a different database
 
 Pointing the app at another database, including a hosted one, only means changing
-`DATABASE_URL`. See `docs/deployment.md`.
+`DATABASE_URL`: that is path C. `make doctor` then reports the hosted path and checks it.
+The production database is a separate matter; see `docs/deployment.md`.
+
+## Measured setup times
+
+Measured on 2026-11-08 on a MacBook (Apple Silicon, macOS, Docker Desktop), from a fresh
+clone or a fresh container to `make doctor` passing every check with the full snapshot
+loaded. "Warm" means the pip and npm download caches and the Docker base images were
+already on the machine, as they are after any earlier project; a new machine adds their
+downloads.
+
+| Path | Step | Time |
+|---|---|---|
+| A, dev container (VS Code / Dev Containers CLI) | Build the image, uncached (base image already pulled) | 86 s |
+| | `post-create.sh`: `make setup` in fresh volumes, download the 380 MB snapshot, restore, migrate | 94 s |
+| | **Total, to `make doctor` all PASS** | **about 3 min** |
+| A, in a GitHub Codespace | | Not measured yet: waiting on a teammate's run (TM05-160) |
+| B, local Docker | `git clone`, then `.env` for a side-by-side copy (port 5442) | 5 s |
+| | `make setup` (warm pip/npm caches, PostGIS image already pulled) | 30 s |
+| | `make restore DUMP=$(make -s snapshot-url)`, including the 380 MB download | 81 s |
+| | **Total, to `make doctor` all PASS** | **116 s** |
+| C, hosted dev database | | Not measured yet: needs the hosted database to be created |
+
+Other measurements from the same day:
+
+- Restoring the snapshot from a local file into a throwaway PostGIS with TLS on and
+  `sslmode=require`, with the PostGIS extension missing (so the restore created it): 88 s.
+  With `NO_TERRAIN=1`: 16 s, and the database is 506 MB instead of 1.16 GB.
+- `make dump` of the full database: 65 s, 380 MB.
+- Inside the dev container, `make dev` served the page (200), `/api/health/` and
+  `/api/map-data/` through the Vite proxy, accepted a `*.app.github.dev` host and refused
+  an unknown one (403).
+
