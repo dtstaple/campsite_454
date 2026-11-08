@@ -169,6 +169,20 @@ if DEBUG and DEV_LAN_ORIGIN:
     CORS_ALLOWED_ORIGINS.append(DEV_LAN_ORIGIN)
     CSRF_TRUSTED_ORIGINS.append(DEV_LAN_ORIGIN)
 
+# TM05-160: in a GitHub Codespace the dev servers are reached through forwarded HTTPS
+# domains, https://<codespace>-<port>.app.github.dev. The app itself needs none of this (Vite
+# proxies /api, so the page and the API share an origin); it lets the Django admin on the
+# forwarded port 8000 accept its own host and login form. Codespaces sets both variables;
+# DEBUG must be on, so a deployment never trusts them.
+CODESPACE_NAME = os.environ.get("CODESPACE_NAME", "").strip()
+CODESPACES_DOMAIN = os.environ.get("GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN", "").strip()
+if DEBUG and CODESPACE_NAME and CODESPACES_DOMAIN:
+    ALLOWED_HOSTS.append(f"{CODESPACE_NAME}-8000.{CODESPACES_DOMAIN}")
+    for port in (5173, 8000):
+        origin = f"https://{CODESPACE_NAME}-{port}.{CODESPACES_DOMAIN}"
+        CORS_ALLOWED_ORIGINS.append(origin)
+        CSRF_TRUSTED_ORIGINS.append(origin)
+
 # TM05-113: HTTPS behind a TLS-terminating proxy (Render). The proxy sets
 # X-Forwarded-Proto, which Django trusts only when this is on. Each is opt-in through the
 # environment, so local development and the test suite (plain HTTP) are unaffected.

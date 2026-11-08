@@ -1,0 +1,51 @@
+# CampSite dev container (TM05-160): the app container and its own PostGIS. Used by
+# devcontainer.json; VS Code and GitHub Codespaces run it. docs/setup.md, path A.
+name: campsite-devcontainer
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # The repo, at the path devcontainer.json opens.
+    volumes:
+      - ..:/workspaces/campsite_454:cached
+      # Linux-only copies, so a host checkout's macOS .venv and node_modules are neither
+      # used nor overwritten here.
+      - venv:/workspaces/campsite_454/.venv
+      - node_modules:/workspaces/campsite_454/frontend/node_modules
+    environment:
+      CAMPSITE_DEVCONTAINER: "1"
+      # These win over the repo's .env (python-dotenv never overrides a set variable), so a
+      # host .env written for macOS (localhost, Homebrew GDAL paths) cannot leak in.
+      DATABASE_URL: postgis://campsite:change-me-locally@db:5432/campsite
+      GDAL_LIBRARY_PATH: ""
+      GEOS_LIBRARY_PATH: ""
+      DEBUG: "True"
+    command: sleep infinity
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    # Not published on the host, so it never clashes with a local campsite_db on 5432. Only
+    # the app container reaches it, as db:5432. The password is a fixed dev-only value for
+    # a database nothing outside this Compose network can connect to, like CI's.
+    environment:
+      POSTGRES_DB: campsite
+      POSTGRES_USER: campsite
+      POSTGRES_PASSWORD: change-me-locally
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U campsite -d campsite"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  pgdata:
+  venv:
+  node_modules:
