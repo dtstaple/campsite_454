@@ -3,7 +3,7 @@
 #
 #   make setup     venv + Python deps, npm ci, .env, database container, migrations
 #   make doctor    check everything, with a FIX line for each failure
-#   make restore DUMP=<path-or-url>   load a database dump (fast data path)
+#   make restore DUMP=<path-or-url>   load a dump (fast data path; FORCE=1 replaces data)
 #   make data      rebuild all Adirondacks data from the sources (slow data path)
 #   make refresh REGION=<region>   refresh one region, with record counts per step
 #   make terrain REGION=<region>   terrain facts and zones with GeoLibre (resumable)
@@ -12,34 +12,34 @@
 #   make prewarm   cache the campsite search for the demo trails (TRAILS="A,B")
 #   make dump      write a dump of your database to dumps/
 
-# .env supplies POSTGRES_*, DB_CONTAINER_NAME and COMPOSE_PROJECT_NAME. Missing on the
-# first `make setup`, which creates it.
--include .env
+# Make reads only COMPOSE_PROJECT_NAME from .env (docker compose reads the rest itself, and
+# the Python scripts and Django read .env on their own). Including the whole file would turn
+# every line into a make variable that overrides the process environment for every command,
+# so a host .env would beat the dev container's own DATABASE_URL and GDAL settings (TM05-160).
+# .env is missing on the first `make setup`, which creates it.
+ifneq ($(wildcard .env),)
+COMPOSE_PROJECT_NAME ?= $(shell sed -n 's/^COMPOSE_PROJECT_NAME=//p' .env)
+endif
+ifneq ($(COMPOSE_PROJECT_NAME),)
 export COMPOSE_PROJECT_NAME
+endif
 
 VENV := .venv
 VPY := $(VENV)/bin/python
-DB_CONTAINER_NAME ?= campsite_db
-POSTGRES_USER ?= campsite
-POSTGRES_DB ?= campsite
 REGION ?= adirondacks
 STEPS ?=
 DUMP ?=
+FORCE ?=
+NO_TERRAIN ?=
 # The current team snapshot (GitHub Release). Update it when a new snapshot is published.
-SNAPSHOT_URL := https://github.com/dtstaple/campsite_454/releases/download/dev-data-2026-10-13/campsite-2026-10-13.dump
+SNAPSHOT_URL := https://github.com/dtstaple/campsite_454/releases/download/dev-data-2026-11-08/campsite-2026-11-08.dump
 OUT ?= dumps/campsite-$(shell date +%Y-%m-%d).dump
 
 # Python 3.12 exactly: CI runs 3.12, and 3.13/3.14 have no wheels for some pinned deps.
 PYTHON312 := $(shell command -v python3.12 2>/dev/null)
 
-# Data that belongs to a person, not the project: dumped as empty tables.
-# 'accounts_*' and 'planning_*' are patterns, so a new per-user table in either app is left
-# out automatically. Every planning table is a user's own: waypoints, trip plans and their
-# stops, saved trails (TM05-90).
-PERSONAL_TABLES := auth_user auth_user_groups auth_user_user_permissions authtoken_token \
-	'accounts_*' 'planning_*' django_session django_admin_log
-
-.PHONY: help setup doctor dev backend frontend data refresh terrain restore dump dev-phone prewarm
+.PHONY: help setup doctor dev backend frontend data refresh terrain restore dump dev-phone prewarm \
+	snapshot-url
 
 help:
 	@sed -n '4,13p' Makefile | sed 's/^# //'
@@ -60,8 +60,11 @@ setup:
 	cd frontend && npm ci --no-audit --no-fund
 	@echo "==> .env"
 	@$(PYTHON312) scripts/ensure_env.py
-	@echo "==> Database container"
-	docker compose up -d --wait
+	@# TM05-160: Docker Compose only on the local Docker path. The dev container has its own
+	@# db service, and a hosted DATABASE_URL needs no container (scripts/db_path.py).
+	@path=$$($(PYTHON312) scripts/db_path.py); \
+	if [ "$$path" = docker ]; then echo "==> Database container"; docker compose up -d --wait; \
+	else echo "==> Database: the $$path path, so no local container is started"; fi
 	@echo "==> Migrations"
 	$(VPY) backend/manage.py migrate --no-input
 	@echo
@@ -124,33 +127,19 @@ refresh:
 terrain:
 	$(VPY) backend/manage.py terrain $(REGION)
 
+# TM05-160: dump and restore go through scripts/snapshot.py, against whatever DATABASE_URL
+# points at: the local Docker database, the dev container's db service, or a hosted PostGIS.
+# A dump leaves out every person's data and checks that it did. A restore refuses a database
+# that already has data unless FORCE=1, creates PostGIS if it is missing, then migrates.
 dump:
-	@mkdir -p $(dir $(OUT))
-	docker exec $(DB_CONTAINER_NAME) pg_dump -U $(POSTGRES_USER) -d $(POSTGRES_DB) \
-		--format=custom --no-owner --schema=public \
-		$(foreach t,$(PERSONAL_TABLES),--exclude-table-data=$(t)) > $(OUT)
-	@ls -lh $(OUT)
-	@echo "Dump written (accounts, tokens, sessions, saved campsites and trip plans left out)."
+	$(VPY) scripts/snapshot.py dump --out $(OUT)
 
-# The dump's own `public` schema entry is skipped: PostGIS lives in that schema, so
-# --clean could never drop it, and the schema already exists in every database here.
 restore:
 	@if [ -z "$(DUMP)" ]; then \
-		echo "Usage: make restore DUMP=<path-or-url>"; \
+		echo "Usage: make restore DUMP=<path-or-url> [FORCE=1] [NO_TERRAIN=1]"; \
 		echo "  latest team snapshot: make restore DUMP=$(SNAPSHOT_URL)"; \
 		exit 1; fi
-	@file="$(DUMP)"; \
-	case "$$file" in http://*|https://*) \
-		mkdir -p dumps; file="dumps/$$(basename "$$file")"; \
-		echo "==> Downloading $(DUMP)"; curl -fL --progress-bar -o "$$file" "$(DUMP)" || exit 1;; \
-	esac; \
-	echo "==> Restoring $$file into $(DB_CONTAINER_NAME) (replaces existing data and local accounts)"; \
-	docker cp "$$file" $(DB_CONTAINER_NAME):/tmp/restore.dump || exit 1; \
-	docker exec $(DB_CONTAINER_NAME) sh -c '\
-		pg_restore -l /tmp/restore.dump | grep -v -e " SCHEMA - public " -e " COMMENT - SCHEMA public " > /tmp/restore.list && \
-		pg_restore -U $(POSTGRES_USER) -d $(POSTGRES_DB) --clean --if-exists --no-owner \
-			--exit-on-error -L /tmp/restore.list /tmp/restore.dump; \
-		status=$$?; rm -f /tmp/restore.dump /tmp/restore.list; exit $$status'
-	$(VPY) backend/manage.py migrate --no-input
-	@echo "Restored. Accounts are not in dumps: make an admin with"
-	@echo "  $(VPY) backend/manage.py createsuperuser"
+	$(VPY) scripts/snapshot.py restore "$(DUMP)" $(if $(FORCE),--force) $(if $(NO_TERRAIN),--no-terrain)
+
+snapshot-url:
+	@echo $(SNAPSHOT_URL)
