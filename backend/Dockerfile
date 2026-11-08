@@ -28,11 +28,20 @@ RUN DATABASE_URL=postgis://build@localhost/build SECRET_KEY=build-only DEBUG=Fal
 RUN useradd --create-home --uid 1000 app && chown -R app /app
 USER app
 
-# Render sets PORT (default 10000); 8000 locally. Migrations run on every start because the
-# free tier has no pre-deploy step; on an up-to-date database they are a no-op. Two workers
-# fit the free tier's 512 MB; the timeout covers the slowest on-demand terrain analyses.
+# Render sets PORT (default 10000); 8000 locally.
+#
+# Migrations (TM05-161): render.yaml runs them as the service's pre-deploy command, before the
+# new image takes traffic, and sets MIGRATE_ON_START=False. Anywhere without a pre-deploy step
+# (Render's free plan, `docker run`), the default runs them on every start instead; on an
+# up-to-date database that is a no-op.
+#
+# Two workers fit 512 MB. GUNICORN_TIMEOUT (seconds) must cover the slowest on-demand request:
+# a trail's first "Find campsites" samples 3DEP, normally 15-35 s, once 129 s on a busy machine
+# (docs/candidates.md, docs/deployment.md).
 ENV PORT=8000
 EXPOSE 8000
-CMD python manage.py migrate --no-input \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+  CMD python -c "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:%s/api/health/' % os.environ.get('PORT', '8000'), timeout=4)"
+CMD if [ "${MIGRATE_ON_START:-True}" = "True" ]; then python manage.py migrate --no-input || exit 1; fi \
  && exec gunicorn config.wsgi:application --bind 0.0.0.0:$PORT \
-      --workers ${WEB_CONCURRENCY:-2} --timeout 120 --access-logfile -
+      --workers ${WEB_CONCURRENCY:-2} --timeout ${GUNICORN_TIMEOUT:-180} --access-logfile -

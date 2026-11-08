@@ -101,3 +101,29 @@ jobs:
       - name: Test
         run: npm test
         working-directory: frontend
+
+  # TM05-161: deploy to Render only after both jobs above pass on a push to main. Each step
+  # calls a Render deploy hook (a secret URL from the service's Settings -> Deploy Hook) and
+  # is skipped while its secret is unset, so this job is a no-op until the secrets are added.
+  # render.yaml turns Render's own auto-deploy off, so nothing deploys before CI is green.
+  # docs/deployment.md, "Deploying".
+  deploy:
+    needs: [quality, frontend]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    env:
+      API_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+      WEB_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_WEB }}
+
+    steps:
+      - name: Deploy the backend (campsite-api)
+        if: env.API_HOOK != ''
+        run: curl -fsS -X POST "$API_HOOK" > /dev/null && echo "backend deploy triggered"
+
+      - name: Deploy the frontend (campsite-web)
+        if: env.WEB_HOOK != ''
+        run: curl -fsS -X POST "$WEB_HOOK" > /dev/null && echo "frontend deploy triggered"
+
+      - name: Nothing to deploy
+        if: env.API_HOOK == '' && env.WEB_HOOK == ''
+        run: echo "RENDER_DEPLOY_HOOK and RENDER_DEPLOY_HOOK_WEB are not set; skipping deploy."
