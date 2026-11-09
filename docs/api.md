@@ -1369,6 +1369,7 @@ precomputed, so they cost nothing per request.
   "shelter": {"level": "moderate", "reason": "About level with the ground around it."},
   "cold_air": {"level": "medium", "reason": "Low-lying: 84% of the land within about 1 km is higher, so some cold air drains down to here on calm nights."},
   "wind": {"level": "moderate", "reason": "Partly open to a west wind: the nearest ground rising against it is about 640 m upwind.", "from_deg": 270, "from": "west"},
+  "sun_hours": {"hours": 13.6, "level": "full", "reason": "About 14 h of direct sun on a day in June to August, out of about 15 h of daylight.", "morning_sun": true, "morning_reason": "In direct sun for most of the time from sunrise to 10 am.", "estimate": "Bare-earth estimate: shade from trees isn't counted"},
   "view": {"area_km2": 7.1, "direction": "all around", "water": true},
   "has_viewshed": true,
   "note": "Terrain-model estimate from bare-earth elevation. Trees, buildings and recent changes aren't counted.",
@@ -1388,6 +1389,10 @@ values the app shows:
 | `cold_air.level` | `low`, `medium` or `high` (TM05-147): how much cold air settles here on clear, calm nights |
 | `wind.level` | `sheltered`, `moderate` or `exposed` (TM05-148): exposure to the region's prevailing wind |
 | `wind.from_deg`, `wind.from` | the prevailing wind assumed, as the bearing it blows from (`270`) and its compass name (`west`) |
+| `sun_hours.hours` | estimated hours of direct sun on a June–August day, with terrain shade counted and trees not (TM05-162) |
+| `sun_hours.level` | `full` (12 h or more), `partial` (8 h or more) or `low` |
+| `sun_hours.morning_sun` | `true` when the site is in direct sun for at least half the time from sunrise to 10 am (EDT) |
+| `sun_hours.estimate` | the label to show with it; each of `hours` and `morning_sun` can be null on its own |
 | `view.direction` | a compass sector, or `all around` |
 | `view.water` | 1 ha or more of lake or pond visible within 2 km |
 

@@ -85,6 +85,7 @@ under [Resolutions](#resolutions-chosen-and-why).
 | What you can see | `viewshed` (per station), `visibility_index`, `skyline_analysis` | `viewshed`, one station per site |
 | Cold-air pooling (TM05-147) | `elevation_percentile`, `relative_topographic_position`, `sky_view_factor`, `depth_in_sink` | `elevation_percentile` |
 | Exposure to the prevailing wind (TM05-148) | `fetch_analysis`, `exposure_towards_wind_flux` | `fetch_analysis` |
+| Hours of direct sun, morning sun (TM05-162) | `time_in_daylight`, `solar_radiation`, `horizon_angle`, `shadow_image` | `time_in_daylight` |
 | Zones as polygons | `reclass`, `raster_to_vector_polygons` | both |
 
 ## The DEM source: USGS 3DEP 1/3 arc-second, verified live
@@ -258,7 +259,8 @@ That is roughly 15 minutes on one core. The pipeline (TM05-141) measures the rea
 
 These are Sprint 8 candidates; none needs a new dependency:
 
-- `solar_radiation`: summer Wh/m², which could become "sun hours" (22 CPU-min at 30 m).
+- `solar_radiation`: summer Wh/m². TM05-162 uses `time_in_daylight` for sun hours
+  instead (see [Sun hours](#sun-hours-tm05-162)).
 - `exposure_towards_wind_flux`: wind exposure to the prevailing westerlies. TM05-148 uses
   `fetch_analysis` instead (see [Wind exposure](#wind-exposure-tm05-148)).
 - `geomorphons`: landform classes such as ridge, hollow or valley.
@@ -333,6 +335,7 @@ The code is in `backend/terrain/`:
    - shelter, from DEV
    - cold-air pooling, from the elevation percentile (TM05-147)
    - wind exposure, from the upwind distance to rising ground (TM05-148)
+   - sun hours and morning sun, from the share of daytime in direct sun (TM05-162)
    - water view: at least 5,000 m² of NHD lake or pond inside the viewshed
 
 **Idempotent and resumable.**
@@ -549,6 +552,92 @@ argument for the region being run.
 - Funnelling along valleys and speed-up over ridges aren't modelled. Only whether
   terrain stands in the wind's way upwind is.
 - The thresholds are first estimates, not yet tuned against a full region run.
+
+### Sun hours (TM05-162)
+
+The `sun` class (from aspect) says which way the ground faces. It doesn't say whether a
+ridge across the valley hides the sun. Sun hours ask that directly: on a summer day, how
+many hours is the site in direct sun, and does the sun reach it in the morning, early
+enough to dry a tent and warm a cold camp?
+
+**The tools.** Two entries, `sun` and `sun_morning`, both run `time_in_daylight`. For
+each cell it finds the horizon in every direction, then follows the sun's path through
+each day of the season. The result is the share (0 to 1) of daytime the cell is in direct
+sun rather than in terrain shadow.
+
+- `sun` runs from sunrise to sunset, and each site samples the median within 90 m as
+  `sun_share`.
+- `sun_morning` runs from sunrise to 10:00, sampled the same way as `morning_sun_share`.
+
+**The assumptions.**
+
+| | Value | Why |
+|---|---|---|
+| Season | 1 June (day 152) to 31 August (day 243), every day | The main backcountry camping season. `classify.sun_hours.season` names it in the panel, and a test keeps the days and the label equal. |
+| Sun position | Each tile's own latitude and longitude, read from the DEM | Checked: on an EPSG:5070 tile it gives exactly what an explicit `latitude`/`longitude` gives. |
+| Clock | `regional.summer_utc_offset`, UTC−04:00 (EDT) | "10:00" means 10 am on a camper's watch. Left out, the tool guesses UTC−05:00 from longitude, which moved the window an hour later: one test site went from 0.61 to 0.68 lit. |
+| Morning | Sunrise to 10:00 | By 10 am a site in the sun has dried and warmed. One that is still shaded hasn't. |
+| Horizon | Out to 5 km, sampled every 10° of azimuth | The sun is blocked by ridges kilometres away. 5 km covers a 1,000 m wall at 11°, and 10° bins halve the cost against the default 5°. |
+| Grid | `sun`: 90 m, 1,000-cell tiles with 5 km overlap, campsite tiles only | The overlap has to cover the horizon search (a test checks it). Sun is a landscape-scale effect, so 90 m loses little. |
+
+**Hours, classes and the panel.** Hours are `sun_share` times the mean day length over the
+season at the site's latitude (`mappers.day_length_h`, sunrise to sunset at −0.833°). That
+day length is 14.8 h at Marcy Dam, against an almanac's 15 h 29 min on Lake Placid's
+longest day. A test checks it.
+
+| Level | Direct sun on a June–August day | The panel says |
+|---|---|---|
+| `full` | 12 h or more | "About 14 h of direct sun on a day in June to August, out of about 15 h of daylight." |
+| `partial` | 8 to 12 h | "About 10 h of direct sun on a day in June to August: the terrain shades it for about 5 of the 15 h of daylight." |
+| `low` | under 8 h | "Only about 6 h of direct sun on a day in June to August: the terrain shades it for most of the 15 h of daylight." |
+
+- **Morning sun** is `yes` when `morning_sun_share` is at least 0.5, meaning the site is
+  in direct sun for most of sunrise to 10 am. The panel adds "In direct sun for most of
+  the time from sunrise to 10 am", or "Higher ground shades it for most of…".
+- **The Terrain section** shows "Sun hours: About 10 h of direct sun · no morning sun",
+  with the reasons, and the label "Bare-earth estimate: shade from trees isn't counted".
+- **Unknowns.** Each half is unknown on its own: a site with no `sun_share` still shows
+  its morning sun.
+- **Thresholds** are `classify.sun_hours` (`full_from_h`, `partial_from_h`,
+  `morning_from_share`). They are first estimates, not yet tuned against a full region
+  run. Nothing is zoned, so no tile layer is added.
+
+**Measured** (geolibre-wasm 1.7.1, WSL on a Windows laptop):
+
+- **Behaviour on synthetic 30 m DEMs**, one test site, June to August, in EDT. Flat ground
+  is 0.99 lit all day and 0.98 in the morning: the tool trims a few minutes at sunrise.
+
+  | Terrain | All day | Sunrise to 10:00 | Why |
+  |---|---|---|---|
+  | Flat | 0.99 | 0.98 | Lit all day |
+  | 300 m wall 150 m to the south | 0.95 | 0.98 | The summer sun clears it |
+  | 300 m wall 150 m to the north | 0.77 | 0.61 | The sun rises and sets in the north-east and north-west in summer |
+  | 300 m ridge 150 m to the east | 0.63 | **0.00** | No morning sun |
+  | 300 m ridge 150 m to the west | 0.63 | 0.98 | Evening shade only |
+
+- **Cost.** On a full `sun` tile (1,111² cells with its overlap, rolling synthetic
+  terrain), `sun` took 94 s and `sun_morning` 23 s, with at most 59 MB of WASM memory. The
+  region's 90 m grid is at most nine tiles, so this is about 18 CPU-minutes, spread over
+  the workers.
+
+**Why `time_in_daylight`.**
+
+- It answers the question directly: the share of time in direct sun, which turns into
+  hours in one step.
+- It reads latitude and longitude from the DEM, so each tile gets its own sun.
+- `solar_radiation` gives Wh/m² (direct plus diffuse). Turning that into hours needs a
+  clear-sky model, and it would mix slope steepness with shade.
+- `horizon_angle` is one azimuth per call: 36 calls, then our own sun-path code.
+- `shadow_image` is one moment in time.
+
+**What it leaves out.**
+
+- Trees. Under a closed canopy, most of the "direct sun" here never reaches the ground.
+  The label says so.
+- Clouds: these are clear-sky hours.
+- Shade from terrain beyond 5 km. That is rare at Adirondack relief.
+- A site's own slope. A cell's horizon includes the ground around it, but the facing
+  (`sun`) is the 10 m answer for that.
 
 ### Measured: the Adirondacks (2026-10-23)
 
