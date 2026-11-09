@@ -24,9 +24,27 @@ export interface TerrainPayload {
    * `from_deg` is the compass bearing it blows from, `from` its 8-point name.
    */
   wind?: { level: ShelterLevel; reason: string; from_deg: number | null; from: string | null } | null;
+  /**
+   * TM05-162: direct sun on a June-August day from terrain shade alone; absent from a
+   * payload older than the sun tool. Either half can be unknown on its own.
+   */
+  sun_hours?: SunHours | null;
   view: { area_km2: number | null; direction: string | null; water: boolean | null } | null;
   has_viewshed: boolean;
   note: string;
+}
+
+/** TM05-162: full (12 h or more of direct sun), partial (8 h or more) or low. */
+export type SunHoursLevel = "full" | "partial" | "low";
+
+export interface SunHours {
+  hours: number | null;
+  level: SunHoursLevel | null;
+  reason: string | null;
+  morning_sun: boolean | null;
+  morning_reason: string | null;
+  /** What the estimate leaves out: trees. */
+  estimate: string;
 }
 
 /** The compact form on list rows: only what a badge needs. */
@@ -37,7 +55,7 @@ export interface TerrainBadges {
 }
 
 export interface TerrainLine {
-  key: "pooling" | "sun" | "shelter" | "cold_air" | "wind" | "view";
+  key: "pooling" | "sun" | "shelter" | "cold_air" | "wind" | "sun_hours" | "view";
   label: string;
   value: string;
   detail: string | null;
@@ -96,6 +114,23 @@ export function viewText(view: NonNullable<TerrainPayload["view"]>): string | nu
   return parts.length ? parts.join(" · ") : null;
 }
 
+/** TM05-162: the sun-hours line's estimate label, when an older payload has none. */
+export const SUN_HOURS_ESTIMATE = "Bare-earth estimate: shade from trees isn't counted";
+
+/**
+ * TM05-162: "About 10 h of direct sun · morning sun", or just "No morning sun" when the
+ * hours are unknown. Null when both are.
+ */
+export function sunHoursText(sun: SunHours): string | null {
+  const parts: string[] = [];
+  if (sun.hours !== null) parts.push(`About ${Math.round(sun.hours)} h of direct sun`);
+  if (sun.morning_sun !== null) {
+    const morning = sun.morning_sun ? "morning sun" : "no morning sun";
+    parts.push(parts.length ? morning : morning[0].toUpperCase() + morning.slice(1));
+  }
+  return parts.length ? parts.join(" · ") : null;
+}
+
 /** "Faces east: morning sun", or "Flat: sun all day where trees allow". */
 export function sunText(sun: NonNullable<TerrainPayload["sun"]>): string {
   if (sun.facing === "flat") return `Flat: ${sun.label}`;
@@ -145,6 +180,19 @@ export function terrainLines(terrain: TerrainPayload | null | undefined): Terrai
       detail: terrain.wind.reason || null,
       tone: terrain.wind.level,
       estimate: windEstimate(terrain.wind),
+    });
+  }
+  const sunHours = terrain.sun_hours ? sunHoursText(terrain.sun_hours) : null;
+  if (terrain.sun_hours && sunHours) {
+    const { reason, morning_reason, estimate } = terrain.sun_hours;
+    const detail = [reason, morning_reason].filter(Boolean).join(" ");
+    lines.push({
+      key: "sun_hours",
+      label: "Sun hours",
+      value: sunHours,
+      detail: detail || null,
+      tone: null,
+      estimate: estimate || SUN_HOURS_ESTIMATE,
     });
   }
   const view = terrain.view ? viewText(terrain.view) : null;
