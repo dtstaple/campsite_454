@@ -41,6 +41,50 @@ Each has a grip on its top edge, and snaps to one of three heights:
   "mi 3.90, 3,319 ft, 23% grade" and the cursor marker along the trail.
 - **The map:** pan, pinch-zoom and rotate are MapLibre's own touch handling.
 
+## Forms and the on-screen keyboard (TM05-133)
+
+The forms people type into on a phone are the trail search, a trip plan's name, a hike's
+name, and a waypoint's name and note. Each one stays usable while the keyboard is open.
+
+- **The field stays in view.** `components/useKeyboard.ts`, mounted once in `App`, reads
+  the keyboard from the visual viewport: whatever of the page the visual viewport no
+  longer shows is under the keyboard (`keyboardInset` in `components/keyboard.ts`). While
+  a keyboard covers 120 px or more, it sets `keyboard-open` and two values on `<html>`:
+  `--keyboard-inset`, the pixels it covers, and `--keyboard-visible-height`. Then
+  `src/phone.css` does three things:
+  - A bottom sheet (plan name, hike name) sits on top of the keyboard, no taller than
+    what is still visible.
+  - The waypoint editor docks to the bottom edge, above the keyboard. It no longer floats
+    over its point, where the keyboard could cover it.
+  - The trail search list stops above the keyboard.
+
+  The hook then scrolls the focused field into the visible part of its sheet, with a
+  12 px margin (`revealDelta`).
+- **No zoom on focus.** iOS Safari zooms the page into a focused field whose text is
+  under 16 px. On a touch screen (`pointer: coarse`), every text field, textarea and
+  select is `--text-input-touch` (16 px). The viewport still allows pinch-zoom, for
+  accessibility.
+- **One-handed.**
+  - On a phone, each field and its submit button are at least `--touch-target` (44 px)
+    tall, and all of them sit in the bottom half of the screen, in thumb reach.
+  - The keyboard's Enter key reads "search" on the trail search and "done" on the name
+    fields (`enterKeyHint`). Enter submits.
+  - `autoComplete="off"` keeps the browser's autofill bar from taking room above the
+    keyboard.
+- **Desktop unchanged.** No keyboard ever covers the page on a desktop, so the
+  `keyboard-open` rules never apply. The 16 px fields only apply to a touch screen, and
+  the docked editor and the 44 px targets only apply below 640 px.
+
+`frontend/tests/keyboard.test.ts` covers four things:
+- the keyboard measured for Android Chrome and for iOS (which also pans the layout), with
+  a moving browser toolbar not counted as a keyboard
+- which elements open a keyboard
+- how far a field is scrolled
+- that the touch font size stays at least 16 px
+
+What the keyboard really covers can only be checked on a device. That is in the run
+report's phone checklist.
+
 ## Live location
 
 There are two buttons at the bottom left (`location/LiveLocation.tsx`):
