@@ -257,6 +257,8 @@ export default function PlanBuilder({ detail, session, draft, onDraft, onWorked 
           >
             <input
               aria-label="Plan name"
+              enterKeyHint="done"
+              autoComplete="off"
               placeholder={`${detail.name}: ${nights(shown.nights)}`}
               value={draft.name}
               maxLength={120}

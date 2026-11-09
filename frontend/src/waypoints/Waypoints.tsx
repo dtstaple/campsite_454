@@ -370,6 +370,8 @@ export default function Waypoints({ map, session, focus }: Props) {
               <input
                 value={draft.name}
                 maxLength={NAME_MAX}
+                enterKeyHint="done"
+                autoComplete="off"
                 autoFocus
                 onChange={(event) => setDraft({ ...draft, name: event.target.value })}
               />
