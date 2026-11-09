@@ -4,6 +4,8 @@ import {
   area,
   COLD_AIR_ESTIMATE,
   passesQuickFilters,
+  SUN_HOURS_ESTIMATE,
+  sunHoursText,
   TERRAIN_NOTE,
   terrainBadges,
   terrainLines,
@@ -23,12 +25,20 @@ const FULL: TerrainPayload = {
     from_deg: 270,
     from: "west",
   },
+  sun_hours: {
+    hours: 10.3,
+    level: "partial",
+    reason: "About 10 h of direct sun on a day in June to August: the terrain shades it for about 5 of the 15 h of daylight.",
+    morning_sun: false,
+    morning_reason: "Higher ground shades it for most of the time from sunrise to 10 am.",
+    estimate: "Bare-earth estimate: shade from trees isn't counted",
+  },
   view: { area_km2: 4.2, direction: "east", water: true },
   has_viewshed: true,
   note: TERRAIN_NOTE,
 };
 
-test("a site with every fact gets six lines in order, worded as the panel shows them", () => {
+test("a site with every fact gets seven lines in order, worded as the panel shows them", () => {
   const lines = terrainLines(FULL);
   assert.deepEqual(
     lines.map((l) => [l.label, l.value]),
@@ -38,6 +48,7 @@ test("a site with every fact gets six lines in order, worded as the panel shows 
       ["Wind", "Sheltered"],
       ["Cold-air pooling", "high"],
       ["Prevailing wind", "Exposed"],
+      ["Sun hours", "About 10 h of direct sun · no morning sun"],
       ["View", "4.2 km², mostly east · water view"],
     ],
   );
@@ -52,6 +63,7 @@ test("partial facts: each unknown fact is left out, never shown as zero or 'unkn
     shelter: null,
     cold_air: null,
     wind: null,
+    sun_hours: null,
     view: { area_km2: null, direction: null, water: null },
   });
   assert.deepEqual(
@@ -84,6 +96,36 @@ test("prevailing wind shows the direction it assumes, labelled as an estimate (T
     "Estimate, assuming the prevailing wind is from the northwest (293°)",
   );
   assert.ok(!terrainLines({ ...FULL, wind: undefined }).some((l) => l.key === "wind"));
+});
+
+test("sun hours say the hours and morning sun, labelled as a bare-earth estimate (TM05-162)", () => {
+  const line = terrainLines(FULL).find((l) => l.key === "sun_hours")!;
+  assert.equal(line.tone, null);
+  assert.equal(
+    line.detail,
+    "About 10 h of direct sun on a day in June to August: the terrain shades it for about 5 " +
+      "of the 15 h of daylight. Higher ground shades it for most of the time from sunrise to 10 am.",
+  );
+  assert.equal(line.estimate, "Bare-earth estimate: shade from trees isn't counted");
+  assert.match(line.estimate!, /trees isn't counted/);
+  // An older payload without its own label still says what the estimate leaves out.
+  const unlabelled = terrainLines({ ...FULL, sun_hours: { ...FULL.sun_hours!, estimate: "" } });
+  assert.equal(unlabelled.find((l) => l.key === "sun_hours")!.estimate, SUN_HOURS_ESTIMATE);
+  assert.ok(!terrainLines({ ...FULL, sun_hours: undefined }).some((l) => l.key === "sun_hours"));
+});
+
+test("sun hours: each half is shown or left out on its own (TM05-162)", () => {
+  const base = FULL.sun_hours!;
+  assert.equal(sunHoursText({ ...base, hours: 14.4, morning_sun: true }), "About 14 h of direct sun · morning sun");
+  assert.equal(sunHoursText({ ...base, morning_sun: null }), "About 10 h of direct sun");
+  assert.equal(sunHoursText({ ...base, hours: null, morning_sun: true }), "Morning sun");
+  assert.equal(sunHoursText({ ...base, hours: null, morning_sun: false }), "No morning sun");
+  assert.equal(sunHoursText({ ...base, hours: null, morning_sun: null }), null);
+  const none = { ...base, hours: null, level: null, reason: null, morning_sun: null, morning_reason: null };
+  assert.ok(!terrainLines({ ...FULL, sun_hours: none }).some((l) => l.key === "sun_hours"));
+  // Only the morning known: its reason alone is the detail.
+  const morningOnly = terrainLines({ ...FULL, sun_hours: { ...none, morning_sun: true, morning_reason: "Lit early." } });
+  assert.equal(morningOnly.find((l) => l.key === "sun_hours")!.detail, "Lit early.");
 });
 
 test("missing facts: no terrain block means no section", () => {

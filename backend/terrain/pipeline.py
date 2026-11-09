@@ -236,7 +236,8 @@ def classify(registry: Registry, site_ids: list[int]) -> None:
     cfg = registry.classify
     # TM05-148: the region's prevailing wind, from Registry.for_region().
     wind_from = registry.params.get("wind_from_deg")
-    rows = TerrainFacts.objects.filter(campsite_id__in=site_ids)
+    # TM05-162: sun hours need each site's latitude, for the length of its day.
+    rows = TerrainFacts.objects.filter(campsite_id__in=site_ids).select_related("campsite")
     for row in rows.iterator():
         row.pooling, row.pooling_reason = mappers.pooling(row.values, cfg["pooling"])
         row.facing, row.sun = mappers.sun(row.values, cfg["sun"])
@@ -244,6 +245,13 @@ def classify(registry: Registry, site_ids: list[int]) -> None:
         row.cold_air, row.cold_air_reason = mappers.cold_air(row.values, cfg["cold_air"])
         row.wind, row.wind_reason = mappers.wind(row.values, cfg["wind"], wind_from)
         row.wind_from_deg = wind_from if row.wind else None
+        (
+            row.sun_hours,
+            row.sun_hours_level,
+            row.sun_hours_reason,
+            row.morning_sun,
+            row.morning_sun_reason,
+        ) = mappers.sun_hours(row.values, cfg["sun_hours"], row.campsite.geom.y)
         if row.viewshed is not None:
             with connection.cursor() as cursor:
                 cursor.execute(
@@ -412,6 +420,8 @@ def run(
         "shelter": facts.exclude(shelter="").count(),
         "cold_air": facts.exclude(cold_air="").count(),
         "wind": facts.exclude(wind="").count(),
+        "sun_hours": facts.exclude(sun_hours=None).count(),
+        "morning_sun": facts.exclude(morning_sun=None).count(),
         "viewshed": facts.exclude(viewshed=None).count(),
         "water_view": facts.filter(water_view=True).count(),
     }

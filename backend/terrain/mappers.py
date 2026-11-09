@@ -190,6 +190,86 @@ def wind(values: dict, cfg: dict, from_deg: float | None) -> tuple[str, str]:
     )
 
 
+#: The sun's centre is this far below a flat horizon at sunrise and sunset (refraction
+#: and the sun's radius), the usual definition of daylight.
+SUNRISE_ALTITUDE_DEG = -0.833
+
+
+def day_length_h(latitude_deg: float, day_of_year: int) -> float:
+    """Hours from sunrise to sunset over a flat horizon, from the sun's declination
+    (Cooper's approximation; within a few minutes, which is all an estimate needs)."""
+    declination = math.radians(23.44) * math.sin(2 * math.pi * (284 + day_of_year) / 365)
+    latitude = math.radians(latitude_deg)
+    cos_hour = (
+        math.sin(math.radians(SUNRISE_ALTITUDE_DEG)) - math.sin(latitude) * math.sin(declination)
+    ) / (math.cos(latitude) * math.cos(declination))
+    # Beyond the polar circles the sun can stay up (or down) all day.
+    hour_angle = math.degrees(math.acos(max(-1.0, min(1.0, cos_hour))))
+    return 2 * hour_angle / 15
+
+
+def season_daylight_h(latitude_deg: float, start_day: int, end_day: int) -> float:
+    """The mean day length over days `start_day` to `end_day` inclusive."""
+    days = range(start_day, end_day + 1)
+    return sum(day_length_h(latitude_deg, day) for day in days) / len(days)
+
+
+def clock(time_text: str) -> str:
+    """ "10:00:00" as the panel says it, "10 am"; "13:30:00" is "1:30 pm"."""
+    hours, minutes = (int(part) for part in time_text.split(":")[:2])
+    suffix = "am" if hours < 12 else "pm"
+    hours = hours % 12 or 12
+    return f"{hours} {suffix}" if minutes == 0 else f"{hours}:{minutes:02d} {suffix}"
+
+
+def sun_hours(
+    values: dict, cfg: dict, latitude_deg: float | None
+) -> tuple[float | None, str, str, bool | None, str]:
+    """Direct sun (TM05-162): (hours, level, reason, morning sun, morning reason).
+
+    `sun_share` is time_in_daylight's share of the season's daytime the site is in direct
+    sun, not in the shadow of terrain. Hours are that share of the mean day length over
+    the season at the site's latitude: about 15 h in an Adirondack summer, so a share of
+    0.8 is about 12 h. The level is `full`, `partial` or `low`. Morning sun is whether
+    the site is lit for at least `morning_from_share` of sunrise to `morning_until`.
+    Either half is unknown on its own when its value is missing.
+    """
+    share, morning_share = values.get("sun_share"), values.get("morning_sun_share")
+    hours, level, reason = None, "", ""
+    season, until = cfg["season"], clock(cfg["morning_until"])
+    if share is not None and latitude_deg is not None:
+        daylight = season_daylight_h(latitude_deg, cfg["start_day"], cfg["end_day"])
+        hours = round(max(0.0, min(1.0, share)) * daylight, 1)
+        rounded, day = round(hours), round(daylight)
+        if hours >= cfg["full_from_h"]:
+            level = "full"
+            reason = (
+                f"About {rounded} h of direct sun on a day in {season}, out of about {day} h "
+                "of daylight."
+            )
+        elif hours >= cfg["partial_from_h"]:
+            level = "partial"
+            reason = (
+                f"About {rounded} h of direct sun on a day in {season}: the terrain shades it "
+                f"for about {day - rounded} of the {day} h of daylight."
+            )
+        else:
+            level = "low"
+            reason = (
+                f"Only about {rounded} h of direct sun on a day in {season}: the terrain "
+                f"shades it for most of the {day} h of daylight."
+            )
+    morning, morning_reason = None, ""
+    if morning_share is not None:
+        morning = morning_share >= cfg["morning_from_share"]
+        morning_reason = (
+            f"In direct sun for most of the time from sunrise to {until}."
+            if morning
+            else f"Higher ground shades it for most of the time from sunrise to {until}."
+        )
+    return hours, level, reason, morning, morning_reason
+
+
 # --- viewshed -----------------------------------------------------------------------
 
 

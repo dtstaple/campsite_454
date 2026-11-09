@@ -51,6 +51,15 @@ grids:
     resolution_m: 90
     tile_cells: 1000
     overlap_m: 1500
+  # TM05-162: sun hours. time_in_daylight finds each cell's horizon in every direction out
+  # to `max_dist`, so its cost grows with the cells times the search length. The sun is
+  # blocked by ridges kilometres away, so it searches 5 km, which the overlap must cover.
+  # 90 m keeps a tile near two minutes; only tiles with a campsite are run (no zones).
+  sun:
+    resolution_m: 90
+    tile_cells: 1000
+    overlap_m: 5000
+    sites_only: true
 
 # TM05-148: values that differ by region (pipeline/regions.yml names), used in step
 # arguments as {name}. A region not listed uses `default`. Changing one changes the
@@ -61,6 +70,11 @@ regional:
   wind_from_deg:
     default: 270
     adirondacks: 270
+  # TM05-162: the clock the morning-sun window ("10:00") is read in, during the summer
+  # season the sun tools model. Every region so far is on Eastern Daylight Time then.
+  # Left out, time_in_daylight guesses from longitude and gets standard time, an hour off.
+  summer_utc_offset:
+    default: "UTC-04:00"
 
 # Each tool is a chain of GeoLibre calls on one grid. `{dem}` is the grid's DEM tile and
 # `{<step>}` an earlier step's output; the last step's output is the tool's raster.
@@ -196,6 +210,28 @@ tools:
       min_area_m2: 50000
       simplify_m: 90
 
+  # TM05-162: direct sun hours. time_in_daylight gives each cell the share of daytime
+  # (sunrise to sunset) it is in direct sun rather than in the shadow of terrain, over the
+  # summer camping season: 1 June (day 152) to 31 August (day 243). The sun's path comes
+  # from each tile's own latitude and longitude, which the tool reads from the DEM. The
+  # horizon is sampled every 10 degrees of azimuth (`az_fraction`) out to 5 km. Classify
+  # turns the share into hours of a season day at the site's latitude.
+  sun:
+    grid: sun
+    steps:
+      - {id: lit, tool: time_in_daylight, args: {dem: "{dem}", start_day: 152, end_day: 243, utc_offset: "{summer_utc_offset}", max_dist: 5000, az_fraction: 10}}
+    facts:
+      sun_share: {sample: median, radius_m: 90}
+
+  # TM05-162: morning sun. The same, from sunrise to 10:00 local (daylight) time: whether
+  # the sun reaches the site early enough to dry a tent and warm a cold camp.
+  sun_morning:
+    grid: sun
+    steps:
+      - {id: lit, tool: time_in_daylight, args: {dem: "{dem}", start_day: 152, end_day: 243, utc_offset: "{summer_utc_offset}", max_dist: 5000, az_fraction: 10, end_time: "10:00:00"}}
+    facts:
+      morning_sun_share: {sample: median, radius_m: 90}
+
   viewshed:
     grid: coarse
     # One viewshed per campsite on a window around it, not a tiled raster.
@@ -235,6 +271,20 @@ classify:
     # Sheltered: it rises within 300 m; exposed: 1 km or more of open ground upwind.
     sheltered_within_m: 300.0
     exposed_from_m: 1000.0
+  sun_hours:
+    # TM05-162. The season and the morning window the `sun` and `sun_morning` tools were
+    # run for (a test keeps them equal), in words for the panel.
+    season: June to August
+    start_day: 152
+    end_day: 243
+    morning_until: "10:00:00"
+    # On hours of direct sun in a season day: the share of daylight (`sun_share`) times
+    # the day's length at the site's latitude.
+    full_from_h: 12.0
+    partial_from_h: 8.0
+    # Morning sun when the site is in direct sun for at least this share of the time
+    # from sunrise to `morning_until` (`morning_sun_share`).
+    morning_from_share: 0.5
   cold_air:
     # On `elev_percentile`, the share (%) of the ground within ~1 km lower than the site.
     # High: in the lowest tenth, where cold air settles; medium: the lowest quarter.
