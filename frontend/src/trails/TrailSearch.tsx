@@ -118,6 +118,8 @@ export default function TrailSearch({ map, onPick }: Props) {
           className="trail-search-input"
           placeholder="Search trails by name"
           aria-label="Search trails by name"
+          enterKeyHint="search"
+          autoComplete="off"
           value={query}
           onChange={(event) => {
             setQuery(event.target.value);

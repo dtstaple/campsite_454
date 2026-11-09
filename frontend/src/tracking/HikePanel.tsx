@@ -198,7 +198,13 @@ function Finish({ hike, signedIn, defaultName }: { hike: Hike; signedIn: boolean
     >
       <label className="hike-name">
         <span>Name</span>
-        <input value={name} maxLength={120} onChange={(event) => setName(event.target.value)} />
+        <input
+          value={name}
+          maxLength={120}
+          enterKeyHint="done"
+          autoComplete="off"
+          onChange={(event) => setName(event.target.value)}
+        />
       </label>
       <div className="hike-controls">
         {signedIn ? (

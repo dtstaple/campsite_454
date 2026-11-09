@@ -402,6 +402,18 @@
   --phone-attribution-height: 60px;
 }
 
+/* --- Forms and the on-screen keyboard (TM05-133) ------------------------------------------ */
+:root {
+  /* iOS Safari zooms the page into a focused field whose text is under 16px, so no text
+   * field on a touch screen is smaller. */
+  --text-input-touch: 16px;
+  /* The smallest field or button a thumb has to hit on a phone. */
+  --touch-target: 44px;
+  /* Set by useKeyboard.ts while the on-screen keyboard is open; these are the closed values. */
+  --keyboard-inset: 0px;
+  --keyboard-visible-height: 100dvh;
+}
+
 /* --- Hike tracking (TM05-111) ------------------------------------------------------------ */
 :root {
   /* The breadcrumb: the live dot's blue, so the track and the dot read as one thing. */

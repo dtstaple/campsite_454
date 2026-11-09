@@ -29,10 +29,13 @@ import Profile from "./pages/Profile";
 import BrowseTrails from "./pages/BrowseTrails";
 import { SessionProvider } from "./session";
 import CompareTray from "./trails/CompareTray";
+import { useKeyboard } from "./components/useKeyboard";
 
 export default function App() {
   // TM05-121: the comparison tray, opened from the header over any page.
   const [comparing, setComparing] = useState(false);
+  // TM05-133: keep the field being typed in above the on-screen keyboard, on every page.
+  useKeyboard();
   return (
     <SessionProvider>
       <BrowserRouter>

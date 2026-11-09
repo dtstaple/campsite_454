@@ -71,3 +71,73 @@
     padding-bottom: calc(var(--space-2xl) + env(safe-area-inset-bottom));
   }
 }
+
+/* Forms and the on-screen keyboard (TM05-133). useKeyboard.ts sets `keyboard-open` on <html>
+ * and the --keyboard-* values while a keyboard covers the page; on a desktop it never does,
+ * and none of the rules below match a mouse, so the desktop layout is unchanged. */
+
+/* No zoom on focus: iOS zooms into any field whose text is under 16px. */
+@media (pointer: coarse) {
+  html :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, select) {
+    font-size: var(--text-input-touch);
+  }
+}
+
+@media (max-width: 640px) {
+  /* A bottom sheet rides on top of the keyboard, no taller than what is left visible, so
+   * the plan or hike name being typed stays on screen. */
+  .keyboard-open .panel.sheet {
+    bottom: var(--keyboard-inset);
+    max-height: calc(var(--keyboard-visible-height) - var(--space-xl));
+    padding-bottom: var(--space-md);
+    transition: none;
+  }
+
+  /* The buttons that sit above the sheet would be stranded behind the keyboard. */
+  .keyboard-open .app .basemap-toggle,
+  .keyboard-open .app .live-controls {
+    display: none;
+  }
+
+  /* The search results stop above the keyboard instead of running under it. */
+  .keyboard-open .app .trail-search-results {
+    max-height: min(
+      var(--trail-search-list-height),
+      calc(var(--keyboard-visible-height) - var(--phone-search-height) - var(--space-xl))
+    );
+  }
+
+  /* The waypoint editor docks to the bottom edge, in thumb reach and on top of the
+   * keyboard, instead of floating over its point where the keyboard can cover it.
+   * MapLibre positions popups with an inline transform, hence the !important. */
+  .maplibregl-popup.waypoint-popup {
+    position: fixed;
+    top: auto;
+    left: calc(var(--space-sm) + env(safe-area-inset-left));
+    right: calc(var(--space-sm) + env(safe-area-inset-right));
+    bottom: calc(var(--keyboard-inset) + var(--space-sm) + env(safe-area-inset-bottom));
+    transform: none !important;
+  }
+
+  .maplibregl-popup.waypoint-popup .maplibregl-popup-tip {
+    display: none;
+  }
+
+  .waypoint-popup .waypoint-editor {
+    width: auto;
+    max-height: calc(var(--keyboard-visible-height) - var(--phone-search-height) - var(--space-xl));
+    overflow-y: auto;
+  }
+
+  /* One-handed: every field and its submit button is a full thumb's height. */
+  .trail-search-input,
+  .trail-search-toggle,
+  .plan-save input,
+  .plan-save button,
+  .hike-name input,
+  .hike-controls > *,
+  .waypoint-field input,
+  .waypoint-actions button {
+    min-height: var(--touch-target);
+  }
+}
