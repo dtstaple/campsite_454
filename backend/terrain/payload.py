@@ -60,10 +60,29 @@ def detail(site) -> dict | None:
         }
         if facts.wind
         else None,
+        # TM05-162: direct sun on a summer-season day, from terrain shade alone.
+        "sun_hours": _sun_hours(facts),
         "view": view,
         "has_viewshed": facts.viewshed is not None,
         "note": NOTE,
         "computed_at": facts.computed_at.isoformat(),
+    }
+
+
+#: TM05-162: what the sun-hours estimate leaves out, shown with it.
+SUN_HOURS_ESTIMATE = "Bare-earth estimate: shade from trees isn't counted"
+
+
+def _sun_hours(facts: TerrainFacts) -> dict | None:
+    if facts.sun_hours is None and facts.morning_sun is None:
+        return None
+    return {
+        "hours": facts.sun_hours,
+        "level": facts.sun_hours_level or None,
+        "reason": facts.sun_hours_reason or None,
+        "morning_sun": facts.morning_sun,
+        "morning_reason": facts.morning_sun_reason or None,
+        "estimate": SUN_HOURS_ESTIMATE,
     }
 
 

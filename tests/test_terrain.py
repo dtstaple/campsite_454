@@ -40,6 +40,7 @@ def test_the_shipped_registry_loads():
         "shelter", "damp",  # TM05-153, zones only, for the potential-campsite search
         "cold_air",  # TM05-147
         "wind",  # TM05-148
+        "sun", "sun_morning",  # TM05-162
     }  # fmt: skip
     assert REAL.tools["wetness"].grid.resolution_m == 45
     assert REAL.tools["wetness"].grid.tile_cells is None  # whole region in one piece
@@ -60,7 +61,7 @@ def test_every_registered_geolibre_tool_is_in_the_v1_7_1_manifest():
     known = {
         "fill_depressions", "dinf_flow_accum", "slope", "wetness_index", "depth_in_sink",
         "aspect", "deviation_from_mean_elevation", "viewshed",
-        "elevation_percentile", "fetch_analysis",
+        "elevation_percentile", "fetch_analysis", "time_in_daylight",
     }  # fmt: skip
     used = {name for tool in REAL.tools.values() for name in tool.geolibre_tools}
     assert used <= known
@@ -131,7 +132,7 @@ def test_for_region_fills_in_that_regions_wind_direction(tmp_path):
     assert step.args["azimuth"] == "{wind_from_deg}"  # unresolved until a region is chosen
     white = loaded.for_region("white-mountains-nh")
     assert white.tools["wind"].steps[0].args["azimuth"] == 290
-    assert white.params == {"wind_from_deg": 290} and white.region == "white-mountains-nh"
+    assert white.params["wind_from_deg"] == 290 and white.region == "white-mountains-nh"
     assert loaded.for_region("adirondacks").tools["wind"].steps[0].args["azimuth"] == 270
     # Every other argument is untouched.
     assert white.tools["wind"].steps[0].args["input"] == "{dem}"
@@ -316,6 +317,121 @@ def test_wind_reasons_name_the_direction_assumed():
     assert "2.5 km of open ground" in mappers.wind({"wind_fetch_m": 2500.0}, WIND, 270)[1]
     # No direction configured, no class.
     assert mappers.wind({"wind_fetch_m": 2500.0}, WIND, None) == ("", "")
+
+
+# --- sun hours (TM05-162) -----------------------------------------------------------
+
+SUN = REAL.classify["sun_hours"]
+#: Marcy Dam's latitude: the mean June-August day there is about 14.8 h.
+MARCY = 44.16
+
+
+def test_the_sun_tools_run_time_in_daylight_for_the_documented_season():
+    """Both tools model 1 June to 31 August, the season the panel names, and the morning
+    tool stops at the time the panel says. Each pair of values is in tools.yml twice, so
+    this keeps them equal."""
+    allday, morning = (REAL.tools[name].steps[0] for name in ("sun", "sun_morning"))
+    for step in (allday, morning):
+        assert step.tool == "time_in_daylight"
+        assert (step.args["start_day"], step.args["end_day"]) == (152, 243)
+        assert (step.args["start_day"], step.args["end_day"]) == (
+            SUN["start_day"],
+            SUN["end_day"],
+        )
+        assert step.args["utc_offset"] == "{summer_utc_offset}"
+    assert "end_time" not in allday.args  # sunrise to sunset
+    assert morning.args["end_time"] == SUN["morning_until"] == "10:00:00"
+    assert SUN["season"] == "June to August"
+    assert allday.args == {k: v for k, v in morning.args.items() if k != "end_time"}
+
+
+def test_the_sun_grid_overlap_covers_the_horizon_search():
+    """A horizon past the tile's padding would be cut off, so a core cell's sun would
+    depend on the tile computing it."""
+    for name in ("sun", "sun_morning"):
+        tool = REAL.tools[name]
+        assert tool.grid.name == "sun" and tool.grid.sites_only
+        assert tool.grid.overlap_m >= tool.steps[0].args["max_dist"]
+
+
+def test_the_morning_window_is_read_in_daylight_saving_time():
+    assert REAL.regional_value("summer_utc_offset", "adirondacks") == "UTC-04:00"
+    filled = REAL.for_region("white-mountains-nh")
+    assert filled.tools["sun_morning"].steps[0].args["utc_offset"] == "UTC-04:00"
+    assert filled.params["summer_utc_offset"] == "UTC-04:00"
+
+
+def test_day_length_matches_the_almanac():
+    # Lake Placid: 15 h 29 min at the June solstice, 8 h 52 min at the December one.
+    assert mappers.day_length_h(44.28, 172) == pytest.approx(15 + 29 / 60, abs=0.1)
+    assert mappers.day_length_h(44.28, 355) == pytest.approx(8 + 52 / 60, abs=0.1)
+    assert mappers.day_length_h(0.0, 80) == pytest.approx(12.1, abs=0.1)
+    # Polar day and night are clamped, not a math error.
+    assert mappers.day_length_h(80.0, 172) == pytest.approx(24.0)
+    assert mappers.day_length_h(80.0, 355) == pytest.approx(0.0)
+    assert mappers.season_daylight_h(MARCY, 152, 243) == pytest.approx(14.8, abs=0.1)
+
+
+@pytest.mark.parametrize(
+    ("share", "level"),
+    [
+        (0.99, "full"),  # flat open ground: lit from sunrise to sunset
+        (0.82, "full"),  # 12.2 h
+        (0.80, "partial"),  # 11.9 h, just under full
+        (0.55, "partial"),  # 8.2 h
+        (0.53, "low"),  # 7.9 h
+        (0.10, "low"),  # a deep north-facing cirque
+        (0.0, "low"),
+    ],
+)
+def test_sun_hours_classification(share, level):
+    """TM05-162: full from 12 h of direct sun on a June-August day, partial from 8 h,
+    little below that. Hours are the share of daylight times the day's length."""
+    hours, got, reason, _, _ = mappers.sun_hours({"sun_share": share}, SUN, MARCY)
+    assert got == level
+    daylight = mappers.season_daylight_h(MARCY, 152, 243)
+    assert hours == pytest.approx(round(share * daylight, 1))
+    assert "June to August" in reason
+
+
+def test_sun_hours_reasons_say_how_much_sun_and_how_much_shade():
+    assert mappers.sun_hours({"sun_share": 0.95}, SUN, MARCY)[2] == (
+        "About 14 h of direct sun on a day in June to August, out of about 15 h of daylight."
+    )
+    assert mappers.sun_hours({"sun_share": 0.66}, SUN, MARCY)[2] == (
+        "About 10 h of direct sun on a day in June to August: the terrain shades it for "
+        "about 5 of the 15 h of daylight."
+    )
+    assert mappers.sun_hours({"sun_share": 0.3}, SUN, MARCY)[2].startswith("Only about 4 h")
+
+
+@pytest.mark.parametrize(
+    ("share", "morning"),
+    [(0.98, True), (0.5, True), (0.49, False), (0.0, False)],
+)
+def test_morning_sun_is_lit_for_most_of_sunrise_to_10_am(share, morning):
+    _, _, _, got, reason = mappers.sun_hours({"morning_sun_share": share}, SUN, MARCY)
+    assert got is morning
+    assert "sunrise to 10 am" in reason
+    assert reason.startswith("In direct sun") == morning
+
+
+def test_sun_facts_are_unknown_one_by_one():
+    # Only the morning value: hours unknown, morning known.
+    hours, level, reason, morning, _ = mappers.sun_hours({"morning_sun_share": 0.9}, SUN, MARCY)
+    assert (hours, level, reason, morning) == (None, "", "", True)
+    # Only the all-day value: morning unknown.
+    assert mappers.sun_hours({"sun_share": 0.9}, SUN, MARCY)[3:] == (None, "")
+    # No latitude, no hours: the share alone can't say how long the day is.
+    assert mappers.sun_hours({"sun_share": 0.9}, SUN, None)[:3] == (None, "", "")
+    assert mappers.sun_hours({}, SUN, MARCY) == (None, "", "", None, "")
+
+
+def test_clock_times_read_as_the_panel_says_them():
+    assert mappers.clock("10:00:00") == "10 am"
+    assert mappers.clock("09:30:00") == "9:30 am"
+    assert mappers.clock("12:00:00") == "12 pm"
+    assert mappers.clock("00:15") == "12:15 am"
 
 
 def test_view_stats_area_and_main_direction():
@@ -536,6 +652,12 @@ class FakeGeoLibre:
         elif tool == "fetch_analysis":
             # Open ground upwind everywhere but the bowl's floor, which its rim shelters.
             values = [120.0 if v < 602 else 1500.0 for v in values]
+        elif tool == "time_in_daylight":
+            # The bowl's floor is shaded by its rim, most of all in the morning.
+            morning = "end_time" in args
+            values = [
+                (0.2 if morning else 0.5) if v < 602 else (0.9 if morning else 0.95) for v in values
+            ]
         elif tool == "elevation_percentile":
             # The bowl's floor is the lowest ground around; everywhere else mid-slope.
             values = [5.0 if v < 602 else 50.0 for v in values]
@@ -618,6 +740,9 @@ def synthetic(tmp_path, monkeypatch, settings):
     raw["grids"]["wind"].update(resolution_m=30, tile_cells=30, overlap_m=150)
     raw["tools"]["wind"]["zones"]["min_area_m2"] = 0
     raw["tools"]["wind"]["facts"]["wind_fetch_m"]["radius_m"] = 30  # 3x3 cells, as at 90 m
+    raw["grids"]["sun"].update(resolution_m=30, tile_cells=30, overlap_m=150)
+    raw["tools"]["sun"]["facts"]["sun_share"]["radius_m"] = 30
+    raw["tools"]["sun_morning"]["facts"]["morning_sun_share"]["radius_m"] = 30
     path = tmp_path / "tools.yml"
     path.write_text(yaml.safe_dump(raw))
 
@@ -670,6 +795,18 @@ def test_the_pipeline_writes_facts_zones_and_provenance(synthetic):
     wind = TerrainZone.objects.filter(region="testland", layer="wind-exposure", tile="")
     assert set(wind.values_list("zone_class", flat=True)) == {"exposed"}
     assert run.counts["coverage"]["wind"] == 2
+    # TM05-162: both sun tools ran in daylight-saving time, the morning one to 10:00.
+    sun_runs = [args for tool, args in synthetic["fake"].args if tool == "time_in_daylight"]
+    assert {args["utc_offset"] for args in sun_runs} == {"UTC-04:00"}
+    assert {args.get("end_time") for args in sun_runs} == {None, "10:00:00"}
+    assert bowl.values["sun_share"] == pytest.approx(0.5)
+    assert bowl.values["morning_sun_share"] == pytest.approx(0.2)
+    daylight = mappers.season_daylight_h(bowl.campsite.geom.y, 152, 243)
+    assert bowl.sun_hours == pytest.approx(round(0.5 * daylight, 1))
+    assert bowl.sun_hours_level == "low" and "Only about 7 h" in bowl.sun_hours_reason
+    assert bowl.morning_sun is False and "10 am" in bowl.morning_sun_reason
+    assert rim.sun_hours_level == "full" and rim.morning_sun is True
+    assert run.counts["coverage"]["sun_hours"] == run.counts["coverage"]["morning_sun"] == 2
 
     pooling = TerrainZone.objects.filter(region="testland", layer="pooling-risk", tile="")
     assert pooling.exists()

@@ -79,6 +79,11 @@ class TerrainFacts(models.Model):
         MODERATE = "moderate", "Moderate"
         EXPOSED = "exposed", "Exposed"
 
+    class SunHours(models.TextChoices):
+        FULL = "full", "Full sun"
+        PARTIAL = "partial", "Partial sun"
+        LOW = "low", "Little sun"
+
     campsite = models.OneToOneField(
         Campsite, on_delete=models.CASCADE, primary_key=True, related_name="terrain"
     )
@@ -103,6 +108,13 @@ class TerrainFacts(models.Model):
     wind = models.CharField(max_length=10, choices=Shelter.choices, blank=True)
     wind_reason = models.CharField(max_length=160, blank=True)
     wind_from_deg = models.FloatField(null=True, blank=True)
+    #: TM05-162: estimated hours of direct sun on a summer-season day (terrain shade only,
+    #: not trees), its level, and whether the sun reaches the site in the morning.
+    sun_hours = models.FloatField(null=True, blank=True)
+    sun_hours_level = models.CharField(max_length=8, choices=SunHours.choices, blank=True)
+    sun_hours_reason = models.CharField(max_length=160, blank=True)
+    morning_sun = models.BooleanField(null=True, blank=True)
+    morning_sun_reason = models.CharField(max_length=160, blank=True)
     view_area_km2 = models.FloatField(null=True, blank=True)
     #: The sector holding the most visible ground, or "all around".
     view_direction = models.CharField(max_length=16, blank=True)
