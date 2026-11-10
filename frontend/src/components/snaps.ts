@@ -6,14 +6,34 @@
 export type Snap = "peek" | "half" | "full";
 export const SNAPS: readonly Snap[] = ["peek", "half", "full"];
 
+/** At most this tall (px), the map area is short: a phone on its side (TM05-134). */
+export const SHORT_AVAILABLE_PX = 500;
+/** On a short map, the share of it a full sheet always leaves uncovered. */
+export const SHORT_MAP_KEPT = 0.4;
+/** On a short map, the largest share of it a peeking sheet covers. */
+export const SHORT_PEEK_SHARE = 0.3;
+/** The smallest peek: the handle and the panel's title line. */
+export const MIN_PEEK_PX = 72;
+
 /**
  * Pixel heights for a map area `available` px tall: peek shows the panel's header and a
  * line under it; half is half the map; full leaves a strip of map at the top so the sheet
  * still reads as a sheet.
+ *
+ * On a short map (a phone in landscape, ~390 px of screen and less of map) the fixed
+ * sizes would leave a sliver: full keeps SHORT_MAP_KEPT of the map visible, and peek
+ * shrinks to SHORT_PEEK_SHARE of it, so the map stays usable at every snap. A taller map
+ * gets the original sizes.
  */
 export function snapHeights(available: number, peek = 132, topGap = 56): Record<Snap, number> {
-  const full = Math.max(peek, available - topGap);
-  return { peek: Math.min(peek, full), half: Math.max(peek, Math.round(available / 2)), full };
+  const short = available <= SHORT_AVAILABLE_PX;
+  const peekPx = short
+    ? Math.min(peek, Math.max(MIN_PEEK_PX, Math.round(available * SHORT_PEEK_SHARE)))
+    : peek;
+  const mapKept = short ? Math.max(topGap, Math.round(available * SHORT_MAP_KEPT)) : topGap;
+  const full = Math.max(peekPx, available - mapKept);
+  const half = Math.min(full, Math.max(peekPx, Math.round(available / 2)));
+  return { peek: Math.min(peekPx, full), half, full };
 }
 
 /** The snap a drag that ended at `height` (px) settles on. A fast flick moves one step. */
