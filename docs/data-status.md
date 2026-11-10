@@ -6,18 +6,19 @@ published. Setup and restore instructions are in `docs/setup.md`.
 
 ## Current snapshot
 
-[dev-data-2026-11-08](https://github.com/dtstaple/campsite_454/releases/tag/dev-data-2026-11-08)
-(380 MB download, about 1.16 GB restored), published 2026-11-08 under TM05-160.
+[dev-data-2026-11-10](https://github.com/dtstaple/campsite_454/releases/tag/dev-data-2026-11-10)
+(483 MB download, about 1.36 GB restored), published 2026-11-10 under TM05-163.
 
 ```
-make restore DUMP=https://github.com/dtstaple/campsite_454/releases/download/dev-data-2026-11-08/campsite-2026-11-08.dump
+make restore DUMP=https://github.com/dtstaple/campsite_454/releases/download/dev-data-2026-11-10/campsite-2026-11-10.dump
 ```
 
-It was dumped with `make dump` (now `scripts/snapshot.py`) from the data owner's database,
-which holds everything the app reads. Nothing personal is in it: the tables matching
-`PERSONAL_TABLES` (accounts, tokens, sessions, the admin log, saved campsites, scoring
-weights, waypoints, trip plans, hikes, saved trails) are dumped empty, and the dump's own
-check confirmed no personal table has rows.
+It was dumped with `make dump` (`scripts/snapshot.py`) from a database restored from
+dev-data-2026-11-08, after `make terrain REGION=white-mountains-nh` had run on it. Nothing
+personal is in it: the tables matching `PERSONAL_TABLES` (accounts, tokens, sessions, the
+admin log, saved campsites, scoring weights, waypoints, trip plans, hikes, saved trails)
+are dumped empty, and both the dump's own check and `scripts/snapshot.py check` confirmed
+that no personal table has rows.
 
 | Table | Rows | Region |
 |---|---|---|
@@ -30,20 +31,35 @@ check confirmed no personal table has rows.
 | Peaks and trailheads | 2,480 (1,861 + 619) | both; `osm-landmarks` re-run on 2026-11-08 for both regions |
 | Road connectors | 70,773 | Adirondacks (TM05-137) |
 | Routing graph edges, graph builds | 92,663, 4 | Adirondacks (TM05-119/137/149) |
-| Terrain facts, zones | 743, 694,544 | Adirondacks (TM05-141..143, the 2026-11-02 terrain run) |
-| Cached analyses | 8,540 | both |
+| Terrain facts | 1,499 (743 + 756) | both: the Adirondacks from the 2026-11-02 run, the White Mountains from the 2026-11-10 run (TM05-163) |
+| Terrain zones | 826,696 (694,544 + 132,152) | both, as above |
+| Cached analyses | 8,737 | both |
 
-**New since dev-data-2026-10-13:** the routing graph and road connectors, terrain facts and
-zones, and peaks and trailheads for the White Mountains.
+**New since dev-data-2026-11-08:** terrain facts and zones for the White Mountains, for
+all 756 campsites and every terrain fact, cold air, wind and sun hours included.
+`docs/terrain-analysis.md` ("Measured: the White Mountains") has the run's coverage,
+runtime and memory. The Adirondacks rows are unchanged.
 
-**Known gap: cold air and wind.** The `cold_air` and `wind` terrain facts (TM05-147/148)
-are empty. `make terrain adirondacks` was re-run on 2026-11-08 to fill them and failed
-twice (3 workers, then 1) in the `elevation_percentile` tool with a WASM trap ("wasm
+**How it was checked (2026-11-10).** Restored with `make restore` from the local file into
+a new, empty database on the local `postgis/postgis:16-3.4` container: PostGIS was
+created, the restore took 47 s, and `migrate` found nothing to apply. The row counts above
+are from that restore, the terrain facts split 743 Adirondacks and 756 White Mountains,
+and `pytest -m data` passed 4/4. sha256 of the dump:
+`ce63131e24dae9cc0597577bf50b93a4b477ffa1ab492d8d68816061893625f3`.
+
+The previous snapshot,
+[dev-data-2026-11-08](https://github.com/dtstaple/campsite_454/releases/tag/dev-data-2026-11-08)
+(380 MB, TM05-160), is kept as a release. It matches this one except that it has no White
+Mountains terrain.
+
+**Known gap: cold air and wind in the Adirondacks.** The Adirondacks `cold_air` and `wind`
+terrain facts (TM05-147/148) are empty; the White Mountains run filled them for its
+region. `make terrain adirondacks` was re-run on 2026-11-08 to fill them and failed twice (3 workers, then 1) in the `elevation_percentile` tool with a WASM trap ("wasm
 `unreachable` instruction executed"). The failed runs wrote no facts or zones, so the
-terrain data is from the last successful run, 2026-11-02. Campsite panels show cold air
-and wind as not available until the terrain run is fixed and a new snapshot is published.
+terrain data is from the last successful run, 2026-11-02. Adirondacks campsite panels show
+cold air and wind as not available until the terrain run is fixed and a new snapshot is published.
 
-**How it was checked (2026-11-08).** Restored with `make restore` into a throwaway
+**How the 2026-11-08 snapshot was checked.** Restored with `make restore` into a throwaway
 `postgis/postgis:16-3.4` container with TLS on and `sslmode=require`, after dropping its
 PostGIS extension: the restore created PostGIS, restored in 88 s from the local file, and
 `migrate` found nothing to apply. Every row count above matched the source; every personal

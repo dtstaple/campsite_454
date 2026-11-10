@@ -31,9 +31,9 @@ Path: A, the dev container (database: its db service) -- docs/setup.md
 ```
 
 The data is the same everywhere: the team snapshot
-[dev-data-2026-11-08](https://github.com/dtstaple/campsite_454/releases/tag/dev-data-2026-11-08) (380 MB download, about 1.16 GB restored).
+[dev-data-2026-11-10](https://github.com/dtstaple/campsite_454/releases/tag/dev-data-2026-11-10) (483 MB download, about 1.36 GB restored).
 It holds every ingested layer for the Adirondacks and the White Mountains, enrichment,
-the routing graph and terrain facts and zones (both for the Adirondacks), and peaks and
+the routing graph (Adirondacks), terrain facts and zones for both regions, and peaks and
 trailheads. It holds **no user data**. What is in it is in [data-status.md](data-status.md).
 
 ## Path A: dev container (Codespaces or VS Code)
@@ -321,7 +321,7 @@ make restore DUMP=$(make -s snapshot-url)
 `Makefile`:
 
 ```
-https://github.com/dtstaple/campsite_454/releases/download/dev-data-2026-11-08/campsite-2026-11-08.dump
+https://github.com/dtstaple/campsite_454/releases/download/dev-data-2026-11-10/campsite-2026-11-10.dump
 ```
 
 - `DUMP` can be a URL or a local path. A URL is downloaded into `dumps/` once and reused.

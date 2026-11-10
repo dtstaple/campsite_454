@@ -32,7 +32,7 @@ DUMP ?=
 FORCE ?=
 NO_TERRAIN ?=
 # The current team snapshot (GitHub Release). Update it when a new snapshot is published.
-SNAPSHOT_URL := https://github.com/dtstaple/campsite_454/releases/download/dev-data-2026-11-08/campsite-2026-11-08.dump
+SNAPSHOT_URL := https://github.com/dtstaple/campsite_454/releases/download/dev-data-2026-11-10/campsite-2026-11-10.dump
 OUT ?= dumps/campsite-$(shell date +%Y-%m-%d).dump
 
 # Python 3.12 exactly: CI runs 3.12, and 3.13/3.14 have no wheels for some pinned deps.
