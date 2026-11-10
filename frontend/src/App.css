@@ -670,11 +670,25 @@
  * defaults to `min-height: auto`, which refuses to shrink -- without it the map's
  * 100%-height child would overflow the column instead of fitting inside it.
  */
+/* The app root (TM05-134) is the *visible* screen, not the largest one: 100vh on iOS
+ * Safari is the height with its bars hidden, so the bottom of the map and of every sheet
+ * sat under the toolbar. 100dvh follows the bars as they show and hide; the 100vh line
+ * before it is the fallback for a browser without dynamic viewport units, which ignores
+ * the second declaration. */
 .shell {
   display: flex;
   flex-direction: column;
   width: 100%;
-  height: 100%;
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* The map page never scrolls or bounces as a page: a drag on the map or a sheet is the
+ * map's or the sheet's, and never starts the browser's pull-to-refresh (TM05-134). */
+html:has(.app),
+html:has(.app) body,
+.app {
+  overscroll-behavior: none;
 }
 
 .shell-body {

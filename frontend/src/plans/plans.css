@@ -81,6 +81,16 @@
   width: 100%;
   text-align: left;
   white-space: normal;
+  /* A long one-word campsite name breaks rather than widening the table (TM05-134). */
+  overflow-wrap: anywhere;
+}
+
+/* On a phone the table fits a 375 px sheet without scrolling sideways (TM05-134): the
+ * numbers drop to the small size, and the stop column takes whatever is left. */
+@media (max-width: 640px) {
+  .plan-days {
+    font-size: var(--text-xs);
+  }
 }
 
 .plan-days thead th {

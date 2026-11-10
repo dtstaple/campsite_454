@@ -44,16 +44,24 @@ export default function Sheet({ className, label, children, initial = "half" }: 
   const [dragHeight, setDragHeight] = useState<number | null>(null);
   const drag = useRef<{ startY: number; startHeight: number; lastY: number; lastT: number; velocity: number } | null>(null);
 
-  // The map area's height, measured (and re-measured on rotation) by a ResizeObserver.
+  // The map area's height, re-measured on rotation and as Safari's bars show and hide: the
+  // shell is 100dvh (App.css), so the map area resizes with the visible screen and the
+  // ResizeObserver sees it; visualViewport covers a browser that resizes without reflow.
   const [available, setAvailable] = useState(() =>
     typeof window !== "undefined" ? window.innerHeight : 800,
   );
   useEffect(() => {
     const host = ref.current?.parentElement;
-    if (!host || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(() => setAvailable(host.clientHeight));
-    observer.observe(host);
-    return () => observer.disconnect();
+    if (!host) return;
+    const measure = () => setAvailable(host.clientHeight);
+    measure();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    observer?.observe(host);
+    window.visualViewport?.addEventListener("resize", measure);
+    return () => {
+      observer?.disconnect();
+      window.visualViewport?.removeEventListener("resize", measure);
+    };
   }, []);
   const heights = () => snapHeights(available);
 
