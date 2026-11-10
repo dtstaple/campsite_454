@@ -3,8 +3,8 @@
  *
  * Deliberately still: no scroll-triggered motion, no fades, no parallax. The only thing
  * that moves is a recording, and it can be paused (or never autoplays, with reduced
- * motion). Desktop pairs text with media side by side, alternating; below 860px every
- * section stacks, text first. (The breakpoint is the one literal: custom properties do not
+ * motion). Desktop and tablet pair text with media side by side, alternating; on a phone every
+ * section stacks, text first. (The breakpoint is MEDIA.phone in layout/breakpoints.ts: custom properties do not
  * work inside a media query.)
  */
 
@@ -284,9 +284,9 @@
   font-size: var(--text-sm);
 }
 
-/* --- small screens: stack, text first --- */
+/* --- phone (MEDIA.phone, layout/breakpoints.ts): stack, text first --- */
 
-@media (max-width: 860px) {
+@media (max-width: 640px) {
   .home {
     padding: var(--space-3xl) var(--space-base) 0;
   }

@@ -122,7 +122,7 @@
   cursor: pointer;
 }
 
-/* Phone (PHONE_MAX_WIDTH, components/snaps.ts): stacked cards across the full width. */
+/* Phone (MEDIA.phone, layout/breakpoints.ts): stacked cards across the full width. */
 @media (max-width: 640px) {
   .compare-tray {
     width: 100%;

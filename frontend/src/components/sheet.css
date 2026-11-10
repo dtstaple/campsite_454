@@ -1,4 +1,4 @@
-/* Bottom sheets on a phone (TM05-103). The 640px matches PHONE_MAX_WIDTH in snaps.ts. */
+/* Bottom sheets on a phone (TM05-103). The query is MEDIA.phone in layout/breakpoints.ts. */
 
 @media (max-width: 640px) {
   .panel.sheet {

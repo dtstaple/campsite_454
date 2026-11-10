@@ -19,7 +19,7 @@ import { REGIONS, type Region } from "../regions";
 import { CONTOUR_MIN_ZOOM } from "../map/contourConfig";
 import { BANDS } from "../slope/slope";
 import { SLOPE_MIN_ZOOM, slopeSupported } from "../slope/slopeLayer";
-import { PHONE_QUERY } from "./snaps";
+import { MEDIA } from "../layout/breakpoints";
 import { bandLabel, GRADES, gradeToken } from "../score/grade";
 import { TERRAIN_NOTE } from "../terrain/terrain";
 import { ZONES, type ZoneOverlay, type ZoneSpec } from "../terrain/zones";
@@ -141,7 +141,7 @@ export default function LayerPanel({
 }: Props) {
   // TM05-103: on a phone the layer list starts folded, so the map is visible.
   const [open, setOpen] = useState(
-    () => typeof window === "undefined" || !window.matchMedia(PHONE_QUERY).matches,
+    () => typeof window === "undefined" || !window.matchMedia(MEDIA.phone).matches,
   );
   const primary = primaryLayer(mode);
 

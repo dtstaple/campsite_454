@@ -401,7 +401,8 @@
   pointer-events: none;
 }
 
-@media (max-width: 720px) {
+/* Phone (MEDIA.phone, layout/breakpoints.ts): the panel is a bottom sheet. */
+@media (max-width: 640px) {
   .trail-panel {
     top: auto;
     left: var(--space-md);
