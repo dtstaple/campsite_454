@@ -20,7 +20,7 @@ import {
   unknownNote,
   type TrailFilters,
 } from "./filters";
-import { MEDIA } from "../layout/breakpoints";
+import { FOLDED_AT_START } from "../layout/breakpoints";
 import { emptySearchMessage, routeHitMeta } from "./format";
 
 const VIEW_DEBOUNCE_MS = 400;
@@ -40,9 +40,10 @@ interface Props {
 
 export default function TrailSearch({ map, onPick }: Props) {
   const [query, setQuery] = useState("");
-  // TM05-103: on a phone the list starts folded, so the map shows; typing opens it.
+  // TM05-103, TM05-130: on a phone, or a phone on its side, the list starts folded so the
+  // map shows; typing opens it.
   const [open, setOpen] = useState(
-    () => typeof window === "undefined" || !window.matchMedia(MEDIA.phone).matches,
+    () => typeof window === "undefined" || !window.matchMedia(FOLDED_AT_START.searchResults).matches,
   );
   const [list, setList] = useState<ListState>({ status: "idle" });
   // TM05-85: filters narrow the list; it refreshes as they change, no page reload.

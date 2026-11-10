@@ -284,6 +284,18 @@
   font-size: var(--text-sm);
 }
 
+/* --- tablet (MEDIA.tablet, layout/breakpoints.ts): still side by side, but the text and
+   * the media share the width evenly, closer together, so the text column is not squeezed. --- */
+
+@media (min-width: 641px) and (max-width: 1279px) {
+  .home-hero,
+  .home-feature,
+  .home-feature.is-flipped {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--space-2xl);
+  }
+}
+
 /* --- phone (MEDIA.phone, layout/breakpoints.ts): stack, text first --- */
 
 @media (max-width: 640px) {

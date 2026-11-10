@@ -17,14 +17,27 @@ export type Layout = "phone" | "tablet" | "desktop";
 export const BREAKPOINTS = {
   phoneMaxPx: 640,
   tabletMaxPx: 1279,
+  /** The tallest viewport counted as short (a phone in landscape is 320-430px). */
+  shortMaxPx: 500,
 } as const;
 
-/** The only width media queries the app uses, in CSS and in matchMedia(). */
+/** The only width and height media queries the app uses, in CSS and in matchMedia(). */
 export const MEDIA = {
   phone: `(max-width: ${BREAKPOINTS.phoneMaxPx}px)`,
   tablet: `(min-width: ${BREAKPOINTS.phoneMaxPx + 1}px) and (max-width: ${BREAKPOINTS.tabletMaxPx}px)`,
   /** Phone or tablet: anything narrower than the desktop layout. */
   belowDesktop: `(max-width: ${BREAKPOINTS.tabletMaxPx}px)`,
+  /** A short viewport: a phone on its side. Overlays that open tall start folded. */
+  short: `(max-height: ${BREAKPOINTS.shortMaxPx}px)`,
+} as const;
+
+/**
+ * Overlays that list a lot start folded where the map is small (matchMedia queries): the
+ * layer list below desktop width, the search results on a phone or a phone on its side.
+ */
+export const FOLDED_AT_START = {
+  layers: MEDIA.belowDesktop,
+  searchResults: `${MEDIA.phone}, ${MEDIA.short}`,
 } as const;
 
 /** The layout a viewport `widthPx` wide gets. */

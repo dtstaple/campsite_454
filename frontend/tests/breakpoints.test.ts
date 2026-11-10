@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { BREAKPOINTS, MEDIA, layoutFor } from "../src/layout/breakpoints.ts";
+import { BREAKPOINTS, FOLDED_AT_START, MEDIA, layoutFor } from "../src/layout/breakpoints.ts";
 
 const SRC = join(import.meta.dirname, "..", "src");
 
@@ -30,17 +30,24 @@ test("the media queries agree with the numbers they are built from", () => {
   assert.equal(MEDIA.phone, "(max-width: 640px)");
   assert.equal(MEDIA.tablet, "(min-width: 641px) and (max-width: 1279px)");
   assert.equal(MEDIA.belowDesktop, "(max-width: 1279px)");
+  assert.equal(MEDIA.short, "(max-height: 500px)");
   assert.ok(BREAKPOINTS.phoneMaxPx < BREAKPOINTS.tabletMaxPx);
 });
 
-test("every @media width in a stylesheet is one of the shared queries", () => {
+test("big overlays start folded on small screens, never on a desktop", () => {
+  // Layer list: phone and tablet. Search results: phone, or any phone on its side.
+  assert.equal(FOLDED_AT_START.layers, MEDIA.belowDesktop);
+  assert.equal(FOLDED_AT_START.searchResults, "(max-width: 640px), (max-height: 500px)");
+});
+
+test("every @media width or height in a stylesheet is one of the shared queries", () => {
   const allowed = new Set<string>(Object.values(MEDIA));
   const strays: string[] = [];
   for (const file of filesUnder(SRC, /\.css$/)) {
     const css = readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
     for (const match of css.matchAll(/@media\s+([^{]+)\{/g)) {
       const query = match[1].trim().replace(/\s+/g, " ");
-      if (!/\bwidth\b/.test(query)) continue; // pointer, hover, reduced motion
+      if (!/\b(width|height)\b/.test(query)) continue; // pointer, hover, reduced motion
       if (!allowed.has(query)) strays.push(`${file.slice(SRC.length + 1)}: @media ${query}`);
     }
   }
@@ -52,7 +59,7 @@ test("no component spells out its own width query", () => {
   for (const file of filesUnder(SRC, /\.tsx?$/)) {
     if (file.endsWith(join("layout", "breakpoints.ts"))) continue;
     const code = readFileSync(file, "utf8");
-    for (const match of code.matchAll(/matchMedia\(\s*["'`]([^"'`]*width[^"'`]*)["'`]/g)) {
+    for (const match of code.matchAll(/matchMedia\(\s*["'`]([^"'`]*(?:width|height)[^"'`]*)["'`]/g)) {
       strays.push(`${file.slice(SRC.length + 1)}: ${match[1]}`);
     }
     if (/\binnerWidth\b/.test(code)) strays.push(`${file.slice(SRC.length + 1)}: innerWidth`);
