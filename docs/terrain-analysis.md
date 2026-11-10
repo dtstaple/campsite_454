@@ -693,3 +693,79 @@ already cached. Logs are in `artifacts/terrain/pipeline/` (run-fresh-tiles.txt, 
 - **GDAL cuts are written to real temporary files, not /vsimem/.** Blocks left unwritten
   there read as zeros in GeoLibre, which gave plateaus at 0 m and made
   `fill_depressions` run for 10+ minutes instead of 11 s.
+
+### Measured: the White Mountains (2026-11-10, TM05-163)
+
+`make terrain REGION=white-mountains-nh`, a first run from an empty cache, on 3 workers
+(Apple Silicon laptop), against a database restored from `dev-data-2026-11-08`. The log is
+in `artifacts/terrain/pipeline/white-mountains-nh-run-2026-11-10.txt`.
+
+**The mosaic** is built from the configured source, `dem` in `tools.yml`: the four 3DEP
+1/3 arc-second tiles covering the `regions.yml` bbox `[-72.00, 43.85, -70.95, 44.55]`,
+which are `n44w071`, `n44w072`, `n45w071` and `n45w072` (1.7 GB). Their URLs and
+Last-Modified dates are in the run's `TerrainRun.dem_source`.
+
+**Regional values.** The White Mountains have no entry in `regional`, so they run on the
+defaults: wind from the west (270°) and Eastern Daylight Time. Mount Washington's
+prevailing wind is commonly given as westerly to northwesterly, so 270° is a fair first
+value, but it has not been checked against reanalysis data the way the Adirondacks one was. Giving
+the region its own direction later, from a wind rose like the Adirondacks one, is a config
+change, but it changes the registry digest and so recomputes every region's tiles.
+
+| Step | Tasks | CPU time | Peak WASM memory |
+|---|---|---|---|
+| `wetness` (45 m, whole region) | 1 | 13.8 s | 258 MB |
+| `sink` (10 m) | 10 tiles | 37.9 s | 566 MB |
+| `slope` (10 m) | 10 tiles | 75.0 s | 349 MB |
+| `aspect` (10 m) | 10 tiles | 72.9 s | 348 MB |
+| `position` (30 m DEV) | 4 tiles | 7.8 s | 362 MB |
+| `shelter` | 4 tiles | 9.8 s | 362 MB |
+| `damp` | 1 | 17.7 s | 359 MB |
+| `cold_air` (TM05-147) | 4 tiles | 28.0 s | 241 MB |
+| `wind` (TM05-148) | 4 tiles | 12.6 s | 142 MB |
+| `sun`, `sun_morning` (TM05-162) | 2 + 2 tiles | 86.5 s | 53 MB |
+| `viewshed` (30 m, per site) | 16 batches | 779.4 s | 20 MB |
+| **All tiles** | 68 | 1,141 s | about 400 s wall |
+| Zone merge (all layers) | | | 15.0 s |
+| Classify | | | 55.8 s |
+
+**Runtime.**
+
+- **Pipeline:** 1,204 s (20 min). Of that, 730 s is the one-time prepare: downloading the
+  four tiles and building the mosaics. A re-run reuses all 68 tasks.
+- **End to end,** `make terrain` took 1,445 s (24 min) wall clock, measured with
+  `/usr/bin/time -l`.
+
+**Peak memory.** The run's peak RSS was 984 MB (`TerrainRun.peak_rss_mb`; `/usr/bin/time`
+agrees, at 1,032 MB maximum resident set size). The largest single GeoLibre call was the
+10 m `sink` tile, at 566 MB of WASM memory. The whole-region hydrology grid is smaller
+than in the Adirondacks (258 MB against 1,267 MB) because the region is about a fifth of
+the area.
+
+**Coverage** of the region's 756 campsites:
+
+- every fact (pooling, shelter, facing, cold air, wind, sun hours, morning sun, viewshed,
+  and the raw values under them): 756 each (100%), with no failed sites
+- water in view (1 ha or more within 2 km): 180 (23.8%). That is much lower than the
+  Adirondacks' 72%, which fits a region with far fewer lakes and ponds (NHD rivers don't
+  count toward a water view).
+
+**Classes.**
+
+- pooling: 33 high, 152 medium, 571 low
+- shelter: 3 exposed, 600 moderate, 153 sheltered
+- cold air: 4 high, 109 medium, 643 low
+- wind: 309 exposed, 148 moderate, 299 sheltered
+- sun hours: 699 full, 57 partial; morning sun at 755 of 756
+- facing: 429 flat (under 4°), the rest mostly south, east, southwest and west
+
+**Zones:** 2,318 pooling-risk, 2,711 exposure, 2,209 sheltered, 4,969 damp-ground, 6,147
+cold-air (1,513 high, 4,634 medium) and 4,213 wind-exposure (1,573 exposed, 2,640
+moderate) polygons. The tile endpoint (`/api/tiles/<layer>/{z}/{x}/{y}.mvt`) serves the
+White Mountains pooling-risk, exposure, cold-air and wind-exposure layers. Two tiles were
+checked, over the Presidential Range and the Pemigewasset.
+
+**The Adirondacks are unchanged.** A hash of all 743 Adirondacks `TerrainFacts` rows (the
+values and every class), and the count and area of each zone layer, were identical before
+and after the White Mountains run. Facts and zones are stored per region, and the registry
+digest did not change.
