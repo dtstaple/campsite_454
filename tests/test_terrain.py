@@ -552,6 +552,29 @@ def test_source_tiles_cover_the_adirondacks():
     ]  # fmt: skip
 
 
+# --- the White Mountains (TM05-163) -------------------------------------------------
+
+
+def test_the_white_mountains_mosaic_is_built_from_the_configured_3dep_tiles():
+    """The region's mosaic comes from regions.yml's bbox and tools.yml's DEM source: four
+    1x1 degree 3DEP tiles, from the same tile URL the Adirondacks use."""
+    from pipeline.regions import get_region
+
+    tiles = dem.source_tiles(get_region("white-mountains-nh").bbox)
+    assert sorted(tiles) == ["n44w071", "n44w072", "n45w071", "n45w072"]
+    url = REAL.dem["tile_url"].format(tile="n45w072")
+    assert url.endswith("/13/TIFF/current/n45w072/USGS_13_n45w072.tif")
+
+
+def test_the_white_mountains_use_the_documented_defaults_and_leave_the_adirondacks_alone():
+    """No White Mountains entry in `regional`: it runs on the defaults (west wind, EDT), so
+    adding the region changes no digest and no Adirondacks tile is recomputed."""
+    white = REAL.for_region("white-mountains-nh")
+    assert white.params == {"wind_from_deg": 270, "summer_utc_offset": "UTC-04:00"}
+    assert white.digest == REAL.digest == REAL.for_region("adirondacks").digest
+    assert REAL.for_region("adirondacks").params["wind_from_deg"] == 270
+
+
 # --- a synthetic DEM and a fake GeoLibre ---------------------------------------------
 
 NODATA = -999999.0
