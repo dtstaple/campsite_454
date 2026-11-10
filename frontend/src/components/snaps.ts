@@ -6,10 +6,6 @@
 export type Snap = "peek" | "half" | "full";
 export const SNAPS: readonly Snap[] = ["peek", "half", "full"];
 
-/** Below this width the side panels become bottom sheets. Mirrored in the CSS. */
-export const PHONE_MAX_WIDTH = 640;
-export const PHONE_QUERY = `(max-width: ${PHONE_MAX_WIDTH}px)`;
-
 /**
  * Pixel heights for a map area `available` px tall: peek shows the panel's header and a
  * line under it; half is half the map; full leaves a strip of map at the top so the sheet

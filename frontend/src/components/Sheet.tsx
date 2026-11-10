@@ -1,7 +1,7 @@
 /**
  * A side panel that becomes a draggable bottom sheet on a phone (TM05-103).
  *
- * Above PHONE_MAX_WIDTH it is the plain <aside> it always was. Below it, it gains a handle
+ * Above the phone breakpoint (layout/breakpoints.ts) it is the plain <aside> it always was. Below it, it gains a handle
  * on its top edge and snaps between three heights (snaps.ts): peek (the header and a line),
  * half, and full. Drag the handle to resize, flick to move one step, or tap it to step
  * through the sizes. The sheet's current height is published as --sheet-height on the map
@@ -9,15 +9,16 @@
  */
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { PHONE_QUERY, nearestSnap, nextSnap, snapHeights, type Snap } from "./snaps";
+import { MEDIA } from "../layout/breakpoints";
+import { nearestSnap, nextSnap, snapHeights, type Snap } from "./snaps";
 import "./sheet.css";
 
 function usePhone(): boolean {
   const [phone, setPhone] = useState(
-    () => typeof window !== "undefined" && window.matchMedia(PHONE_QUERY).matches,
+    () => typeof window !== "undefined" && window.matchMedia(MEDIA.phone).matches,
   );
   useEffect(() => {
-    const query = window.matchMedia(PHONE_QUERY);
+    const query = window.matchMedia(MEDIA.phone);
     const onChange = () => setPhone(query.matches);
     query.addEventListener("change", onChange);
     return () => query.removeEventListener("change", onChange);

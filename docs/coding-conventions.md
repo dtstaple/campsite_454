@@ -126,6 +126,13 @@ distance queries. A unit in the name makes the wrong value look wrong at the cal
   The fallback literals inside `theme.ts` are the one sanctioned exception. CI's
   frontend build exists partly because a paint property once referenced a token that was
   never added.
+- **Breakpoints (TM05-130):** one set, in `src/layout/breakpoints.ts`: phone up to 640px,
+  tablet 641-1279px (tablets, and large phones in landscape), desktop 1280px and up, plus
+  `short` (up to 500px tall: a phone on its side). CSS cannot read a custom property in
+  `@media`, so a stylesheet writes the query out exactly as `MEDIA` spells it, with a
+  comment naming it, and TypeScript passes `MEDIA.*` to `matchMedia()`.
+  `tests/breakpoints.test.ts` fails on any other width or height query. Tablet-only
+  overrides live in `src/tablet.css`; phone ones in `src/phone.css`.
 
 ## 5. Geospatial and SQL
 

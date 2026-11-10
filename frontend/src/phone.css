@@ -1,4 +1,4 @@
-/* Phone layout (TM05-103). Below 640px (PHONE_MAX_WIDTH in components/snaps.ts) the side
+/* Phone layout (TM05-103). At phone width (MEDIA.phone, layout/breakpoints.ts) the side
  * panels are bottom sheets (components/sheet.css); this file keeps everything else clear of
  * them, of the notch and of the home bar. Safe-area insets need viewport-fit=cover
  * (index.html). */

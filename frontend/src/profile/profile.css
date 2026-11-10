@@ -255,7 +255,8 @@
   color: var(--danger);
 }
 
-@media (max-width: 520px) {
+/* Phone (MEDIA.phone, layout/breakpoints.ts). */
+@media (max-width: 640px) {
   .prefs-row {
     grid-template-columns: minmax(0, 1fr) 3em;
   }

@@ -477,3 +477,17 @@
   --conditions-alert-severe: var(--danger);
   --conditions-alert-bar-width: 3px;
 }
+
+/* --- Tablet layout (TM05-130) -------------------------------------------------------------
+ * Tablets and large phones in landscape (MEDIA.tablet, layout/breakpoints.ts). The side
+ * panels stay docked, but narrower, under the search row; tablet.css. */
+:root {
+  /* The left column: the mode switcher and the layer panel (the panel's min-width). */
+  --tablet-column-width: 232px;
+  /* The trail / campsite panel docked on the right. */
+  --tablet-panel-width: 320px;
+  /* The search row's height, which the docked panel sits under. */
+  --tablet-search-height: 52px;
+  /* MapLibre's attribution on one line, which the docked panel stops above. */
+  --tablet-attribution-height: 24px;
+}

@@ -1,0 +1,85 @@
+/* Tablet layout (TM05-130): tablets, and large phones in landscape, at 641-1279px
+ * (MEDIA.tablet in layout/breakpoints.ts). Every value comes from theme.css tokens.
+ *
+ * On a desktop the search floats top centre and the trail panel runs the full height on
+ * the right, which is fine with room to spare. Narrower than that they collide with the
+ * layer column and with each other, so here the page reads as three lanes:
+ *
+ *   left column       mode switcher and layers (folded at first, LayerPanel.tsx)
+ *   search row        top, starting right of the left column
+ *   docked panel      right, narrower, under the search row
+ *
+ * and the route planner moves from bottom centre to the left, above the location buttons,
+ * so it never slides under the docked panel. At 1280px and up none of this applies.
+ * (`.app` raises these above the feature stylesheets, which load after this one.) */
+
+@media (min-width: 641px) and (max-width: 1279px) {
+  .app .overlay-left {
+    left: calc(var(--space-md) + env(safe-area-inset-left));
+    width: var(--tablet-column-width);
+    /* Clear of the location buttons and the basemap toggle at the bottom left, and
+     * scrolling when open on a short screen (a phone on its side). */
+    max-height: calc(100% - 2 * var(--space-md) - var(--live-controls-lift) - var(--hike-panel-lift));
+    overflow-y: auto;
+  }
+
+  .app .overlay-left .panel {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .app .trail-search {
+    left: calc(var(--space-md) + env(safe-area-inset-left) + var(--tablet-column-width) + var(--space-md));
+    width: min(
+      var(--trail-search-width),
+      calc(100% - 3 * var(--space-md) - var(--tablet-column-width) - env(safe-area-inset-left) - env(safe-area-inset-right))
+    );
+    transform: none;
+  }
+
+  /* The trail and campsite panels: docked right, under the search row and above
+   * MapLibre's attribution, which keeps its one line along the bottom right. (Pushing the
+   * whole corner left of the panel, as a desktop does, folds the attribution onto two
+   * lines over the basemap toggle. `.maplibregl-map` outranks that rule in trails.css.) */
+  .app .trail-panel {
+    top: calc(var(--space-md) + var(--tablet-search-height) + var(--space-sm));
+    right: calc(var(--space-md) + env(safe-area-inset-right));
+    bottom: calc(var(--tablet-attribution-height) + var(--space-sm) + env(safe-area-inset-bottom));
+    width: var(--tablet-panel-width);
+    max-height: none;
+  }
+
+  .app:has(.trail-panel) .maplibregl-map .maplibregl-ctrl-bottom-right {
+    right: 0;
+  }
+
+  /* Zoom and compass: just left of the panel. */
+  .app:has(.trail-panel) .maplibregl-map .maplibregl-ctrl-bottom-right .maplibregl-ctrl-group {
+    margin-right: calc(var(--tablet-panel-width) + 2 * var(--space-md) + env(safe-area-inset-right));
+  }
+
+  .app .route-planner {
+    left: calc(var(--space-md) + env(safe-area-inset-left));
+    bottom: calc(
+      var(--space-md) + var(--live-controls-lift) + var(--hike-panel-lift) + var(--space-sm) +
+        env(safe-area-inset-bottom)
+    );
+    transform: none;
+  }
+
+  /* The card for "What can I see from here?" covers the search, as it does on a desktop:
+   * in the search's lane, not centred over the layer column. */
+  .app .viewshed-here {
+    left: calc(var(--space-md) + env(safe-area-inset-left) + var(--tablet-column-width) + var(--space-md));
+    transform: none;
+  }
+}
+
+/* A phone on its side (MEDIA.short): the map is only ~350px tall, so the route planner is
+ * compact, as on a phone: the count and Undo last stand in for the list and the hint. */
+@media (max-height: 500px) {
+  .app .route-planner-stops,
+  .app .route-planner-hint {
+    display: none;
+  }
+}

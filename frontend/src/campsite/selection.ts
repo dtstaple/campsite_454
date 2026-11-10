@@ -79,7 +79,7 @@ export interface Padding {
 /**
  * Camera padding that keeps the site clear of the side panel. On a wide screen the panel
  * is a column on the right, so the right padding is its width plus the gap to the edge;
- * on a phone it is a sheet along the bottom (trails.css, max-width 720px), so the bottom
+ * on a phone it is a sheet along the bottom (MEDIA.phone, layout/breakpoints.ts), so the bottom
  * padding is its height instead. `margin` is the breathing room on every side.
  * selectionCamera turns this into an offset.
  */
