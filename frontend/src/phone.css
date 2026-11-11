@@ -57,11 +57,11 @@
     bottom: calc(var(--sheet-height, var(--phone-attribution-height)) + var(--space-sm) + var(--live-controls-lift) + env(safe-area-inset-bottom));
   }
 
-  /* Touch targets: at least 40px tall where a finger has to hit them. */
+  /* Touch targets: a thumb's height (--touch-target) where a finger has to hit them. */
   .trail-stop,
   .trail-3d-button,
   .waypoint-add {
-    min-height: 36px;
+    min-height: var(--touch-target);
   }
 
   .profile,
@@ -77,6 +77,7 @@
  * and none of the rules below match a mouse, so the desktop layout is unchanged. */
 
 /* No zoom on focus: iOS zooms into any field whose text is under 16px. */
+/* Touch screens: MEDIA.touch in layout/breakpoints.ts. */
 @media (pointer: coarse) {
   html :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, select) {
     font-size: var(--text-input-touch);

@@ -21,6 +21,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import "./App.css";
 import "./phone.css";
 import "./tablet.css";
+import "./touch.css";
 import Header from "./Header";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";

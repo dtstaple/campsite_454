@@ -1,0 +1,86 @@
+/* Touch screens (TM05-131): MEDIA.touch, `(pointer: coarse)` in layout/breakpoints.ts.
+ *
+ * Every control is at least a thumb's size, --touch-target (44 x 44 px), the WCAG 2.5.5
+ * target size. A mouse never matches `pointer: coarse`, so on a desktop none of this
+ * applies and the layout is unchanged. Links inside running text keep their size, as
+ * WCAG's inline exception allows; their line is the target.
+ *
+ * `:where()` keeps these at zero specificity, so a component that sets its own, larger
+ * size keeps it. Every value comes from theme.css tokens. */
+
+@media (pointer: coarse) {
+  :where(
+      button,
+      select,
+      summary,
+      [role="button"],
+      input:not([type="checkbox"], [type="radio"], [type="range"], [type="hidden"]),
+      a.brand,
+      a.nav-link,
+      .site-account a.link-button,
+      a.button-primary,
+      a.trail-3d-button
+    ) {
+    min-width: var(--touch-target);
+    min-height: var(--touch-target);
+  }
+
+  /* Links and text buttons centre their label in the taller box. (Not `:where()`: their
+   * own rules set `display`, and this has to win.) */
+  a.brand,
+  a.nav-link,
+  .site-account a.link-button,
+  a.button-primary,
+  a.trail-3d-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* A checkbox or radio is hit through its label, so the label is the target. */
+  :where(label.row, label:has(> input[type="checkbox"]), label:has(> input[type="radio"])) {
+    min-height: var(--touch-target);
+  }
+
+  /* Controls that set their own, smaller, min-height in a stylesheet that loads later. */
+  .app .live-button {
+    min-height: var(--touch-target);
+  }
+
+  /* MapLibre's zoom / compass buttons, popup close and attribution toggle set their own
+   * pixel sizes, so these need the extra weight. */
+  .maplibregl-ctrl-group button {
+    width: var(--touch-target);
+    height: var(--touch-target);
+  }
+
+  .maplibregl-ctrl.maplibregl-ctrl-attrib .maplibregl-ctrl-attrib-button {
+    width: var(--touch-target);
+    height: var(--touch-target);
+    background-position: center;
+  }
+
+  /* The folded attribution makes room for its bigger toggle, so the toggle does not ride
+   * up over the zoom buttons. */
+  .maplibregl-ctrl.maplibregl-ctrl-attrib.maplibregl-compact {
+    display: flex;
+    align-items: center;
+    min-height: var(--touch-target);
+    padding-right: var(--touch-target);
+  }
+
+  .maplibregl-popup .maplibregl-popup-close-button {
+    min-width: var(--touch-target);
+    min-height: var(--touch-target);
+  }
+
+  /* Taller rows make the layer list longer: it scrolls rather than running off a
+   * phone's screen, clear of the buttons at the bottom left. */
+  .app .overlay-left {
+    max-height: calc(
+      100% - 2 * var(--space-md) - var(--phone-search-height) - var(--live-controls-lift) -
+        var(--hike-panel-lift)
+    );
+    overflow-y: auto;
+  }
+}

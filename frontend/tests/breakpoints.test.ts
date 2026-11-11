@@ -31,6 +31,7 @@ test("the media queries agree with the numbers they are built from", () => {
   assert.equal(MEDIA.tablet, "(min-width: 641px) and (max-width: 1279px)");
   assert.equal(MEDIA.belowDesktop, "(max-width: 1279px)");
   assert.equal(MEDIA.short, "(max-height: 500px)");
+  assert.equal(MEDIA.touch, "(pointer: coarse)");
   assert.ok(BREAKPOINTS.phoneMaxPx < BREAKPOINTS.tabletMaxPx);
 });
 
@@ -40,26 +41,26 @@ test("big overlays start folded on small screens, never on a desktop", () => {
   assert.equal(FOLDED_AT_START.searchResults, "(max-width: 640px), (max-height: 500px)");
 });
 
-test("every @media width or height in a stylesheet is one of the shared queries", () => {
+test("every @media width, height or pointer query in a stylesheet is a shared one", () => {
   const allowed = new Set<string>(Object.values(MEDIA));
   const strays: string[] = [];
   for (const file of filesUnder(SRC, /\.css$/)) {
     const css = readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
     for (const match of css.matchAll(/@media\s+([^{]+)\{/g)) {
       const query = match[1].trim().replace(/\s+/g, " ");
-      if (!/\b(width|height)\b/.test(query)) continue; // pointer, hover, reduced motion
+      if (!/\b(width|height|pointer|hover)\b/.test(query)) continue; // reduced motion
       if (!allowed.has(query)) strays.push(`${file.slice(SRC.length + 1)}: @media ${query}`);
     }
   }
   assert.deepEqual(strays, [], "use a query from src/layout/breakpoints.ts MEDIA");
 });
 
-test("no component spells out its own width query", () => {
+test("no component spells out its own width, height or pointer query", () => {
   const strays: string[] = [];
   for (const file of filesUnder(SRC, /\.tsx?$/)) {
     if (file.endsWith(join("layout", "breakpoints.ts"))) continue;
     const code = readFileSync(file, "utf8");
-    for (const match of code.matchAll(/matchMedia\(\s*["'`]([^"'`]*(?:width|height)[^"'`]*)["'`]/g)) {
+    for (const match of code.matchAll(/matchMedia\(\s*["'`]([^"'`]*(?:width|height|pointer|hover)[^"'`]*)["'`]/g)) {
       strays.push(`${file.slice(SRC.length + 1)}: ${match[1]}`);
     }
     if (/\binnerWidth\b/.test(code)) strays.push(`${file.slice(SRC.length + 1)}: innerWidth`);
