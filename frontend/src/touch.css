@@ -47,6 +47,11 @@
     min-height: var(--touch-target);
   }
 
+  .app .viewshed-here-close {
+    min-width: var(--touch-target);
+    min-height: var(--touch-target);
+  }
+
   /* MapLibre's zoom / compass buttons, popup close and attribution toggle set their own
    * pixel sizes, so these need the extra weight. */
   .maplibregl-ctrl-group button {
@@ -83,4 +88,34 @@
     );
     overflow-y: auto;
   }
+}
+
+/* What a finger tapped stays lit, as a hovered row is under a mouse (TM05-131). Only a
+ * touch adds these classes (input/touch.ts, input/TouchTips.tsx). */
+.trail-campsite.is-pinned,
+.trail-connection.is-pinned {
+  background: var(--bg-raised);
+}
+
+.is-tip-open {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* A `title`, shown for a tap (input/TouchTips.tsx). */
+.touch-tip {
+  position: fixed;
+  z-index: 10;
+  max-width: var(--touch-tip-max-width);
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--bg-raised);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-float);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+  pointer-events: none;
 }

@@ -409,6 +409,8 @@
   --text-input-touch: 16px;
   /* The smallest field or button a thumb has to hit on a phone. */
   --touch-target: 44px;
+  /* TM05-131: the bubble a tap on a `title` shows on a touch screen. */
+  --touch-tip-max-width: 260px;
   /* Set by useKeyboard.ts while the on-screen keyboard is open; these are the closed values. */
   --keyboard-inset: 0px;
   --keyboard-visible-height: 100dvh;
