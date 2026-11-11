@@ -3,7 +3,7 @@
  * campsites along it. Presentational -- TrailInsight owns the data and the map.
  */
 
-import { useState, type MouseEvent, type ReactNode } from "react";
+import { useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { API_BASE_URL } from "../api";
 import { authHeaders } from "../auth";
 import { useSession } from "../session";
@@ -46,6 +46,7 @@ import { fromDetail } from "./compare";
 import Sheet from "../components/Sheet";
 import { gradeAt, nearestIndex } from "./profile";
 import { chartBands, legendItems, summaryLines, type TerrainAlong } from "../terrain/along";
+import { tapPreview, isTouch } from "../input/touch";
 import { duration as plannedDuration, offTrailNote, stretch } from "../routing/planned";
 
 export type DetailState =
@@ -304,24 +305,11 @@ function Ready({
       {detail.connections && detail.connections.length > 0 && (
         <section className="trail-connections" aria-label="Connecting trails">
           <div className="panel-subtitle">Connects to</div>
-          <ul>
-            {byMile(detail.connections).map((connection) => (
-              <li key={`${connection.osm_id ?? connection.way_id}`}>
-                <button
-                  type="button"
-                  className="trail-connection"
-                  onClick={() => onConnection?.(connection)}
-                  onMouseEnter={() => onConnectionHover?.(connection)}
-                  onMouseLeave={() => onConnectionHover?.(null)}
-                  onFocus={() => onConnectionHover?.(connection)}
-                  onBlur={() => onConnectionHover?.(null)}
-                >
-                  <span className="trail-connection-name">{connection.name}</span>
-                  <span className="trail-connection-mile">{junctionMiles(connection)}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
+          <ConnectionList
+            connections={detail.connections}
+            onConnection={onConnection}
+            onConnectionHover={onConnectionHover}
+          />
         </section>
       )}
 
@@ -386,6 +374,61 @@ function Ready({
   );
 }
 
+/**
+ * TM05-101: the connecting trails. A mouse hovering a row shows its junctions on the map
+ * and a click opens it. A finger cannot hover (TM05-131): its first tap shows the
+ * junctions and keeps the row highlighted, and a second tap on the same row opens it.
+ */
+function ConnectionList({
+  connections,
+  onConnection,
+  onConnectionHover,
+}: {
+  connections: Connection[];
+  onConnection?: (connection: Connection) => void;
+  onConnectionHover?: (connection: Connection | null) => void;
+}) {
+  const [pinned, setPinned] = useState<string | null>(null);
+  const pointer = useRef("mouse");
+  return (
+    <ul>
+      {byMile(connections).map((connection) => {
+        const id = `${connection.osm_id ?? connection.way_id}`;
+        return (
+          <li key={id}>
+            <button
+              type="button"
+              className={`trail-connection${pinned === id ? " is-pinned" : ""}`}
+              aria-pressed={pinned === id ? true : undefined}
+              onPointerEnter={(event) => (pointer.current = event.pointerType)}
+              onPointerDown={(event) => (pointer.current = event.pointerType)}
+              onClick={() => {
+                const next = tapPreview(pinned, id, pointer.current);
+                setPinned(next.pinned);
+                if (next.open) onConnection?.(connection);
+                else onConnectionHover?.(connection);
+              }}
+              onMouseEnter={() => {
+                if (!isTouch(pointer.current)) onConnectionHover?.(connection);
+              }}
+              onMouseLeave={() => {
+                if (!isTouch(pointer.current)) onConnectionHover?.(null);
+              }}
+              onFocus={() => onConnectionHover?.(connection)}
+              onBlur={() => {
+                if (!isTouch(pointer.current)) onConnectionHover?.(null);
+              }}
+            >
+              <span className="trail-connection-name">{connection.name}</span>
+              <span className="trail-connection-mile">{junctionMiles(connection)}</span>
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 /** TM05-152: what the profile's shading means; only the kinds this route crosses. */
 function AlongLegend({ along }: { along: TerrainAlong | undefined }) {
   const items = legendItems(along);
@@ -427,7 +470,7 @@ function Readout({
   cursorM: number | null;
 }) {
   if (cursorM === null || distances.length === 0) {
-    return <div className="trail-readout is-idle">Hover the profile or the trail</div>;
+    return <div className="trail-readout is-idle">Hover or tap the profile or the trail</div>;
   }
   const index = nearestIndex(distances, cursorM);
   return (
@@ -548,6 +591,14 @@ function AlongList({
   onCampsiteHover?: (campsite: CampsiteAlong | null) => void;
 }) {
   const [filters, setFilters] = useState<ReadonlySet<QuickFilter>>(new Set());
+  // TM05-131: the row a finger last tapped stays highlighted, as a hovered row is.
+  const [tapped, setTapped] = useState<string | null>(null);
+  const pointer = useRef("mouse");
+  const rowClass = (id: string) => `trail-campsite${tapped === id ? " is-pinned" : ""}`;
+  const onRowPointerDown = (event: { pointerType: string }) => (pointer.current = event.pointerType);
+  const noteTap = (id: string) => {
+    if (isTouch(pointer.current)) setTapped(id);
+  };
   const all = alongResults(campsites, search?.candidates ?? []);
   const terrainOf = (row: (typeof all)[number]) =>
     row.kind === "campsite" ? row.site.terrain : row.candidate.terrain;
@@ -597,8 +648,12 @@ function AlongList({
             <li key={row.id}>
               <button
                 type="button"
-                className="trail-campsite"
-                onClick={() => onCampsite(row.site)}
+                className={rowClass(row.id)}
+                onPointerDown={onRowPointerDown}
+                onClick={() => {
+                  noteTap(row.id);
+                  onCampsite(row.site);
+                }}
                 onMouseEnter={() => {
                   // Past either end there is no point on the profile to show (TM05-73).
                   onCursor(isAlong(row.site) ? row.site.distance_along_m : null);
@@ -647,8 +702,12 @@ function AlongList({
             <li key={row.id} className="is-candidate">
               <button
                 type="button"
-                className="trail-campsite"
-                onClick={() => onCandidate(row.candidate)}
+                className={rowClass(row.id)}
+                onPointerDown={onRowPointerDown}
+                onClick={() => {
+                  noteTap(row.id);
+                  onCandidate(row.candidate);
+                }}
                 onMouseEnter={() => onCursor(row.candidate.distance_along_m)}
               >
                 <span className="trail-mile">

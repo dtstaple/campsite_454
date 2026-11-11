@@ -11,6 +11,7 @@
 import { useRef } from "react";
 import type { ChartBand } from "../terrain/along";
 import { nearestIndex } from "./profile";
+import { clearsOnLeave } from "../input/touch";
 
 const WIDTH = 320;
 const HEIGHT = 132;
@@ -83,13 +84,16 @@ export default function ElevationChart({
         onHover(d);
         if (dragging.current) onScrub?.(d);
       }}
-      onPointerLeave={() => {
-        if (!dragging.current) onHover(null);
+      onPointerLeave={(event) => {
+        // TM05-131: a lifted finger leaves the cursor where it was tapped.
+        if (clearsOnLeave(event.pointerType, dragging.current)) onHover(null);
       }}
       onPointerDown={(event) => {
         dragging.current = true;
         event.currentTarget.setPointerCapture(event.pointerId);
-        onScrub?.(distanceAt(event.clientX));
+        const d = distanceAt(event.clientX);
+        onHover(d); // a tap, with no move, still places the cursor (TM05-131)
+        onScrub?.(d);
       }}
       onPointerUp={(event) => {
         dragging.current = false;

@@ -21,7 +21,7 @@ export const BREAKPOINTS = {
   shortMaxPx: 500,
 } as const;
 
-/** The only width and height media queries the app uses, in CSS and in matchMedia(). */
+/** The only width, height and pointer media queries the app uses, in CSS and matchMedia(). */
 export const MEDIA = {
   phone: `(max-width: ${BREAKPOINTS.phoneMaxPx}px)`,
   tablet: `(min-width: ${BREAKPOINTS.phoneMaxPx + 1}px) and (max-width: ${BREAKPOINTS.tabletMaxPx}px)`,
@@ -29,6 +29,8 @@ export const MEDIA = {
   belowDesktop: `(max-width: ${BREAKPOINTS.tabletMaxPx}px)`,
   /** A short viewport: a phone on its side. Overlays that open tall start folded. */
   short: `(max-height: ${BREAKPOINTS.shortMaxPx}px)`,
+  /** A touch screen, whatever its size (TM05-131): no hover, and a thumb for a pointer. */
+  touch: "(pointer: coarse)",
 } as const;
 
 /**

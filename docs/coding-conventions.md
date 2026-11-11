@@ -133,6 +133,11 @@ distance queries. A unit in the name makes the wrong value look wrong at the cal
   comment naming it, and TypeScript passes `MEDIA.*` to `matchMedia()`.
   `tests/breakpoints.test.ts` fails on any other width or height query. Tablet-only
   overrides live in `src/tablet.css`; phone ones in `src/phone.css`.
+- **Touch (TM05-131):** `MEDIA.touch` is `(pointer: coarse)`. On a touch screen every control
+  is at least `--touch-target` (44 x 44 px), set in `src/touch.css`. Nothing may be reachable
+  only by hover. If a hover shows something, a tap must show it too and keep it highlighted;
+  `src/input/touch.ts` has the helpers (`tapPreview`, `clearsOnLeave`). A `title` is
+  covered on its own: `input/TouchTips.tsx` shows it for a tap.
 
 ## 5. Geospatial and SQL
 

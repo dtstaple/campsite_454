@@ -21,6 +21,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import "./App.css";
 import "./phone.css";
 import "./tablet.css";
+import "./touch.css";
 import Header from "./Header";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
@@ -31,6 +32,7 @@ import BrowseTrails from "./pages/BrowseTrails";
 import { SessionProvider } from "./session";
 import CompareTray from "./trails/CompareTray";
 import { useKeyboard } from "./components/useKeyboard";
+import TouchTips from "./input/TouchTips";
 
 export default function App() {
   // TM05-121: the comparison tray, opened from the header over any page.
@@ -57,6 +59,8 @@ export default function App() {
             </Routes>
           </div>
         </div>
+        {/* TM05-131: on a touch screen a tap shows what a hover tooltip would. */}
+        <TouchTips />
       </BrowserRouter>
     </SessionProvider>
   );

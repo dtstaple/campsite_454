@@ -369,6 +369,8 @@ export default function TrailInsight({
     map.on("mousemove", ROUTES_HIT, onRouteHover);
     map.on("mousemove", SELECTED_HIT, onSelectedHover);
     map.on("mouseleave", SELECTED_HIT, onSelectedLeave);
+    // TM05-131: a finger cannot hover, so tapping the open trail places the cursor there.
+    map.on("click", SELECTED_HIT, onSelectedHover);
     load();
 
     return () => {
@@ -380,6 +382,7 @@ export default function TrailInsight({
       map.off("mousemove", ROUTES_HIT, onRouteHover);
       map.off("mousemove", SELECTED_HIT, onSelectedHover);
       map.off("mouseleave", SELECTED_HIT, onSelectedLeave);
+      map.off("click", SELECTED_HIT, onSelectedHover);
       // On unmount the page may already have removed the map; its layers went with it.
       try {
         removeRouteLayers(map);
