@@ -29,6 +29,7 @@ import Register from "./pages/Register";
 import Discover from "./pages/Discover";
 import Profile from "./pages/Profile";
 import BrowseTrails from "./pages/BrowseTrails";
+import SharedPlan from "./pages/SharedPlan";
 import { SessionProvider } from "./session";
 import CompareTray from "./trails/CompareTray";
 import { useKeyboard } from "./components/useKeyboard";
@@ -53,6 +54,8 @@ export default function App() {
               <Route path="/discover" element={<Discover />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/trails" element={<BrowseTrails />} />
+              {/* TM05-172: a shared overnight plan, read-only, no sign-in. */}
+              <Route path="/shared/:token" element={<SharedPlan />} />
               {/* Anything else is a typo, not a page. Send it to the front door rather
                   than showing a blank shell. */}
               <Route path="*" element={<Navigate to="/" replace />} />

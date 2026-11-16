@@ -1,7 +1,8 @@
 /**
  * "Overnight plan" in the trail panel (TM05-81): the campsites chosen as stops (with the
  * Night buttons in the campsite list below), each day's distance, gain and loss, the
- * legality of every stop, and saving, reopening, deleting and exporting plans.
+ * legality of every stop, and saving, reopening, deleting, exporting and (TM05-172) sharing
+ * plans.
  *
  * The numbers are the server's: every change to the stops asks /api/plans/preview/, which
  * orders the stops along the route and measures each day on the route's stored profile.
@@ -38,6 +39,7 @@ import {
   type WorkedPlan,
 } from "./api";
 import { nights, planFilename, trailRef, type PlanDraft } from "./draft";
+import ShareLink from "./ShareLink";
 import "./plans.css";
 
 interface Props {
@@ -387,6 +389,9 @@ export default function PlanBuilder({ detail, session, draft, onDraft, onWorked 
             <button type="button" className="trail-3d-button" onClick={() => void download()}>
               Download plan GPX
             </button>
+          )}
+          {draft.planId !== null && (
+            <ShareLink key={draft.planId} session={session} planId={draft.planId} />
           )}
           {status && (
             <p className="plan-status" role="status">
