@@ -4,6 +4,7 @@
 
 import { authHeaders, type Session } from "../auth";
 import type { Legality } from "../campsite/legality";
+import type { AutoBody, AutoPlanAnswer } from "./auto";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
 
@@ -87,6 +88,14 @@ export function previewPlan(session: Session, trail: TrailRef, stopIds: string[]
   return request<WorkedPlan>(session, "/api/plans/preview/", {
     method: "POST",
     body: JSON.stringify({ ...trail, stop_ids: stopIds }),
+  });
+}
+
+/** Propose a stop for each night (TM05-169). Nothing is saved. */
+export function autoPlan(session: Session, trail: TrailRef, body: AutoBody, withinM: number) {
+  return request<AutoPlanAnswer<WorkedPlan>>(session, "/api/plans/auto/", {
+    method: "POST",
+    body: JSON.stringify({ ...trail, ...body, campsites_within_m: withinM }),
   });
 }
 

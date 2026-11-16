@@ -6,14 +6,27 @@
  * The numbers are the server's: every change to the stops asks /api/plans/preview/, which
  * orders the stops along the route and measures each day on the route's stored profile.
  * TrailInsight owns the draft so the campsite rows and this section share it.
+ *
+ * Auto-plan (TM05-169) asks the server to choose a Permitted stop for each night. Its
+ * answer opens as an ordinary unsaved draft, so + Night, remove, save and GPX all work;
+ * each day shows why its stop was chosen until the stops are changed by hand.
  */
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type { Session } from "../auth";
 import type { RouteDetail } from "../trails/api";
 import { feet, miles } from "../trails/format";
 import {
+  autoBody,
+  consideredLine,
+  reasonsByStop,
+  sameStops,
+  type AutoMode,
+  type AutoPlanAnswer,
+} from "./auto";
+import {
+  autoPlan,
   createPlan,
   deletePlan,
   downloadPlanGpx,
@@ -47,6 +60,23 @@ export default function PlanBuilder({ detail, session, draft, onDraft, onWorked 
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
+
+  // --- auto-plan (TM05-169) ----------------------------------------------------------------
+  const [autoMode, setAutoMode] = useState<AutoMode>("nights");
+  const [autoValue, setAutoValue] = useState("2");
+  const [autoBusy, setAutoBusy] = useState(false);
+  const [autoProblem, setAutoProblem] = useState<string | null>(null);
+  const [auto, setAuto] = useState<{ trailKey: string; answer: AutoPlanAnswer<WorkedPlan> } | null>(
+    null,
+  );
+  const autoAnswer = auto && auto.trailKey === draft.trailKey ? auto.answer : null;
+  // The reasons describe the auto-plan's stops; after a hand edit they no longer apply.
+  const autoApplies =
+    autoAnswer !== null &&
+    (autoAnswer.stop_ids.length === 0
+      ? draft.stopIds.length === 0
+      : sameStops(autoAnswer.stop_ids, draft.stopIds));
+  const reasons = autoApplies && autoAnswer ? reasonsByStop(autoAnswer) : new Map<string, string>();
 
   // --- the plans already saved for this trail --------------------------------------------
   const [listVersion, setListVersion] = useState(0);
@@ -153,6 +183,29 @@ export default function PlanBuilder({ detail, session, draft, onDraft, onWorked 
     }
   };
 
+  const runAuto = async () => {
+    const body = autoBody(autoMode, autoValue);
+    if ("error" in body) {
+      setAutoProblem(body.error);
+      return;
+    }
+    setAutoBusy(true);
+    setAutoProblem(null);
+    setStatus(null);
+    try {
+      const answer = await autoPlan(session, trail, body, detail.campsites.within_m);
+      setAuto({ trailKey: draft.trailKey, answer });
+      if (answer.stop_ids.length > 0) {
+        // A new, unsaved draft: saving it never overwrites the plan that was open.
+        onDraft({ trailKey: draft.trailKey, stopIds: answer.stop_ids, planId: null, name: "" });
+      }
+    } catch (error) {
+      setAutoProblem((error as Error).message);
+    } finally {
+      setAutoBusy(false);
+    }
+  };
+
   const download = async () => {
     if (draft.planId === null) return;
     try {
@@ -177,9 +230,61 @@ export default function PlanBuilder({ detail, session, draft, onDraft, onWorked 
         )}
       </div>
 
+      <form
+        className="plan-auto"
+        aria-label="Auto-plan"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void runAuto();
+        }}
+      >
+        <input
+          aria-label={autoMode === "nights" ? "Nights" : "Miles a day"}
+          type="text"
+          inputMode={autoMode === "nights" ? "numeric" : "decimal"}
+          enterKeyHint="go"
+          autoComplete="off"
+          value={autoValue}
+          onChange={(event) => setAutoValue(event.target.value)}
+        />
+        <select
+          aria-label="Plan by"
+          value={autoMode}
+          onChange={(event) => {
+            const mode = event.target.value as AutoMode;
+            setAutoMode(mode);
+            setAutoValue(mode === "nights" ? "2" : "10");
+          }}
+        >
+          <option value="nights">nights</option>
+          <option value="miles">miles a day</option>
+        </select>
+        <button type="submit" className="trail-3d-button" disabled={autoBusy}>
+          {autoBusy ? "Planning…" : "Auto-plan"}
+        </button>
+      </form>
+      {autoProblem && (
+        <p className="plan-problem" role="alert">
+          {autoProblem}
+        </p>
+      )}
+      {autoApplies && autoAnswer && (
+        <div className="plan-auto-result" role="status">
+          {autoAnswer.gaps.length > 0 && (
+            <ul className="plan-gaps" aria-label="Nights with no legal stop">
+              {autoAnswer.gaps.map((gap) => (
+                <li key={gap.night}>{gap.message}</li>
+              ))}
+            </ul>
+          )}
+          <p className="plan-hint">{consideredLine(autoAnswer)}</p>
+        </div>
+      )}
+
       {draft.stopIds.length === 0 && (
         <p className="plan-hint">
-          Choose <b>+ Night</b> beside campsites in the list below to stop there overnight.
+          Choose <b>+ Night</b> beside campsites in the list below to stop there overnight, or
+          let <b>Auto-plan</b> choose legal stops for you.
         </p>
       )}
 
@@ -211,21 +316,31 @@ export default function PlanBuilder({ detail, session, draft, onDraft, onWorked 
             <tbody>
               {shown.days.map((day) => {
                 const stop = shown.stops[day.day - 1];
+                const why = stop ? reasons.get(stop.id) : undefined;
                 return (
-                  <tr key={day.day}>
-                    <td>{day.day}</td>
-                    <td>
-                      <span className="plan-to">{day.to}</span>
-                      {stop && stop.legality.label !== day.to && (
-                        <span className={`plan-verdict is-${stop.legality.verdict}`}>
-                          {stop.legality.label}
-                        </span>
-                      )}
-                    </td>
-                    <td>{miles(day.distance_m)}</td>
-                    <td>{day.gain_m === null ? "—" : feet(day.gain_m)}</td>
-                    <td>{day.loss_m === null ? "—" : feet(day.loss_m)}</td>
-                  </tr>
+                  <Fragment key={day.day}>
+                    <tr className={why ? "has-why" : undefined}>
+                      <td>{day.day}</td>
+                      <td>
+                        <span className="plan-to">{day.to}</span>
+                        {stop && stop.legality.label !== day.to && (
+                          <span className={`plan-verdict is-${stop.legality.verdict}`}>
+                            {stop.legality.label}
+                          </span>
+                        )}
+                      </td>
+                      <td>{miles(day.distance_m)}</td>
+                      <td>{day.gain_m === null ? "—" : feet(day.gain_m)}</td>
+                      <td>{day.loss_m === null ? "—" : feet(day.loss_m)}</td>
+                    </tr>
+                    {why && (
+                      <tr className="plan-why-row">
+                        <td colSpan={5}>
+                          <span className="plan-why">Why here: {why}</span>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 );
               })}
             </tbody>
