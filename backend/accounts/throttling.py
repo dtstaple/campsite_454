@@ -17,10 +17,13 @@ from rest_framework.views import exception_handler as drf_exception_handler
 
 LOGIN = "auth-login"
 REGISTER = "auth-register"
+#: TM05-170: the natural-language trip finder, which can call a paid model.
+DISCOVER_INTERPRET = "discover-interpret"
 
 MESSAGES = {
     LOGIN: "Too many login attempts from this address.",
     REGISTER: "Too many accounts created from this address.",
+    DISCOVER_INTERPRET: "Too many trip descriptions from this address.",
 }
 
 
