@@ -10,6 +10,7 @@ from .plan_views import (
     plans_view,
 )
 from .saved_trail_views import saved_trail_view, saved_trails_view
+from .share_views import plan_share_view, shared_plan_view
 from .views import waypoint_view, waypoints_view
 
 urlpatterns = [
@@ -25,6 +26,8 @@ urlpatterns = [
     path("plans/auto/", plan_auto_view, name="plan-auto"),
     path("plans/<int:pk>/", plan_view, name="plan"),
     path("plans/<int:pk>/gpx/", plan_gpx_view, name="plan-gpx"),
+    path("plans/<int:pk>/share/", plan_share_view, name="plan-share"),
+    path("shared/<str:token>/", shared_plan_view, name="shared-plan"),
     path("routes/<int:osm_id>/candidates/", route_candidates_view, name="route-candidates"),
     # <path:> because a way's source_id contains a slash; /candidates/ anchors it.
     path("trails/<path:source_id>/candidates/", way_candidates_view, name="way-candidates"),
