@@ -163,6 +163,67 @@
   margin-top: var(--space-sm);
 }
 
+/* --- Auto-plan (TM05-169) -------------------------------------------------------------- */
+
+.plan-auto {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  margin: var(--space-sm) 0 var(--space-xs);
+}
+
+.plan-auto input {
+  width: 4.5em;
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+}
+
+.plan-auto select {
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+}
+
+.plan-gaps {
+  margin: var(--space-xs) 0;
+  padding: var(--space-xs) var(--space-sm) var(--space-xs) var(--space-lg);
+  border-left: var(--space-xs) solid var(--danger);
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+}
+
+/* The reason under a day's stop, across the whole table: why the auto-plan chose it. */
+.plan-days tr.has-why td {
+  border-bottom: none;
+}
+
+.plan-days tr.plan-why-row td {
+  padding-top: 0;
+  text-align: left;
+  white-space: normal;
+  font-family: var(--font-sans);
+}
+
+.plan-why {
+  display: block;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  line-height: var(--leading-snug);
+}
+
 .plan-saved-title {
   color: var(--text-tertiary);
   font-size: var(--text-xs);

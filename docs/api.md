@@ -849,6 +849,7 @@ one user. Authentication and isolation work exactly as for waypoints: every endp
 | `PATCH /api/plans/<id>/` | Change `name` and/or `stop_ids`. An invalid change is rejected and changes nothing |
 | `DELETE /api/plans/<id>/` | **204** |
 | `GET /api/plans/<id>/gpx/` | The plan as GPX 1.1 |
+| `POST /api/plans/auto/` | Propose a stop for each night, unsaved ([Auto-planned stops](#auto-planned-stops-tm05-169)) |
 
 **Request body**: `{"osm_id": 6619234, "stop_ids": ["node/…", "node/…"], "name": "…"}`.
 - `osm_id` names a route. For a trail assembled from segments (TM05-97), use
@@ -929,6 +930,70 @@ shows:
 - "Your plans for this trail", each with Open and Delete
 
 Signed out, the section offers sign-in.
+
+### Auto-planned stops (TM05-169)
+
+`POST /api/plans/auto/` proposes one Permitted stop per night. Nothing is saved: the
+answer carries the stop ids and the worked-out plan, which the trail panel opens as an
+unsaved draft. The method is in `docs/routing.md`, "Auto-planning overnight stops".
+It needs a token, like every plan endpoint.
+
+**Request:**
+
+```json
+{"osm_id": 4286650, "nights": 3, "campsites_within_m": 500}
+```
+
+- The trail is named as for any plan: `osm_id`, `from_way` or `planned_route`.
+- Give exactly one of:
+  - `nights`: a whole number, 1 to 30
+  - `daily_target_m`: metres a day, at least 3,000
+- `campsites_within_m` is the corridor for mapped campsites, as in the trail panel: 1 to
+  5,000, default 500.
+
+**Response:**
+
+```json
+{"status": "ok", "mode": "nights", "daily_target_m": null,
+ "nights_requested": 3, "nights_planned": 3, "day_target_m": 55279.3, "gain_target_m": 1144.1,
+ "stop_ids": ["node/3241862521", "node/5766626694", "node/6725137625"],
+ "choices": [{"night": 1, "even_night": 1, "id": "node/3241862521", "name": "Mud Lake lean--to",
+              "distance_along_m": 48913.5, "score": 91,
+              "window_start_m": 38695.5, "window_end_m": 71863.1,
+              "legal_options": 4, "other_options": 0, "alternative": null,
+              "reason": "Score 91: the highest-scoring of 4 legal stops between mi 24.0 and mi 44.7."}, …],
+ "gaps": [],
+ "considered": {"within_m": 500, "mapped": 61, "mapped_permitted": 52, "mapped_truncated": false,
+                "candidates_searched": false, "candidates": null, "candidates_permitted": 0},
+ "weights": {"distance": 1.0, "gain": 0.5, "score": 0.3},
+ "climb_used": true,
+ "plan": {"trail": {…}, "nights": 3, "stops": […], "days": […], "totals": {…}, …}}
+```
+
+**Status:**
+- `ok`: every night has a stop.
+- `partial`: at least one night had no Permitted stop in its window.
+- `none`: no night did, and `plan` is null.
+
+**Fields:**
+- `plan` is exactly what `POST /api/plans/preview/` returns for `stop_ids`.
+- `choices[].night` is the stop's night in the plan. `even_night` is the night of the even
+  split it was chosen for; they differ after a gap.
+- `alternative` is set when a higher-scoring legal stop in the same window lost on balance:
+  `{id, name, score, day_before_m, day_after_m}`.
+- `gaps`: `[{"night": 2, "from_m": 53699.9, "to_m": 72652.8, "unverified": 0, "message": "No legal stop between mi 33.4 and mi 45.1 for night 2, so that night is left out and the days either side run together."}]`.
+- `considered.candidates_searched` is false when Find campsites hasn't been run for this
+  trail and corridor. Auto-plan never starts that search. Potential spots are never
+  Permitted, so they are never chosen either way.
+
+**Errors** (400, `{"error": "…"}`):
+- "Phelps Trail is 7.8 mi: 4 nights would make days of 1.6 mi, under the 1.9 mi
+  minimum. Choose fewer nights."
+- "Give either a number of nights or a daily distance target."
+- a bad `nights`, `daily_target_m` or `campsites_within_m`
+- a trail that is one day at the target
+
+An unknown trail returns 404, and no token returns 401.
 
 ## Potential campsites (TM05-99)
 

@@ -8,6 +8,7 @@ Overnight plan endpoints (TM05-81). Contract: docs/api.md, "Overnight plans".
     PATCH  /api/plans/<id>/          rename it or change its stops
     DELETE /api/plans/<id>/          delete it
     GET    /api/plans/<id>/gpx/      the plan as GPX: track, stops, the user's waypoints
+    POST   /api/plans/auto/          propose stops for N nights or a daily target (TM05-169)
 
 A plan body names its trail with `osm_id` (a route) or `from_way` (an assembled trail,
 TM05-97) and its stops with `stop_ids`, campsite source ids in any order.
@@ -26,11 +27,12 @@ from rest_framework.response import Response
 
 from api.gpx import Waypoint as GpxWaypoint
 from api.gpx import build_gpx, track_points
-from api.routes import DEFAULT_WITHIN_M, gpx_response, trail_for_way
+from api.routes import DEFAULT_WITHIN_M, MAX_WITHIN_M, gpx_response, trail_for_way
 from geodata.models import Campsite, TrailRoute
 from routing.service import PlanningError
 from routing.service import resolve as resolve_planned
 
+from .autoplan import AutoPlanError, auto_plan
 from .models import PlanStop, TripPlan
 from .plans import CANDIDATE_PREFIX, CandidateStop, PlanError, build_plan, is_candidate
 from .queries import as_gpx, waypoints_near
@@ -132,6 +134,32 @@ def plan_preview_view(request):
         return Response(_public(build_plan(route, _sites(request.data.get("stop_ids")))))
     except PlanError as error:
         return _bad(error)
+
+
+@api_view(["POST"])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def plan_auto_view(request):
+    """Propose a stop for each night (TM05-169). Nothing is saved: the answer carries the
+    stop ids and the worked-out plan, which the trail panel opens as an unsaved draft."""
+    data = request.data
+    try:
+        within = data.get("campsites_within_m", DEFAULT_WITHIN_M)
+        whole = isinstance(within, int) and not isinstance(within, bool)
+        if not whole or not 0 < within <= MAX_WITHIN_M:
+            raise PlanError(f"campsites_within_m must be a whole number from 1 to {MAX_WITHIN_M}.")
+        route = _resolve_trail(*_trail_fields(data))
+        answer = auto_plan(
+            route,
+            nights=data.get("nights"),
+            daily_target_m=data.get("daily_target_m"),
+            within_m=within,
+        )
+    except (PlanError, AutoPlanError) as error:
+        return _bad(error)
+    if answer["plan"] is not None:
+        answer["plan"] = _public(answer["plan"])
+    return Response(answer)
 
 
 @api_view(["GET", "POST"])
