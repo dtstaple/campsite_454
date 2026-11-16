@@ -1666,6 +1666,117 @@ A missing, non-numeric, non-finite or out-of-range value is a **400**:
 - `cached` says whether this response came from the cache, and `fetched_at` says when
   the source was actually asked.
 
+## Natural-language trip finder (TM05-170)
+
+### `POST /api/discover/interpret/`
+
+The **Describe your trip** box on Discover trails sends the user's words here. The answer
+is the trail search's filters, read from the text. **The results always come from
+[the trail search](#trail-search-and-the-discover-list-tm05-74) with those filters, never
+from the model**, so every result stays explainable factor by factor.
+
+| Piece | Where |
+|---|---|
+| Schema and validation | `backend/discover/schema.py` |
+| Model call, cache, fallback | `backend/discover/interpret.py` |
+| Keyword parser | `backend/discover/keywords.py` |
+| Endpoint | `backend/discover/views.py` |
+| UI | `frontend/src/browse/TripFinder.tsx`, `frontend/src/browse/tripReading.ts`, in `pages/BrowseTrails.tsx` |
+| Tests | `tests/test_discover_interpret.py` (model mocked), `frontend/tests/tripReading.test.ts` |
+
+**Request:** `{"text": "two nights, lakeside, moderate climb"}`. It is public, like the
+trail search, and needs no token. The text is 1 to 300 characters; anything else is
+**400**.
+
+**Response** (the shape, for a model reading):
+
+```json
+{"text": "two nights, lakeside, moderate climb",
+ "source": "llm",
+ "fallback_reason": null,
+ "model": "claude-haiku-5-5",
+ "interpretation": {"min_length_mi": null, "max_length_mi": null, "min_gain_ft": null, "max_gain_ft": null,
+                    "difficulty": ["moderate"], "route_type": [], "nights": 2, "has_campsites": null,
+                    "water_view": true, "sheltered": null, "region": null, "weights": null,
+                    "unsupported": []},
+ "search": {"difficulty": "moderate", "campsites_within_m": "500"},
+ "not_filtered": ["nights", "water_view"],
+ "empty": false, "schema_version": "1", "cached": false, "elapsed_ms": 412}
+```
+
+- `search` holds the query parameters for `GET /api/routes/search/`. The page sets its own
+  filters to the same values and searches as usual.
+- `not_filtered` names fields that are read and shown but that the trail search can't
+  filter on. The page shows them as dashed chips.
+- `cached` is true when an identical request was answered from the cache.
+
+**The schema** (strict; every key is required, and nothing else is allowed):
+
+| Field | Type and range | Becomes |
+|---|---|---|
+| `min_length_mi`, `max_length_mi` | number 0–300, or null; min ≤ max; max > 0 | `min_length_m`, `max_length_m` |
+| `min_gain_ft`, `max_gain_ft` | number 0–30,000, or null; min ≤ max | `min_gain_m`, `max_gain_m` |
+| `difficulty` | list of `easy`, `moderate`, `hard`, no repeats | `difficulty` |
+| `route_type` | list of `loop`, `out_and_back`, `point_to_point`, no repeats | `route_type` |
+| `nights` | whole number 0–30, or null | not a trail filter. One or more nights adds `campsites_within_m=500` unless `has_campsites` is false |
+| `has_campsites` | true, false or null | `campsites_within_m=500`, the Discover cards' "campsites within 500 m" |
+| `water_view`, `sheltered` | true, false or null | not trail filters: they are campsite facts (TM05-142), shown as chips |
+| `region` | an id from `pipeline/regions.yml`, or null | `region` |
+| `weights` | null, or an object with exactly the scoring factors (`water`, `legal`, `trail`, `weather`, `slope`, `land_cover`, `drainage`, `shelter`, `view`), each 0–1 or null | not applied. Shown as a chip; a user sets weights in Profile ([Scoring weights](#scoring-weights-tm05-46)) |
+| `unsupported` | at most 5 plain-text noun phrases, 1–60 characters | named back: "Crowding isn't something we can measure yet." |
+
+"Easy access" (distance from a road) isn't measured (docs/candidates.md, "Not checked"),
+so it has no field. It is an `unsupported` ask.
+
+**How a request is read:**
+
+1. **Cache.** An identical request is answered from Django's cache for
+   `DISCOVER_INTERPRET_CACHE_S` (600 s). Identical means the same words after case and
+   spaces are normalised, the same model, the same schema version, and a key either set or
+   not. A transient failure is not cached, so the next try asks the model again.
+2. **Model,** when `ANTHROPIC_API_KEY` is set. The request goes to `DISCOVER_LLM_MODEL`
+   (default `claude-haiku-5-5`) through the official `anthropic` SDK:
+   - `max_tokens` is `DISCOVER_LLM_MAX_TOKENS` (500), with no thinking and effort `low`.
+   - The timeout is `DISCOVER_LLM_TIMEOUT_S` (8 s), with no retries.
+   - Structured outputs (`output_config.format`) ask for ONLY JSON in the schema's shape.
+   - The text goes in `<request>` tags, and the system prompt says to treat it as data.
+3. **Validation.** `schema.validate()` checks the reply against everything in the table,
+   including the ranges and lengths that structured outputs can't express. Anything outside
+   it is rejected, not repaired.
+4. **Fallback.** The keyword parser reads the text when the model gives no usable answer.
+   `source` is then `keywords`, and `fallback_reason` says why:
+
+   | `fallback_reason` | When |
+   |---|---|
+   | `no_key` | `ANTHROPIC_API_KEY` isn't set. The model is never called. |
+   | `timeout` | The model didn't answer within the timeout |
+   | `api_error` | A connection error or an HTTP error from the API |
+   | `invalid_output` | Not JSON, outside the schema, out of range, a refusal, or cut off at `max_tokens` |
+
+   The page then shows a small note: "The AI reader isn't set up here, so a simple keyword
+   reader read your request. Check the chips."
+
+**The keyword parser** (`keywords.py`) reads fixed patterns:
+- lengths: "under 10 miles", "5 to 8 mi", "a 10 mile hike" (±20%)
+- climb: "less than 2,000 ft", "at least 3000 ft of gain", "flat" (under 500 ft)
+- difficulty and route type words
+- nights: "two nights", "overnight", "weekend" (2), "3 day" (2), "day hike" (0)
+- campsite, water and shelter words
+- region names, used only when exactly one is named
+- the asks it can't measure: crowding, dogs, fishing, swimming, permits, road access,
+  bugs, cell signal, campfires, kid-friendliness, seasonal scenery
+
+It never sets weights. Its output goes through the same validation.
+
+**Limits and secrets.**
+- Requests are rate-limited per client IP, `DISCOVER_INTERPRET_RATE` (default `20/min`),
+  with DRF's `ScopedRateThrottle` (scope `discover-interpret`, as for login in
+  docs/auth.md). Over the limit is **429**: "Too many trip descriptions from this address.
+  Try again in N seconds."
+- The key is read from the server's environment (`config/settings.py`). It is never in a
+  response, a log line or the frontend bundle. A fallback logs its reason and, for invalid
+  output, the schema rule it broke; never the key or the request's text.
+
 ## Not included yet
 
 **Scores on the trail, water and public-land layers.** Only campsites are scored. Campsite
