@@ -17,6 +17,11 @@ djangorestframework==3.15.2
 django-cors-headers==4.4.0
 dj-database-url==2.2.0
 
+# --- natural-language trip finder (Davis, TM05-170) ---
+# The official Anthropic SDK, for the optional model call in backend/discover/. Without
+# ANTHROPIC_API_KEY it is imported but never called.
+anthropic==2.8.0
+
 # --- deployment (Bleron, TM05-113) ---
 gunicorn==23.0.0
 whitenoise==6.8.2

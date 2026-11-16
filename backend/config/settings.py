@@ -147,11 +147,13 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS", "http://localhost:5173")
 
 # TM05-88: login and register are rate-limited per client IP (accounts/throttling.py,
-# docs/auth.md). Only those two views throttle; nothing else is affected.
+# docs/auth.md). Only those two views and the trip finder (TM05-170) throttle.
 REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "auth-login": os.environ.get("AUTH_LOGIN_RATE", "10/min"),
         "auth-register": os.environ.get("AUTH_REGISTER_RATE", "10/hour"),
+        # TM05-170: the natural-language trip finder (discover/, docs/api.md).
+        "discover-interpret": os.environ.get("DISCOVER_INTERPRET_RATE", "20/min"),
     },
     # The client is REMOTE_ADDR alone. DRF's default (None) trusts the whole
     # X-Forwarded-For header, which a client writes itself: a new value per request would
@@ -213,3 +215,12 @@ LOGGING = {
         },
     },
 }
+
+# TM05-170: the natural-language trip finder (discover/interpret.py, docs/api.md). The key
+# stays on the server: it is read here and never sent to the browser. Without it, requests
+# are read by the keyword parser.
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+DISCOVER_LLM_MODEL = os.environ.get("DISCOVER_LLM_MODEL", "claude-haiku-5-5")
+DISCOVER_LLM_TIMEOUT_S = float(os.environ.get("DISCOVER_LLM_TIMEOUT_S", "8"))
+DISCOVER_LLM_MAX_TOKENS = int(os.environ.get("DISCOVER_LLM_MAX_TOKENS", "500"))
+DISCOVER_INTERPRET_CACHE_S = int(os.environ.get("DISCOVER_INTERPRET_CACHE_S", "600"))
