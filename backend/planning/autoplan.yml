@@ -1,0 +1,37 @@
+# Auto-planned overnight stops (TM05-169). docs/routing.md, "Auto-planning overnight
+# stops", explains every value. Tuning one is an edit here.
+
+# Night k's stop is looked for within this fraction of one even day either side of the
+# even split (k x route length / days). At most 0.5, so two nights' windows never overlap
+# and the nights stay in order. 0.3 keeps every day within about 30% of an even day when
+# each night has a legal stop.
+window_fraction: 0.3
+
+# A plan whose even days would be shorter than this is refused: the route is too short
+# for that many nights. 3 km is a short half-day.
+min_day_m: 3000
+
+# How much each term counts when choosing between legal stops. The plan with the lowest
+# total wins (docs/routing.md gives the formula):
+#   distance: each day's squared deviation from its share of the route's length
+#   gain:     each day's squared deviation from its share of the route's climb
+#   score:    each stop's shortfall from a perfect score, (100 - score) / 100
+# With these weights, a stop 10 points better is worth moving it about 12% of a day off
+# the even split: that lengthens one day and shortens the next, 2 x 1.0 x 0.12^2 = 0.03
+# = 0.3 x 0.1 (distance alone).
+weights:
+  distance: 1.0
+  gain: 0.5
+  score: 0.3
+
+# A day's climb is compared with its share of the route's climb, but never with less than
+# this, so a nearly flat route doesn't turn a few metres into a large deviation.
+gain_floor_m: 100
+
+# A permitted site with no score yet (not enriched) counts as this score: neither
+# preferred nor avoided.
+unscored_score: 50
+
+# Mapped campsites are read up to this many along one route (a long trail can have
+# hundreds within the corridor).
+max_sites: 2000

@@ -134,6 +134,20 @@ def _profile(route):
     return outcome.value, None
 
 
+def assess(site, config) -> tuple[dict, dict, dict]:
+    """(score result, legality verdict, name fields) for a stop, as a plan shows it. A
+    potential spot has no score and an Unknown verdict. A campsite has the score its panel
+    and the trail list show, from stored values only (TM05-72): an unenriched one is
+    pending, with no score."""
+    if is_candidate(site):
+        name = {"display_name": CANDIDATE_LABEL, "display_name_derived": False}
+        return {"score": None}, _candidate_legality(site), name
+    facts = facts_of(site)
+    _, scored = stored_score(site, facts, config)
+    legality = legality_verdict(site, facts, scored["legal_status"] if scored else None)
+    return scored or {"score": None}, legality, display_name(site)
+
+
 def build_plan(route, sites) -> dict:
     """The worked-out plan for `sites` (Campsite rows, any order) along `route`."""
     if not sites:
@@ -161,20 +175,11 @@ def build_plan(route, sites) -> dict:
     stop_payloads, warnings = [], []
     for night, stop in enumerate(stops, start=1):
         site = stop.site
+        result, legality, name = assess(site, config)
         if is_candidate(site):
-            result = {"score": None}
-            legality = _candidate_legality(site)
-            name = {"display_name": CANDIDATE_LABEL, "display_name_derived": False}
             warning = f"Night {night}, " + CANDIDATE_WARNING.format(label=CANDIDATE_LABEL)
             warnings.append(warning)
         else:
-            # TM05-72: the score the campsite's panel and the trail list show, from stored
-            # values only; an unenriched stop is pending, with no score.
-            facts = facts_of(site)
-            _, scored = stored_score(site, facts, config)
-            result = scored or {"score": None}
-            legality = legality_verdict(site, facts, scored["legal_status"] if scored else None)
-            name = display_name(site)
             warning = None
         if warning is None and legality["verdict"] != PERMITTED:
             label = name["display_name"] or "campsite"
