@@ -363,6 +363,92 @@ Mountain → Loj planned from four map clicks; its profile and stats; Find camps
 mapped, 8 potential); two lean-tos as nights with daily distances; and a GPX of 2,106
 track points and 8 waypoints. Screenshots are in `artifacts/sprint7/`.
 
+## Auto-planning overnight stops (TM05-169)
+
+The Overnight plan section's **Auto-plan** proposes one stop per night along a trail or a
+planned route. It takes a number of nights, or a daily distance target that picks the
+number of nights. The proposal opens as an ordinary unsaved plan, so + Night, remove, save
+and GPX export all work on it. The contract is in `docs/api.md`, "Auto-planned stops".
+
+| Piece | Where |
+|---|---|
+| Method (pure) and gathering the stops | `backend/planning/autoplan.py` |
+| Weights and limits | `backend/planning/autoplan.yml` |
+| Endpoint | `POST /api/plans/auto/`, `backend/planning/plan_views.py` |
+| UI | `frontend/src/plans/PlanBuilder.tsx`, `frontend/src/plans/auto.ts` |
+| Tests | `tests/test_autoplan.py`, `frontend/tests/autoPlan.test.ts` |
+
+**Which stops it may choose.**
+- **Mapped campsites** along the route, found exactly as the trail panel's list finds them:
+  within the panel's corridor (**within**, 500 m by default) and not past either end.
+- **Potential spots**, but only those Find campsites has already found for this trail and
+  corridor. They are read from the cache; auto-plan never starts the slow 3DEP search.
+- **Only a "Permitted" verdict is eligible.** Each stop's verdict and score are the ones the
+  plan itself shows (`plans.assess`). A potential spot is always Unknown, so it is never
+  chosen automatically. It is counted in the gap message, where a hiker may choose it by
+  hand.
+
+**The method.**
+1. **Days.** With N nights there are D = N + 1 days, and an even day is L / D for a route
+   L long. For a daily target T, D is the whole number of days whose even split is
+   closest to T. On a tie it takes the shorter days, so 24 km at 10 km a day is 3 days of
+   8 km, not 2 of 12.
+2. **Windows.** Night k's stop must lie within `window_fraction` (0.3) of an even day
+   either side of k × L / D. That is at most 0.5, so windows never overlap and the nights
+   stay in order.
+3. **Gaps.** A night whose window holds no Permitted stop is left out, never filled. It is
+   reported: "No legal stop between mi 33.4 and mi 45.1 for night 2, so that night is left
+   out and the days either side run together." The message counts any unverified spots
+   there.
+4. **Cost.** Each candidate plan's cost is
+
+   ```
+   Σ days   w_distance × ((d − s·L/D) / (s·L/D))²
+          + w_gain     × ((g − s·G/D) / max(s·G/D, s·gain_floor_m))²
+   + Σ stops w_score   × (100 − score) / 100
+   ```
+
+   - d and g are the day's distance and climb.
+   - s is the number of even days it spans: 2 across a gap.
+   - G is the route's total climb.
+   - A stop with no score yet counts as `unscored_score` (50).
+   - The weights are `distance` 1.0, `gain` 0.5 and `score` 0.3. At these weights, a stop
+     10 points better is worth moving it about 12% of a day off the even split.
+5. **Exact choice.** Dynamic programming over the nights finds the lowest-cost plan: each
+   night's best cost for each of its stops, from every stop of the night before. It is
+   exact, and costs O(N × m²) for m stops per window: milliseconds even on the
+   Northville-Placid Trail.
+   - Climb, while choosing, is the sum of every rise in the smoothed profile, which is
+     additive. The table then measures each day exactly as the trail panel does (3 m
+     threshold, `days.py`), and the reasons quote those figures.
+   - Without a profile, the gain term is left out.
+6. **Determinism.** Stops are taken in order along the route, then by id, and only a
+   strictly lower cost replaces the best so far, so ties always break the same way. The
+   same input gives the same plan; a test shuffles 80 stops to check it.
+
+**Why each stop.** Each day shows a sentence with the stop's score and how many legal stops
+its window held: "Score 91: the highest-scoring of 4 legal stops between mi 24.0 and mi
+44.7." When a higher-scoring stop lost on balance, the sentence names it and gives the days
+it would have made, with neighbouring stops fixed. When other sites in the window were not
+Permitted, it says so. A hand edit (+ Night, remove) hides the reasons, because they no
+longer describe the plan.
+
+**Refused** (400, with a sentence):
+- a route too short for the nights: even days under `min_day_m` (3 km)
+- a daily target under 3 km, or one that would need more than 30 nights
+- a trail that is one day at the target: it needs no stop
+- both or neither of nights and target
+
+**Measured** (dev DB, 2026-11-15, server time in a Django shell):
+
+| Trail | Request | Mapped (Permitted) | Time | Result |
+|---|---|---|---|---|
+| Northville-Placid Trail, 137.4 mi | 3 nights | 61 (52) | 575 ms | 3 stops, days 30.4 / 33.6 / 37.9 / 35.5 mi |
+| Northville-Placid Trail | 6 nights | 61 (52) | <1 s | 5 stops, night 2 reported as a gap |
+| Phelps Trail, 7.8 mi | 1 night | 22 (22) + 5 potential | 183–226 ms | Bushnell Falls Lean-to #1, days 4.8 / 3.0 mi |
+
+Screenshots and the browser run are in `artifacts/tm05-169/`.
+
 ## Known limits
 
 - **A route that walks the same stretch twice** (out and back, or a lollipop) has an
@@ -371,6 +457,8 @@ track points and 8 waypoints. Screenshots are in `artifacts/sprint7/`.
 - **Saved trails and hikes** (TM05-100, TM05-111) keep a trail by route or way only. A
   planned route can be planned, saved as an overnight plan and exported, but not saved
   as a trail or hiked in trail mode; the panel hides those two buttons for it.
+- **Auto-plan on a route that doubles back** places stops by their first pass, like
+  everything else here, so an out-and-back's return leg has no stops of its own.
 - **Graph ascent vs profile gain.** The panel's stats come from the route's 3DEP profile
   (25 m, smoothed, 3 m threshold), the same as any trail. The graph's own totals (50 m,
   unsmoothed sum) drive the cost and are reported in `planned.graph_totals`; they differ
