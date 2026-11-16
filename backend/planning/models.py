@@ -62,6 +62,9 @@ class TripPlan(models.Model):
     from_way = models.CharField(max_length=64, blank=True, default="")
     planned_route = models.CharField(max_length=255, blank=True, default="")
     trail_name = models.CharField(max_length=255, blank=True, default="")
+    # TM05-172: the token of the plan's read-only share link, or null when it isn't
+    # shared. Revoking clears it, so the old link stops working at once.
+    share_token = models.CharField(max_length=64, null=True, blank=True, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

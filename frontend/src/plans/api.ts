@@ -59,6 +59,8 @@ export interface PlanSummary {
   planned_route?: string | null;
   trail_name: string;
   nights?: number;
+  /** TM05-172: the token of the plan's share link, null when it isn't shared. */
+  share_token?: string | null;
   updated_at: string;
 }
 
@@ -139,4 +141,40 @@ export async function downloadPlanGpx(session: Session, id: number, filename: st
   link.download = filename;
   link.click();
   window.setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+}
+
+// --- Share links (TM05-172) ----------------------------------------------------------
+
+export interface Share {
+  token: string;
+  path: string;
+}
+
+/** Turn on the plan's read-only link (or get the one it has). */
+export function sharePlan(session: Session, id: number) {
+  return request<Share>(session, `/api/plans/${id}/share/`, { method: "POST" });
+}
+
+/** Revoke the link: it stops working at once. */
+export function revokeShare(session: Session, id: number) {
+  return request<void>(session, `/api/plans/${id}/share/`, { method: "DELETE" });
+}
+
+/** A shared plan, read-only: the route, nights and days, and nothing about its owner. */
+export type SharedPlan = WorkedPlan & { name: string; trail_name: string };
+
+/** Open a shared plan by its token. No sign-in. */
+export async function getSharedPlan(token: string): Promise<SharedPlan> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}/api/shared/${encodeURIComponent(token)}/`);
+  } catch {
+    throw new PlanError(`Could not reach the API at ${API_BASE_URL}.`);
+  }
+  if (response.status === 404) {
+    throw new PlanError("This link doesn't work any more. The owner may have stopped sharing it.");
+  }
+  const body = await response.json().catch(() => null);
+  if (!response.ok) throw new PlanError(body?.error ?? `The server answered ${response.status}.`);
+  return body as SharedPlan;
 }

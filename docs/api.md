@@ -849,6 +849,7 @@ one user. Authentication and isolation work exactly as for waypoints: every endp
 | `PATCH /api/plans/<id>/` | Change `name` and/or `stop_ids`. An invalid change is rejected and changes nothing |
 | `DELETE /api/plans/<id>/` | **204** |
 | `GET /api/plans/<id>/gpx/` | The plan as GPX 1.1 |
+| `POST`/`DELETE /api/plans/<id>/share/`, `GET /api/shared/<token>/` | Share it read-only ([Sharing a plan](#sharing-a-plan-tm05-172)) |
 | `POST /api/plans/auto/` | Propose a stop for each night, unsaved ([Auto-planned stops](#auto-planned-stops-tm05-169)) |
 
 **Request body**: `{"osm_id": 6619234, "stop_ids": ["node/…", "node/…"], "name": "…"}`.
@@ -930,6 +931,31 @@ shows:
 - "Your plans for this trail", each with Open and Delete
 
 Signed out, the section offers sign-in.
+
+### Sharing a plan (TM05-172)
+
+The owner of a saved plan can give it a read-only link. Anyone with the link sees the
+route, the nights and each day's stats without signing in.
+
+| Method and path | What it does |
+|---|---|
+| `POST /api/plans/<id>/share/` | Turn the link on. **201** `{"token": "…", "path": "/shared/<token>"}`; **200** with the same token if it is already on |
+| `DELETE /api/plans/<id>/share/` | Revoke it. **204**; the old link is a **404** from then on |
+| `GET /api/shared/<token>/` | The plan, read-only. No authentication. **404** for an unknown or revoked token |
+
+- The token is `secrets.token_urlsafe(32)`: 256 random bits, 43 characters, so a link
+  can't be guessed. Sharing again after revoking makes a new token.
+- Only the owner can share or revoke: **401** signed out, **404** for another user's plan.
+- The shared view is the worked-out plan (the same shape as above) plus `name` and
+  `trail_name`. It carries nothing about the owner: no username, email, user or plan id,
+  timestamps, or the owner's waypoints.
+- The owner's own plan responses carry `share_token` (null when not shared).
+- Deleting the plan ends the link.
+
+**In the trail panel**, a saved plan has **Share link**, then the link with **Copy** and
+**Stop sharing**. The link opens `/shared/<token>`, a page with the route drawn as a strip
+from start to end with each night's stop, the stops with their verdicts, and the day
+table.
 
 ### Auto-planned stops (TM05-169)
 

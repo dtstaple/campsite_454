@@ -106,6 +106,7 @@ def _saved(plan: TripPlan, worked: dict | None) -> dict:
         "from_way": plan.from_way or None,
         "planned_route": plan.planned_route or None,
         "trail_name": plan.trail_name,
+        "share_token": plan.share_token,  # TM05-172, the owner's own view only
         "created_at": plan.created_at,
         "updated_at": plan.updated_at,
     }
