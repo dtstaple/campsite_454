@@ -161,3 +161,120 @@
 .browse-item .compare-button {
   align-self: flex-start;
 }
+
+/* --- Describe your trip (TM05-170) ------------------------------------------------------- */
+
+.trip-finder {
+  /* Block margins only: `.browse > *` centres it in the page's column. */
+  margin-block: 0 var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.trip-finder-label,
+.trip-finder-title {
+  display: block;
+  margin-bottom: var(--space-xs);
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.trip-finder-title {
+  margin-top: var(--space-sm);
+}
+
+.trip-finder-row {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.trip-finder-row input {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--bg-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+}
+
+.trip-finder-problem {
+  margin: var(--space-xs) 0 0;
+  color: var(--danger);
+  font-size: var(--text-sm);
+}
+
+.trip-finder-note {
+  margin: var(--space-xs) 0 0;
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+  line-height: var(--leading-snug);
+}
+
+.trip-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.trip-chip {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+/* Read from the request but not a trail filter: dashed, like other unverified things. */
+.trip-chip.is-shown {
+  border-style: dashed;
+  border-color: var(--border-strong);
+}
+
+.trip-chip-label,
+.trip-chip-remove {
+  padding: var(--space-xs) var(--space-sm);
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.trip-chip-note {
+  display: block;
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+}
+
+.trip-chip-remove {
+  padding-left: var(--space-xs);
+  color: var(--text-secondary);
+}
+
+.trip-chip-remove:hover {
+  color: var(--danger);
+}
+
+.trip-unsupported {
+  margin: var(--space-sm) 0 0;
+  padding: var(--space-xs) var(--space-sm) var(--space-xs) var(--space-lg);
+  border-left: var(--space-xs) solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+}

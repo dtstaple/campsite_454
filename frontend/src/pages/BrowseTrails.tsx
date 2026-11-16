@@ -11,6 +11,9 @@
  * (docs/api.md). Results come 24 at a time with "Show more". A card opens the map with
  * that trail's panel, and the panel fits the view to it. "Compare" under a card adds it to
  * the comparison tray (TM05-121).
+ *
+ * "Describe your trip" (TM05-170, browse/TripFinder.tsx) reads a sentence into these same
+ * filters and region, so its results are this search's results.
  */
 
 import { useEffect, useMemo, useState } from "react";
@@ -22,6 +25,8 @@ import { NO_FILTERS, activeFilterCount, filterParams, unknownNote, type TrailFil
 import { CompareButton } from "../trails/CompareTray";
 import { fromHit } from "../trails/compare";
 import { OPEN_STATE_KEY, type OpenRequest } from "../profile/openRequest";
+import TripFinder from "../browse/TripFinder";
+import { NO_EXTRAS, extrasFrom, filtersFrom, type Extras, type InterpretAnswer } from "../browse/tripReading";
 import "../trails/trails.css";
 import "../browse/browse.css";
 
@@ -67,6 +72,7 @@ export default function BrowseTrails() {
   const [sort, setSort] = useState<Sort>("distance");
   const [filters, setFilters] = useState<TrailFilters>(NO_FILTERS);
   const [showFilters, setShowFilters] = useState(false);
+  const [extras, setExtras] = useState<Extras>(NO_EXTRAS);
   const [page, setPage] = useState<Page>({ status: "loading" });
   const [offset, setOffset] = useState(0);
 
@@ -128,6 +134,15 @@ export default function BrowseTrails() {
     }
   };
 
+  const applyReading = (answer: InterpretAnswer) => {
+    setFilters(filtersFrom(answer));
+    setExtras(extrasFrom(answer.interpretation));
+    const named = answer.interpretation.region;
+    if (named && named !== regionId && regions?.some((r) => r.id === named && r.trails > 0)) {
+      chooseRegion(named);
+    }
+  };
+
   const open = (hit: RouteHit) => {
     const request: OpenRequest = { kind: "trail", trail: { osmId: hit.osm_id }, name: hit.name };
     navigate("/discover", { state: { [OPEN_STATE_KEY]: request } });
@@ -142,6 +157,18 @@ export default function BrowseTrails() {
         <h1>Discover trails</h1>
         <p>Browse a region's named trails. Choose one to open it on the map.</p>
       </header>
+
+      <TripFinder
+        filters={filters}
+        extras={extras}
+        regionLabel={region?.label ?? null}
+        onAnswer={applyReading}
+        onChange={(next, nextExtras) => {
+          setFilters(next);
+          setExtras(nextExtras);
+        }}
+        onEdit={() => setShowFilters(true)}
+      />
 
       <div className="browse-controls">
         <label className="browse-field">
