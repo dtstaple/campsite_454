@@ -1489,6 +1489,25 @@ values the app shows:
 
 Show `note` with them: the model sees bare earth only.
 
+### In `GET /api/campsites/<id>/detail/` and each along-trail campsite: `access` (TM05-171)
+
+```json
+"access": {
+  "class": "moderate",
+  "label": "Moderate access",
+  "reason": "2.0 km and 294 m of climb from West Lot, about 53 min by Naismith's rule: within 10 km, 600 m of climb and 3.5 h of walking.",
+  "trailhead": "West Lot",
+  "distance_m": 1980.0,
+  "gain_m": 294.0,
+  "time_s": 3189.6
+}
+```
+
+`class` is `easy`, `moderate`, `hard` or `unknown`. With `unknown`, no trailhead connects to
+the site's trails, and `trailhead`, `distance_m`, `gain_m` and `time_s` are null. `access`
+itself is null until `compute_access` has run for the site. How it is worked out is in
+docs/routing.md, "Access difficulty".
+
 ### `GET /api/campsites/<id>/viewshed/`
 
 What the terrain lets you see from the site (eye height 1.7 m, out to 10 km), as a GeoJSON
