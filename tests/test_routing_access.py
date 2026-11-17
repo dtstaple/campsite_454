@@ -19,8 +19,10 @@ from routing.access import (
     HARD,
     MODERATE,
     UNKNOWN,
+    NodeIndex,
     classify,
     from_trailheads,
+    reach_along_edge,
     site_access,
 )
 from routing.build import config
@@ -146,3 +148,29 @@ def test_site_adds_its_approach_as_flat_walking(graph):
 def test_trailhead_not_on_graph_is_ignored(graph):
     reach = from_trailheads(graph, {999: "Nowhere", H1: "West"})
     assert all(r.trailhead == "West" for r in reach.values())
+
+
+def test_node_index_finds_the_nearest_node_within_reach(graph):
+    index = NodeIndex(graph.coords, 500)
+    assert index.nearest(1100, 50, 500) == (A, pytest.approx(111.80, abs=0.01))
+    assert index.nearest(3500, 0, 500) is None  # 2.5 km from A and from B
+    # Across a cell boundary.
+    assert index.nearest(-10, -10, 500)[0] == H1
+
+
+def test_a_point_mid_edge_is_reached_from_its_quicker_end(graph):
+    reach = from_trailheads(graph, {H1: "West", H2: "East"})
+    edge = graph.edges[11]  # A -> B, 6 km climbing 500 m
+    # 1 km from A, having climbed 100 m: from A (1 km in from West) beats from B.
+    near_a = reach_along_edge(reach, edge, 1000, up_from_u=100, up_from_v=0)
+    assert near_a.trailhead == "West"
+    assert near_a.length_m == 2000 and near_a.ascent_m == 100
+    # 5.5 km from A: from B (1 km in from East) and 0.5 km back down.
+    near_b = reach_along_edge(reach, edge, 5500, up_from_u=450, up_from_v=0)
+    assert near_b.trailhead == "East"
+    assert near_b.length_m == pytest.approx(1500)
+
+
+def test_a_point_on_an_edge_no_trailhead_reaches_has_no_reach(graph):
+    reach = from_trailheads(graph, {H1: "West"})
+    assert reach_along_edge(reach, graph.edges[13], 500, 0, 0) is None

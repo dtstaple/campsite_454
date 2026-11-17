@@ -5,7 +5,8 @@ Plain Python, like routing/engine.py: no Django and no database. One multi-sourc
 over the region's trail graph, started from every trailhead at once, finds for every node
 the quickest walk (by Naismith time, road walks at their cost factor) from any trailhead,
 and which trailhead it starts from. A campsite then reads its nearest node's answer, so a
-whole region is one search, not one per site.
+whole region is one search, not one per site. A site joins the graph at its nearest point
+on an edge, walked to from whichever end of that edge is quicker.
 
 `classify()` turns a walk's distance, climb and time into easy, moderate or hard with a
 one-line reason, by the limits in routing.yml's `access` section. A site no trailhead
@@ -21,7 +22,7 @@ import heapq
 import math
 from dataclasses import dataclass
 
-from .engine import Graph, naismith_seconds, step_cost
+from .engine import Edge, Graph, naismith_seconds, step_cost
 
 EASY, MODERATE, HARD, UNKNOWN = "easy", "moderate", "hard", "unknown"
 CLASSES = (EASY, MODERATE, HARD, UNKNOWN)
@@ -143,9 +144,41 @@ def unknown(reason: str) -> Access:
     return Access(UNKNOWN, reason)
 
 
+def reach_along_edge(
+    reach: dict[int, Reach],
+    edge: Edge,
+    along_m: float,
+    up_from_u: float,
+    up_from_v: float,
+) -> Reach | None:
+    """The quickest walk to a point `along_m` from the edge's u end, arriving from either
+    end: `up_from_u` is the climb walking u -> point, `up_from_v` walking v -> point. None
+    when neither end is reached from a trailhead."""
+    options = []
+    for node, part_m, climb in (
+        (edge.u, along_m, up_from_u),
+        (edge.v, max(0.0, edge.length_m - along_m), up_from_v),
+    ):
+        start = reach.get(node)
+        if start is None:
+            continue
+        cost = start.cost + naismith_seconds(part_m, climb) * edge.factor
+        options.append(
+            (
+                cost,
+                start.trailhead,
+                Reach(start.trailhead, start.length_m + part_m, start.ascent_m + climb, cost),
+            )
+        )
+    if not options:
+        return None
+    return min(options, key=lambda option: option[:2])[2]
+
+
 def site_access(reach: Reach | None, approach_m: float | None, settings: dict) -> Access:
-    """A campsite's access from its nearest graph node's Reach and the straight line from
-    that node to the site (`approach_m`, walked flat). None for either is unknown."""
+    """A campsite's access from the Reach of its nearest point on the graph and the
+    straight line from that point to the site (`approach_m`, walked flat). No point
+    within `campsite_max_m` (approach None) or no trailhead reaching it is unknown."""
     if approach_m is None:
         return unknown(
             f"No trail within {settings['campsite_max_m']:g} m of this site, so how far it is "
@@ -158,3 +191,30 @@ def site_access(reach: Reach | None, approach_m: float | None, settings: dict) -
     distance = reach.length_m + approach_m
     time_s = naismith_seconds(distance, reach.ascent_m)
     return classify(distance, reach.ascent_m, time_s, reach.trailhead, settings)
+
+
+class NodeIndex:
+    """Nearest graph node to a point, in the graph's metre coordinates: a grid of
+    `cell_m` squares, so a lookup only checks the nine cells round the point."""
+
+    def __init__(self, coords: dict[int, tuple[float, float]], cell_m: float):
+        self.cell_m = cell_m
+        self.cells: dict[tuple[int, int], list[tuple[int, float, float]]] = {}
+        for node, (x, y) in coords.items():
+            self.cells.setdefault(self._cell(x, y), []).append((node, x, y))
+
+    def _cell(self, x: float, y: float) -> tuple[int, int]:
+        return math.floor(x / self.cell_m), math.floor(y / self.cell_m)
+
+    def nearest(self, x: float, y: float, max_m: float) -> tuple[int, float] | None:
+        """(node, distance_m) of the nearest node within `max_m`, which must not exceed
+        the cell size; ties break on the lower node id. None when there is none."""
+        cx, cy = self._cell(x, y)
+        best: tuple[float, int] | None = None
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for node, nx, ny in self.cells.get((cx + dx, cy + dy), ()):
+                    distance = math.hypot(nx - x, ny - y)
+                    if distance <= max_m and (best is None or (distance, node) < best):
+                        best = (distance, node)
+        return None if best is None else (best[1], best[0])

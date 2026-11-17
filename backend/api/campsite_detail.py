@@ -28,6 +28,7 @@ from enrichment.facts import stored_factor_results
 from enrichment.models import CampsiteFacts
 from geodata.confidence import confidence_payload
 from geodata.models import Campsite
+from routing.access_store import payload as access_payload
 from scoring.config import ScoringConfig
 from scoring.engine import ScoringError, score_campsite
 from scoring.verdict import legality_verdict
@@ -170,6 +171,9 @@ def campsite_detail_view(request, source_id: str):
             "legality": legality_verdict(site, facts, result["legal_status"] if result else None),
             # Terrain-model facts from `make terrain` (TM05-142); null before it has run.
             "terrain": terrain_payload.detail(site),
+            # TM05-171: access from the nearest reachable trailhead; null before
+            # `compute_access` has run.
+            "access": access_payload(facts),
         }
     )
 

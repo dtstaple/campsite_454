@@ -54,6 +54,17 @@ class CampsiteFacts(models.Model):
     display_name = models.CharField(max_length=255, blank=True)
     display_name_derived = models.BooleanField(default=False)
 
+    # TM05-171: how hard the site is to reach on foot from the nearest reachable trailhead,
+    # over the routing graph (`compute_access <region>`, routing/access.py). Blank class
+    # means not computed yet; "unknown" means no trailhead connects, and then the walk's
+    # figures are null, never guessed.
+    access_class = models.CharField(max_length=16, blank=True, db_index=True)
+    access_reason = models.TextField(blank=True)
+    access_trailhead = models.CharField(max_length=255, blank=True)
+    access_distance_m = models.FloatField(null=True, blank=True)
+    access_gain_m = models.FloatField(null=True, blank=True)
+    access_time_s = models.FloatField(null=True, blank=True)
+
     provenance = models.JSONField(default=dict, blank=True)
 
     # The vector-data factor results of the site's score, stored-only, so scoring a map's

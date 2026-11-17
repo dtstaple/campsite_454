@@ -102,6 +102,7 @@ def test_refresh_runs_ingests_then_profiles_then_enrichment(steps):
         ("build_trail_graph", "adirondacks"),  # TM05-137: the routing graph
         ("build_route_profiles", "adirondacks"),
         ("enrich_campsites", "adirondacks"),
+        ("compute_access", "adirondacks"),  # TM05-171: campsite access
         ("enrich_routes", "adirondacks"),
         ("terrain", "adirondacks"),  # TM05-141: terrain facts and zones
     ]
