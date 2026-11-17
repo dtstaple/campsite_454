@@ -47,6 +47,7 @@ import Sheet from "../components/Sheet";
 import { gradeAt, nearestIndex } from "./profile";
 import { chartBands, legendItems, summaryLines, type TerrainAlong } from "../terrain/along";
 import { tapPreview, isTouch } from "../input/touch";
+import { passesAccessFilter } from "../campsite/access";
 import { duration as plannedDuration, offTrailNote, stretch } from "../routing/planned";
 
 export type DetailState =
@@ -591,6 +592,8 @@ function AlongList({
   onCampsiteHover?: (campsite: CampsiteAlong | null) => void;
 }) {
   const [filters, setFilters] = useState<ReadonlySet<QuickFilter>>(new Set());
+  // TM05-171: "Easy access", from the stored access class. A potential spot has none.
+  const [easyOnly, setEasyOnly] = useState(false);
   // TM05-131: the row a finger last tapped stays highlighted, as a hovered row is.
   const [tapped, setTapped] = useState<string | null>(null);
   const pointer = useRef("mouse");
@@ -602,8 +605,12 @@ function AlongList({
   const all = alongResults(campsites, search?.candidates ?? []);
   const terrainOf = (row: (typeof all)[number]) =>
     row.kind === "campsite" ? row.site.terrain : row.candidate.terrain;
-  const rows = all.filter((row) => passesQuickFilters(terrainOf(row), filters));
+  const accessOf = (row: (typeof all)[number]) => (row.kind === "campsite" ? row.site.access : null);
+  const rows = all.filter(
+    (row) => passesQuickFilters(terrainOf(row), filters) && passesAccessFilter(accessOf(row), easyOnly),
+  );
   const hasTerrain = all.some((row) => terrainOf(row));
+  const hasAccess = all.some((row) => accessOf(row));
   const within = withinM < 1000 ? `${withinM} m` : `${withinM / 1000} km`;
   const toggleFilter = (key: QuickFilter) =>
     setFilters((current) => {
@@ -622,9 +629,20 @@ function AlongList({
   return (
     <>
       <div className="trail-find-summary">{searchSummary(campsites.length, search)}</div>
-      {hasTerrain && (
-        <div className="terrain-filters" role="group" aria-label="Terrain filters">
-          {QUICK_FILTERS.map((filter) => (
+      {(hasTerrain || hasAccess) && (
+        <div className="terrain-filters" role="group" aria-label="Quick filters">
+          {hasAccess && (
+            <button
+              type="button"
+              className={`terrain-filter${easyOnly ? " is-on" : ""}`}
+              aria-pressed={easyOnly}
+              title="Known to be an easy walk from the nearest trailhead"
+              onClick={() => setEasyOnly((on) => !on)}
+            >
+              Easy access
+            </button>
+          )}
+          {hasTerrain && QUICK_FILTERS.map((filter) => (
             <button
               key={filter.key}
               type="button"
@@ -637,9 +655,9 @@ function AlongList({
           ))}
         </div>
       )}
-      {filters.size > 0 && (
+      {(filters.size > 0 || easyOnly) && (
         <div className="trail-find-summary">
-          {rows.length} of {all.length} match · {TERRAIN_NOTE}
+          {rows.length} of {all.length} match{filters.size > 0 ? ` · ${TERRAIN_NOTE}` : ""}
         </div>
       )}
       <ol className="trail-campsite-list">

@@ -8,6 +8,7 @@ import { authHeaders, storedSession } from "../auth";
 import type { Feature } from "geojson";
 import type { Legality } from "./legality";
 import type { TerrainPayload } from "../terrain/terrain";
+import type { Access } from "./access";
 
 export interface CampsiteFactsPayload {
   public_land: {
@@ -57,6 +58,8 @@ export interface CampsiteDetail {
   legality?: Legality | null;
   /** Terrain-model facts (TM05-142); null before `make terrain` has reached the site. */
   terrain?: TerrainPayload | null;
+  /** TM05-171: access from the nearest trailhead; null before `compute_access` has run. */
+  access?: Access | null;
 }
 
 export class CampsiteApiError extends Error {}
