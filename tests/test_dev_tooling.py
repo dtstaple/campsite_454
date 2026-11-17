@@ -69,7 +69,8 @@ def test_build_data_runs_steps_in_dependency_order():
     assert names.index("osm-routes") < names.index("route-profiles") < names.index("enrich")
     # Enrichment reads every other layer; route facts read the profiles.
     assert names.index("route-profiles") < names.index("route-facts")
-    assert names[-3:] == ["enrich", "route-facts", "terrain"]  # TM05-141: terrain last
+    assert names[-4:] == ["enrich", "access", "route-facts", "terrain"]  # TM05-141: terrain last
+    assert names.index("trail-graph") < names.index("access")  # TM05-171
     # TM05-137: the routing graph is built from the trails and the roads between them.
     assert names.index("osm-trails") < names.index("trail-graph")
     assert names.index("osm-connectors") < names.index("trail-graph")

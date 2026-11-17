@@ -40,6 +40,8 @@ def steps(region: str) -> list[tuple[str, list[str]]]:
         ("trail-graph", ["build_trail_graph", region]),
         ("route-profiles", ["build_route_profiles", region]),
         ("enrich", ["enrich_campsites", region]),
+        # TM05-171: campsite access from trailheads, over the graph, onto the facts.
+        ("access", ["compute_access", region]),
         # TM05-85: the Discover filters' stored facts; needs the profiles above.
         ("route-facts", ["enrich_routes", region]),
         # TM05-141: terrain facts and zones (make terrain), after enrichment.

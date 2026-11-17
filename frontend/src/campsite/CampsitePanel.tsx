@@ -24,6 +24,7 @@ import LegalityVerdict from "./LegalityVerdict";
 import Sheet from "../components/Sheet";
 import { withoutLegalFactor } from "./legality";
 import TerrainSection from "./TerrainSection";
+import { accessText } from "./access";
 import ConditionsSection from "../conditions/ConditionsSection";
 
 export type CampsiteState =
@@ -112,6 +113,7 @@ function Body({
   const amenities = Object.entries(AMENITY_LABELS).filter(([key]) => tags[key]);
   const description = tags.description;
   const website = tags.website;
+  const access = accessText(detail.access);
 
   return (
     <>
@@ -138,6 +140,12 @@ function Body({
             <Row label="Elevation">{elevation(facts.terrain.elevation_m)}</Row>
             <Row label="Slope">{slope(facts.terrain.slope_deg, facts.terrain.slope_pct)}</Row>
           </>
+        )}
+        {access && (
+          <Row label="Access">
+            {access.label}
+            <span className="campsite-sub">{access.reason}</span>
+          </Row>
         )}
         {facts?.water && (
           <Row label="Nearest water">

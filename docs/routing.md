@@ -449,6 +449,59 @@ longer describe the plan.
 
 Screenshots and the browser run are in `artifacts/tm05-169/`.
 
+## Access difficulty (TM05-171)
+
+Every campsite gets an access class from the nearest reachable trailhead: **easy**,
+**moderate**, **hard**, or **unknown** when no trailhead connects. It comes with a one-line
+reason. The campsite panel shows it as "Access", and the along-trail list has an **Easy
+access** quick filter.
+
+| Piece | Where |
+|---|---|
+| Search and classes (pure) | `backend/routing/access.py` |
+| Snapping and storing | `backend/routing/access_store.py`, `manage.py compute_access <region>` |
+| Thresholds | `access` in `backend/routing/routing.yml` |
+| Stored on | `CampsiteFacts.access_*` (migration `enrichment.0004`) |
+| UI | `frontend/src/campsite/access.ts`, `CampsitePanel.tsx`, `trails/TrailPanel.tsx` |
+| Tests | `tests/test_routing_access.py`, `tests/test_routing_access_store.py`, `frontend/tests/access.test.ts` |
+
+**Precomputed, never per request.** `compute_access` is a `make data` and `make refresh`
+step. It runs after `enrich_campsites`, because it writes onto the facts rows that step
+makes, and after `build_trail_graph`.
+
+**The method:**
+1. **Trailheads** (`osm-landmarks`, `highway=trailhead`) join the graph at their nearest
+   node within `trailhead_max_m` (300 m). Trailheads further from the graph are counted
+   and not used.
+2. **One multi-source search** (Dijkstra) starts from every joined trailhead at once,
+   with the planner's own cost: Naismith time with each edge's factor, so a road walk
+   costs 1.5×. Every node keeps its quickest walk: distance, climb in the walking
+   direction, and the trailhead it starts from. That is one search for the whole region,
+   not one per campsite.
+3. **Each campsite** joins at its nearest point on an edge within `campsite_max_m`
+   (500 m). It is reached from whichever end of that edge is quicker, and the climb along
+   the part of the edge comes from the edge's stored samples. The straight line from that
+   point to the site is added as flat walking.
+4. **The class** is the first of easy and moderate whose every limit the walk is within;
+   anything past moderate is hard:
+
+   | Class | Distance | Climb | Naismith time |
+   |---|---|---|---|
+   | easy | ≤ 3 km | ≤ 200 m | ≤ 1 h |
+   | moderate | ≤ 10 km | ≤ 600 m | ≤ 3.5 h |
+   | hard | beyond moderate | | |
+
+   The time is Naismith's rule on the walk's distance and climb, without road factors.
+5. **Unknown, never guessed.** A site with no edge within 500 m, or whose edge no trailhead
+   reaches, is `unknown`. Its figures stay null.
+
+**Limits:**
+- **Trailheads only from OSM.** A road crossing or a parking area that is not tagged
+  `highway=trailhead` is not a start, so a site near a road but far from a tagged trailhead
+  can read harder than it is, or unknown.
+- **No measurements yet.** The run time and the class counts on the dev DB still have to be
+  recorded. `compute_access adirondacks` prints both.
+
 ## Known limits
 
 - **A route that walks the same stretch twice** (out and back, or a lollipop) has an

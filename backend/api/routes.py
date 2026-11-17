@@ -27,7 +27,7 @@ from accounts.weights import config_for
 from analysis.analyses.elevation import RouteProfile, stitch
 from analysis.base import AnalysisError
 from api.bbox import InvalidBbox, parse_bbox
-from api.campsite_detail import facts_of, stored_score
+from api.campsite_detail import access_payload, facts_of, stored_score
 from api.gpx import CONTENT_TYPE, Waypoint, build_gpx, campsite_waypoints, track_points
 from api.gpx import filename as gpx_filename
 from api.layers import COORDINATE_PRECISION, SimplifyPreserveTopology, envelope
@@ -272,6 +272,8 @@ def route_detail(route: TrailRoute, within: int, scoring: ScoringConfig | None =
                 ),
                 # TM05-142: badges for the row (water view, sheltered, pooling risk).
                 "terrain": terrain_payload.badges(site),
+                # TM05-171: access from the nearest trailhead, for the Easy access filter.
+                "access": access_payload(facts),
             }
         )
 

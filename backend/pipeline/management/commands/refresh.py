@@ -48,6 +48,8 @@ DERIVED_STEPS: tuple[tuple[str, str], ...] = (
     ("trail-graph", "build_trail_graph"),
     ("route-profiles", "build_route_profiles"),
     ("enrich", "enrich_campsites"),
+    # TM05-171: access difficulty, from the graph and onto the facts enrichment made.
+    ("access", "compute_access"),
     ("route-facts", "enrich_routes"),
     # TM05-141: terrain facts and zones (make terrain), after enrichment.
     ("terrain", "terrain"),

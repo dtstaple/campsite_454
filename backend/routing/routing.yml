@@ -41,3 +41,26 @@ snapping:
   # nearby wins.
   fragment_max_km: 2
   fragment_penalty_m: 300
+
+access:
+  # TM05-171: how hard a campsite is to reach, walking from the nearest reachable
+  # trailhead over this graph by Naismith time. `make data` / `make refresh` store it per
+  # campsite (`compute_access <region>`); docs/routing.md, "Access difficulty".
+  #
+  # A site is the first class whose every limit it is within; past "moderate" it is hard.
+  classes:
+    easy:
+      distance_km: 3
+      gain_m: 200
+      time_h: 1
+    moderate:
+      distance_km: 10
+      gain_m: 600
+      time_h: 3.5
+  # A trailhead joins the graph at its nearest node this close, metres; one further
+  # from every trail is not used.
+  trailhead_max_m: 300
+  # A campsite joins at its nearest node this close. The straight line from that node to
+  # the site is added to the distance as flat walking. Further than this, access is
+  # unknown.
+  campsite_max_m: 500
