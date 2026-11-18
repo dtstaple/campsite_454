@@ -789,8 +789,8 @@ here. **The clock is wrong for Colorado**, which is on MDT (UTC−06:00) in summ
 "sunrise to 10:00" morning-sun window is really sunrise to 08:00 local time, and
 `morning_sun` reads too strict. Fixing it is one line,
 `summer_utc_offset: {front-range-co: "UTC-06:00"}`. But that changes the registry digest
-and so recomputes every region's tiles, so it is left to a follow-up: this PR keeps the
-Adirondacks and White Mountains results byte-for-byte unchanged.
+and so recomputes every region's tiles, so it is left to a follow-up. This PR leaves the
+Adirondacks and White Mountains tile keys and results untouched.
 
 | Step | Tasks | CPU time | Peak WASM memory |
 |---|---|---|---|
