@@ -769,3 +769,53 @@ checked, over the Presidential Range and the Pemigewasset.
 values and every class), and the count and area of each zone layer, were identical before
 and after the White Mountains run. Facts and zones are stored per region, and the registry
 digest did not change.
+
+### Measured: the Colorado Front Range pilot (2026-11-17, TM05-173)
+
+`make data REGION=front-range-co`, whose last step is `manage.py terrain front-range-co`.
+It was a first run from an empty cache, on 3 workers (Apple Silicon laptop), into a fresh
+database (`campsite_tm05_173`). The log is in
+`artifacts/terrain/pipeline/front-range-co-run-2026-11-17.txt`. The region, its sources
+and its rules are in `docs/western-pilot.md`.
+
+**The mosaic** comes from the configured `dem` source: a single 3DEP 1/3 arc-second tile,
+`n41w106` (391 MB), because the pilot bbox `[-105.70, 40.02, -105.52, 40.12]` sits inside
+one 1° × 1° tile. This is the first region west of the Mississippi. Nothing in `dem.py` or
+the tile naming needed a change.
+
+**Regional values.** The pilot has no entry in `regional`, so it runs on the defaults:
+wind from 270° and `summer_utc_offset` UTC−04:00 (EDT). The wind default is unchecked
+here. **The clock is wrong for Colorado**, which is on MDT (UTC−06:00) in summer, so the
+"sunrise to 10:00" morning-sun window is really sunrise to 08:00 local time, and
+`morning_sun` reads too strict. Fixing it is one line,
+`summer_utc_offset: {front-range-co: "UTC-06:00"}`. But that changes the registry digest
+and so recomputes every region's tiles, so it is left to a follow-up: this PR keeps the
+Adirondacks and White Mountains results byte-for-byte unchanged.
+
+| Step | Tasks | CPU time | Peak WASM memory |
+|---|---|---|---|
+| `wetness` (45 m, whole region) | 1 | 0.4 s | 13 MB |
+| `sink` (10 m) | 1 | 0.8 s | 120 MB |
+| `slope` / `aspect` (10 m) | 1 + 1 | 1.7 s / 1.6 s | 82 MB |
+| `position` / `shelter` / `damp` | 1 each | 0.2 / 0.2 / 0.3 s | 16 MB |
+| `cold_air` / `wind` | 1 each | 0.8 / 0.1 s | 16 MB |
+| `sun` / `sun_morning` | 1 each | 1.6 / 0.8 s | 9 MB |
+| `viewshed` (30 m, per site) | 1 batch | 0.5 s | 19 MB |
+| **All tiles** | 12 | about 9 s | |
+
+**Runtime.** The pipeline took 284.2 s, and 278.2 s of that was the one-time prepare
+(downloading `n41w106` and building the 45 m, 30 m and 90 m mosaics). Zones took 1.5 s
+and classify 0.1 s. The whole `make data` run took 536.9 s wall clock, with a 304 MB
+peak RSS (`/usr/bin/time -l` agrees, at 319 MB maximum resident set size).
+
+**Coverage.** The box has only 1 enriched campsite, so this run shows that the pipeline
+works on a Western region. It isn't a statistical result.
+
+- every fact, 1 of 1 (100%), except water in view, 0 of 1
+- zones: 43 pooling-risk, 60 exposure, 73 sheltered, 89 damp-ground, 147 cold-air (50
+  high, 97 medium) and 157 wind-exposure (63 exposed, 94 moderate) polygons
+
+**The existing regions are unchanged.** `tools.yml` was not edited, so the registry
+digest and every Adirondacks and White Mountains tile key are the same. The run wrote
+only to its own database. The full test suite (1,531 tests) passes, including the
+Adirondacks verdict replay and the White Mountains terrain tests.
