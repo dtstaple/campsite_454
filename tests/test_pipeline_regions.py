@@ -18,10 +18,11 @@ from pipeline.regions import (
 pytestmark = pytest.mark.unit
 
 NORTHEAST = ["adirondacks", "green-mountains-vt", "maine", "white-mountains-nh"]
+WESTERN = ["front-range-co"]
 
 
-def test_shipped_config_defines_the_northeast_regions():
-    assert list_regions() == NORTHEAST
+def test_shipped_config_defines_the_northeast_and_western_pilot_regions():
+    assert list_regions() == sorted(NORTHEAST + WESTERN)
 
 
 def test_regions_load_as_area_of_interest_objects():
@@ -42,6 +43,21 @@ def test_every_shipped_bbox_is_in_the_northeast_us(name):
     assert 42 < aoi.min_lat < 48, f"{name} latitude looks wrong: {aoi.bbox}"
     assert aoi.min_lon < aoi.max_lon
     assert aoi.min_lat < aoi.max_lat
+
+
+def test_the_western_pilot_region_loads_as_a_small_colorado_box():
+    """TM05-173: one modest Front Range box, inside a single 1x1 degree 3DEP tile."""
+    aoi = get_region("front-range-co")
+
+    assert isinstance(aoi, AreaOfInterest)
+    assert aoi.states == ("CO",)
+    assert aoi.notes
+    assert -109.1 < aoi.min_lon < aoi.max_lon < -102.0, f"not in Colorado: {aoi.bbox}"
+    assert 37.0 < aoi.min_lat < aoi.max_lat < 41.0, f"not in Colorado: {aoi.bbox}"
+    # A pilot: small enough that the ingests and the terrain download stay small.
+    assert aoi.max_lon - aoi.min_lon <= 0.25
+    assert aoi.max_lat - aoi.min_lat <= 0.25
+    assert int(aoi.min_lon) == int(aoi.max_lon) and int(aoi.min_lat) == int(aoi.max_lat)
 
 
 def test_unknown_region_names_what_is_available():

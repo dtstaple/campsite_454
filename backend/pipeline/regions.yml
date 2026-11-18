@@ -46,3 +46,14 @@ regions:
       Whole-state extent covering Baxter, the Hundred Mile Wilderness, and the North Maine
       Woods. Much larger than the other three; consider splitting it into sub-regions if
       ingest runs get slow.
+
+  front-range-co:
+    label: Colorado Front Range (Indian Peaks)
+    bbox: [-105.70, 40.02, -105.52, 40.12]
+    states: [CO]
+    notes: >
+      Western USA pilot (TM05-173). A deliberately small box (about 15 x 11 km) over the
+      Brainard Lake area and the eastern Indian Peaks Wilderness, in the Boulder Ranger
+      District of the Arapaho and Roosevelt National Forests. It sits inside a single 3DEP
+      1/3 arc-second tile (n41w106), so the terrain download stays small. It stops short of
+      Rocky Mountain National Park to the north, whose rules are not configured.
