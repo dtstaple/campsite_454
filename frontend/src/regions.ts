@@ -12,7 +12,8 @@
  * rather than display geometry, so a viewport shortcut was never going to consume them
  * unmodified -- see regionCamera() below.
  *
- * Only the two ingested regions are listed. Green Mountains VT and Maine are defined in
+ * Only the ingested regions are listed: the two Northeast ones, and the Colorado Front
+ * Range pilot (TM05-173). Green Mountains VT and Maine are defined in
  * regions.yml but hold no data yet, and a shortcut to either would land the user on the
  * blank map this story exists to prevent. When one is ingested, add it here.
  */
@@ -30,6 +31,8 @@ export interface Region {
 export const REGIONS: readonly Region[] = [
   { id: "adirondacks", label: "Adirondacks", bbox: [-75.4, 43.0, -73.3, 44.9] },
   { id: "white-mountains-nh", label: "White Mountains", bbox: [-72.0, 43.85, -70.95, 44.55] },
+  // TM05-173, the Western USA pilot: a small box over Brainard Lake and the Indian Peaks.
+  { id: "front-range-co", label: "Front Range (CO)", bbox: [-105.7, 40.02, -105.52, 40.12] },
 ];
 
 /**
