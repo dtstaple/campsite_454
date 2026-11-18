@@ -216,6 +216,59 @@ def test_closed_land_in_the_white_mountains_is_still_not_permitted():
     assert legality_verdict(site(), facts(), CLOSED)["verdict"] == NOT_PERMITTED
 
 
+# --- the Colorado Front Range pilot (TM05-173) -------------------------------------------
+
+FRONT_RANGE = (-105.6, 40.07)  # Brainard Lake / eastern Indian Peaks Wilderness
+IPW = "Indian Peaks Wilderness"
+
+
+def test_the_front_range_pilot_has_its_own_rules_region():
+    assert region_of(site(where=FRONT_RANGE)).key == "front-range-co"
+
+
+def test_front_range_rules_all_cite_the_forest_service():
+    region = legality().region_at(*FRONT_RANGE)
+    assert region.rules and region.unchecked
+    for rule in region.rules:
+        assert rule.source_url.startswith("https://www.fs.usda.gov/r02/arp/"), rule.id
+
+
+def test_an_undesignated_front_range_site_is_unknown_never_permitted():
+    for land in (IPW, "Arapaho National Forest", None):
+        verdict = legality_verdict(
+            site(where=FRONT_RANGE), facts(land=land, trail_m=500, water_m=500), OPEN
+        )
+        assert verdict["verdict"] == UNKNOWN, land
+        assert verdict["rule"]["text"].startswith("These backcountry zones allow camping only")
+
+
+def test_within_100_ft_of_a_trail_or_water_in_the_wilderness_cites_the_setback():
+    by_trail = facts(land=IPW, trail_name="Pawnee Pass Trail", trail_m=20, water_m=500)
+    by_lake = facts(land=IPW, water_name="Long Lake", water_m=10, trail_m=500)
+    for near in (by_trail, by_lake):
+        verdict = legality_verdict(site(where=FRONT_RANGE), near, OPEN)
+        assert verdict["verdict"] == UNKNOWN
+        assert verdict["rule"]["text"].startswith("Campsites must be located at least 100'")
+
+
+def test_the_front_range_setback_applies_only_inside_the_wilderness():
+    near = facts(land="Arapaho National Forest", trail_name="Some Trail", trail_m=5)
+    rule = legality_verdict(site(where=FRONT_RANGE), near, OPEN)["rule"]
+    assert rule["text"].startswith("These backcountry zones")
+
+
+def test_the_front_range_has_no_unverified_closures_or_elevation_limits():
+    region = legality().region_at(*FRONT_RANGE)
+    assert region.of_kind("no_camping") == []
+    assert elevation_limits(site(where=FRONT_RANGE), IPW) == []
+
+
+def test_closed_land_in_the_front_range_is_still_not_permitted():
+    assert legality_verdict(site(where=FRONT_RANGE), facts(land=IPW), CLOSED)["verdict"] == (
+        NOT_PERMITTED
+    )
+
+
 # --- anywhere without rules: always Unknown -----------------------------------------------
 
 

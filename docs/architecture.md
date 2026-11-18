@@ -296,7 +296,8 @@ itself evidence that the framework does not depend on any particular source exis
 ## Choosing where to look
 
 The pipeline never has locations written into its code. Instead, the areas it works on live
-in a configuration file, `regions.yml`, listing four areas to start with:
+in a configuration file, `regions.yml`. It lists four Northeast areas and one Western
+pilot (TM05-173):
 
 | Region | Covers |
 |---|---|
@@ -304,6 +305,7 @@ in a configuration file, `regions.yml`, listing four areas to start with:
 | `white-mountains-nh` | White Mountains, New Hampshire |
 | `green-mountains-vt` | Green Mountains and the Long Trail, Vermont |
 | `maine` | The whole state, including Baxter and the North Maine Woods |
+| `front-range-co` | Western pilot: Brainard Lake and the eastern Indian Peaks, Colorado (`docs/western-pilot.md`) |
 
 Each entry gives the area a name, a rectangle of coordinates, which states it covers, and
 notes for whoever writes the next source. Adding a region is editing this file — no code

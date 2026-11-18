@@ -176,8 +176,8 @@ panel shows a **verdict** for the **site** instead: `legality` on
 
 Code: `backend/scoring/verdict.py`. The rules it applies live in
 `backend/scoring/legality.yml`, one entry per region (TM05-118, "Per-region camping rules"
-below). This section describes the Adirondacks entry; the White Mountains entry and the
-format follow it.
+below). This section describes the Adirondacks entry; the White Mountains entry, the
+Front Range pilot and the format follow it.
 
 | Verdict | Label |
 |---|---|
@@ -363,6 +363,43 @@ The general rule for undesignated sites names the alpine zone in its reason, so 
 never silently passed over. The White Mountains have no elevation limit, so a designated
 site there is never downgraded for its elevation. The highest designated sites today are
 the AMC's Liberty Springs (about 3,864 ft) and Naumann (about 3,778 ft) tentsites.
+
+#### The Colorado Front Range pilot (TM05-173)
+
+Sources, both USDA Forest Service, Arapaho and Roosevelt National Forests, fetched
+2026-11-17:
+[Indian Peaks Wilderness](https://www.fs.usda.gov/r02/arp/recreation/indian-peaks-wilderness)
+and
+[Brainard Lake Recreation Area](https://www.fs.usda.gov/r02/arp/recreation/brainard-lake-recreation-area).
+Every rule below quotes one of them; `docs/western-pilot.md` describes the region.
+
+| Rule | Kind | Checked against |
+|---|---|---|
+| Indian Peaks Wilderness: "Campsites must be located at least 100' away from all lakes, streams & trails." | `setback` ×2 (trail, water) | parcel name contains "Indian Peaks Wilderness", nearest trail / water |
+| "These backcountry zones allow camping only in designated sites: Caribou Lake, Crater Lake, Diamond Lake & Jasper Lake." | `undesignated` | cited for every undesignated site |
+
+There is **no `no_camping` rule and no elevation limit**: neither page names a closure as
+a PAD-US parcel, and neither gives an elevation or treeline rule. **No operators** are
+added as designation evidence, because neither page names one that OpenStreetMap could
+show. Only the universal evidence counts, so the 2 OSM campsites in the pilot box are
+Unknown unless they are tagged "designated".
+
+**Cited but not checkable** (`unchecked`):
+
+- The overnight permit, June 1 to September 15: it is about the camper, not the site.
+- "Camping prohibited in the Four Lakes Backcountry Zone May 1-Nov 30": the zone is not a
+  PAD-US parcel, and the closure is seasonal.
+- The designated-site-only zones (Caribou, Crater, Diamond and Jasper Lakes): not PAD-US
+  parcels. Their site lists are in zone-map PDFs that were not read.
+- Brainard Lake, May 1 to November 14: dispersed camping only north of South St Vrain
+  Creek. That creek is not a boundary in the data, and the rule is seasonal.
+- Brainard Lake, November 15 to April 30: no camping within 1/4 mile of developed
+  recreation sites except Red Rock Lake. The data have no layer of developed sites.
+
+So an undesignated site in the pilot is always **Unknown**. It is never Permitted, and
+never Not permitted unless PAD-US marks the land closed. A Recreation.gov listing would
+be Permitted, as in every region, but RIDB was not ingested for the pilot (see
+`docs/western-pilot.md`). Note that the Brainard page lists Pawnee Campground as closed.
 
 #### Measured (dev DB, 1,500 sites, 2026-10-23)
 

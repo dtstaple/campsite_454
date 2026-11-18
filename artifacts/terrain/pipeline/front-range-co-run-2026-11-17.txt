@@ -1,0 +1,172 @@
+.venv/bin/python scripts/build_data.py --region front-range-co 
+
+=== padus: manage.py ingest padus front-range-co
+Ingesting padus for Colorado Front Range (Indian Peaks) (front-range-co)...
+Success: 30 record(s) from padus for front-range-co (run #1)
+=== padus: 4.8 s
+
+=== nhd-flowlines: manage.py ingest nhd-flowlines front-range-co
+Ingesting nhd-flowlines for Colorado Front Range (Indian Peaks) (front-range-co)...
+Success: 903 record(s) from nhd for front-range-co (run #2)
+=== nhd-flowlines: 4.3 s
+
+=== nhd-waterbodies: manage.py ingest nhd-waterbodies front-range-co
+Ingesting nhd-waterbodies for Colorado Front Range (Indian Peaks) (front-range-co)...
+Success: 167 record(s) from nhd for front-range-co (run #3)
+=== nhd-waterbodies: 2.2 s
+
+=== osm-trails: manage.py ingest osm-trails front-range-co
+Ingesting osm-trails for Colorado Front Range (Indian Peaks) (front-range-co)...
+Success: 188 record(s) from osm for front-range-co (run #4)
+=== osm-trails: 36.1 s
+
+=== osm-campsites: manage.py ingest osm-campsites front-range-co
+Ingesting osm-campsites for Colorado Front Range (Indian Peaks) (front-range-co)...
+Success: 2 record(s) from osm for front-range-co (run #5)
+=== osm-campsites: 45.8 s
+
+=== osm-landmarks: manage.py ingest osm-landmarks front-range-co
+Ingesting osm-landmarks for Colorado Front Range (Indian Peaks) (front-range-co)...
+Success: 29 record(s) from osm for front-range-co (run #6)
+=== osm-landmarks: 40.0 s
+
+=== ridb: SKIP (RIDB_API_KEY not set; optional)
+
+=== osm-routes: manage.py ingest osm-routes front-range-co
+Ingesting osm-routes for Colorado Front Range (Indian Peaks) (front-range-co)...
+Success: 0 record(s) from osm for front-range-co (run #7)
+=== osm-routes: 30.6 s
+
+=== osm-connectors: manage.py ingest osm-connectors front-range-co
+Ingesting osm-connectors for Colorado Front Range (Indian Peaks) (front-range-co)...
+Success: 67 record(s) from osm for front-range-co (run #8)
+=== osm-connectors: 39.1 s
+
+=== trail-graph: manage.py build_trail_graph front-range-co
+front-range-co: elevation from 3dep-getsamples
+front-range-co: 254 ways (0 skipped), 440 edges ({TrailEdge.Kind.TRACK: 64, TrailEdge.Kind.TRAIL: 247, TrailEdge.Kind.ROAD: 117, TrailEdge.Kind.BRIDGE: 12}; 7 far road edges dropped), 380 nodes, 12 bridged gaps, 0 crossings joined
+front-range-co: 4848 new elevation samples in 32.3 s (0 edges reused the last build's)
+front-range-co: 440 edges, 380 nodes from 254 ways (0 skipped); 4848 elevation samples (0 no data) from 3dep-getsamples; 33.2 s (cut 0.6 s, elevation 32.3 s)
+=== trail-graph: 34.9 s
+
+=== route-profiles: manage.py build_route_profiles front-range-co
+front-range-co: 0 named routes in 0.0 s (0 computed, 0 already cached, 0 failed)
+=== route-profiles: 1.9 s
+
+=== enrich: manage.py enrich_campsites front-range-co
+front-range-co: 1 campsites in 7.4 s (terrain 7.2 s)
+  public land unit   1 (100.0%)
+  named water        1 (100.0%)
+  named trail        1 (100.0%)  (route 0, way 1)
+  elevation + slope  1 (100.0%)
+  any OSM tag        0 (0.0%)
+  shelter kind       0 (0.0%)
+  display name       1 (100.0%)  (derived for 0 of 0 unnamed)
+=== enrich: 8.6 s
+
+=== access: manage.py compute_access front-range-co
+front-range-co: 1 campsites, 0 of 0 trailheads on the graph
+  Easy access      0
+  Moderate access  0
+  Hard access      0
+  Access unknown   1
+=== access: 1.5 s
+
+=== route-facts: manage.py enrich_routes front-range-co
+front-range-co: 0 routes in 0.1 s (0 with gain and difficulty, 0 without a profile yet)
+=== route-facts: 1.2 s
+
+=== terrain: manage.py terrain front-range-co
+Preparing the runtime and DEM
+  n41w106: downloading 391 MB
+  building front-range-co-45m-3e9d5c00a4c3.tif
+  building front-range-co-30m-3e9d5c00a4c3.tif
+  building front-range-co-90m-3e9d5c00a4c3.tif
+12 tasks for 12 tools on 3 workers (0 already done)
+  [1/12] wetness 0-0: 0.4 s, 13 MB
+  [2/12] sink 0-0: 0.8 s, 120 MB
+  [3/12] position 0-0: 0.2 s, 16 MB
+  [4/12] shelter 0-0: 0.2 s, 16 MB
+  [5/12] damp 0-0: 0.3 s, 13 MB
+  [6/12] slope 0-0: 1.7 s, 82 MB
+  [7/12] wind 0-0: 0.1 s, 11 MB
+  [8/12] aspect 0-0: 1.6 s, 82 MB
+  [9/12] cold_air 0-0: 0.8 s, 16 MB
+  [10/12] viewshed s0: 0.5 s, 19 MB
+  [11/12] sun_morning 0-0: 0.8 s, 9 MB
+  [12/12] sun 0-0: 1.6 s, 9 MB
+
+front-range-co: 1 campsites, 284.2 s total (prepare 278.2 s, zones 1.5 s, classify 0.1 s), peak RSS 304.1 MB
+  wetness         0.4 s over 1 tasks (0 reused), peak WASM 13 MB
+  sink            0.8 s over 1 tasks (0 reused), peak WASM 120 MB
+  slope           1.7 s over 1 tasks (0 reused), peak WASM 82 MB
+  aspect          1.6 s over 1 tasks (0 reused), peak WASM 82 MB
+  position        0.2 s over 1 tasks (0 reused), peak WASM 16 MB
+  shelter         0.2 s over 1 tasks (0 reused), peak WASM 16 MB
+  damp            0.3 s over 1 tasks (0 reused), peak WASM 13 MB
+  cold_air        0.8 s over 1 tasks (0 reused), peak WASM 16 MB
+  wind            0.1 s over 1 tasks (0 reused), peak WASM 11 MB
+  sun             1.6 s over 1 tasks (0 reused), peak WASM 9 MB
+  sun_morning      0.8 s over 1 tasks (0 reused), peak WASM 9 MB
+  viewshed        0.5 s over 1 tasks (0 reused), peak WASM 19 MB
+  twi            1 (100.0%)
+  sink_depth_m   1 (100.0%)
+  slope_deg      1 (100.0%)
+  aspect_deg     1 (100.0%)
+  dev            1 (100.0%)
+  elev_percentile 1 (100.0%)
+  wind_fetch_m   1 (100.0%)
+  sun_share      1 (100.0%)
+  morning_sun_share 1 (100.0%)
+  pooling        1 (100.0%)
+  facing         1 (100.0%)
+  shelter        1 (100.0%)
+  cold_air       1 (100.0%)
+  wind           1 (100.0%)
+  sun_hours      1 (100.0%)
+  morning_sun    1 (100.0%)
+  viewshed       1 (100.0%)
+  water_view     0 (0.0%)
+  zones pooling-risk: {'high': 43}
+  zones exposure: {'high': 60}
+  zones sheltered: {'sheltered': 73}
+  zones damp-ground: {'medium': 89}
+  zones cold-air: {'high': 50, 'medium': 97}
+  zones wind-exposure: {'exposed': 63, 'moderate': 94}
+=== terrain: 285.8 s
+
+step              result           seconds
+padus             ok                   4.8
+nhd-flowlines     ok                   4.3
+nhd-waterbodies   ok                   2.2
+osm-trails        ok                  36.1
+osm-campsites     ok                  45.8
+osm-landmarks     ok                  40.0
+ridb              skipped              0.0
+osm-routes        ok                  30.6
+osm-connectors    ok                  39.1
+trail-graph       ok                  34.9
+route-profiles    ok                   1.9
+enrich            ok                   8.6
+access            ok                   1.5
+route-facts       ok                   1.2
+terrain           ok                 285.8
+total                                536.9
+      536.92 real        26.60 user         5.33 sys
+           318881792  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+              557221  page reclaims
+                9695  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                 724  messages sent
+              113390  messages received
+                   3  signals received
+               23170  voluntary context switches
+               48006  involuntary context switches
+            57767846  instructions retired
+            23640469  cycles elapsed
+             1261760  peak memory footprint
