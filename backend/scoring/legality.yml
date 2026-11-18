@@ -153,3 +153,73 @@ regions:
         text: "FPA regulations on parts of trails and rivers: the Appalachian Trail corridor from the summit of Mt. Moosilauke to the Connecticut River; the East Branch of the Pemigewasset River; the Great Gulf Trail, Valley Way, Wild River Trail and Champney Falls Trail between named points; Virginia Lake's southern shoreline; Zeta Pass."
         source: wmnf_backcountry
         why: The rule covers part of a trail or river between named points, which the data cannot locate.
+
+  front-range-co:
+    label: Indian Peaks and Brainard Lake, Colorado
+    authority: {name: "USDA Forest Service, Arapaho and Roosevelt National Forests (Boulder Ranger District)", short: ARNF}
+    # TM05-173, the Western USA pilot. The region's ingestion box (backend/pipeline/regions.yml).
+    # Only rules quoted from the two Forest Service pages below are here. Everything else
+    # stays Unknown: no rule here can make an undesignated site Permitted.
+    area: {bbox: [-105.70, 40.02, -105.52, 40.12]}
+    sources:
+      indian_peaks:
+        title: Indian Peaks Wilderness (USDA Forest Service, Arapaho and Roosevelt National Forests)
+        url: https://www.fs.usda.gov/r02/arp/recreation/indian-peaks-wilderness
+        fetched: 2026-11-17
+      brainard_lake:
+        title: Brainard Lake Recreation Area (USDA Forest Service, Arapaho and Roosevelt National Forests)
+        url: https://www.fs.usda.gov/r02/arp/recreation/brainard-lake-recreation-area
+        fetched: 2026-11-17
+    # No operator list: neither page names an operator whose OpenStreetMap tag would show a
+    # designated site, so only the universal evidence (Recreation.gov, lean-to, "designated")
+    # counts here.
+    rules:
+      # The setback is quoted from the Wilderness page, so it applies only on land PAD-US
+      # names as the Indian Peaks Wilderness.
+      - id: ipw_100ft_trails
+        kind: setback
+        from: trail
+        distance: {value: 100, unit: ft}
+        where: {land_name_contains: [indian peaks wilderness]}
+        text: "Campsites must be located at least 100' away from all lakes, streams & trails."
+        source: indian_peaks
+      - id: ipw_100ft_water
+        kind: setback
+        from: water
+        distance: {value: 100, unit: ft}
+        where: {land_name_contains: [indian peaks wilderness]}
+        text: "Campsites must be located at least 100' away from all lakes, streams & trails."
+        source: indian_peaks
+      - id: ipw_designated_zones
+        kind: undesignated
+        text: "These backcountry zones allow camping only in designated sites: Caribou Lake, Crater Lake, Diamond Lake & Jasper Lake."
+        source: indian_peaks
+        reason: >-
+          Not a designated site we can confirm. In the Indian Peaks Wilderness some
+          backcountry zones allow camping only at designated sites, the Four Lakes zone is
+          closed to camping from May 1 to November 30, and an overnight permit is required
+          from June 1 to September 15. Around Brainard Lake, dispersed camping is limited by
+          season. None of that can be checked here.
+    # Cited rules the data cannot check: they never make a verdict Permitted or Not
+    # permitted, and docs/scoring.md lists them so the gap is visible.
+    unchecked:
+      - id: ipw_permit
+        text: "Overnight permits are required from June 1 - Sept. 15 for all groups camping in Indian Peaks Wilderness Area."
+        source: indian_peaks
+        why: A permit is a seasonal requirement on the camper, not a property of the site.
+      - id: ipw_four_lakes_closed
+        text: "Camping prohibited in the Four Lakes Backcountry Zone May 1-Nov 30."
+        source: indian_peaks
+        why: The backcountry zone is not a parcel in PAD-US, and the closure is seasonal.
+      - id: ipw_designated_only_zones
+        text: "These backcountry zones allow camping only in designated sites: Caribou Lake, Crater Lake, Diamond Lake & Jasper Lake."
+        source: indian_peaks
+        why: The zones are not parcels in PAD-US, and the designated-site lists are in zone-map PDFs that were not read.
+      - id: brainard_summer
+        text: "May 1 - Nov 14: … when open, developed camping is only allowed at Pawnee Campground (no camping in closed campgrounds); dispersed camping is only allowed north of the South St Vrain Creek."
+        source: brainard_lake
+        why: The rule is seasonal, and "north of the South St Vrain Creek" is not a boundary in the data.
+      - id: brainard_winter
+        text: "Nov 15 - Apr 30: … camping is prohibited within 1/4 mile of developed recreation sites except Red Rock Lake; …"
+        source: brainard_lake
+        why: The rule is seasonal, and the data have no layer of developed recreation sites.
